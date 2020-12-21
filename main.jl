@@ -25,18 +25,21 @@ lqr_problem = let
     model
 end
 
+x̂ = JuMP.value.(JuMP.value.(lqr_problem[:x]))
+
 #====================== Inverse LQR as nested constrained optimization problem =====================#
+
 inverse_lqr_problem = let
     model = JuMP.Model(Ipopt.Optimizer)
-    @variable(model, q̃ >= 1e-3)
-    @variable(model, r̃ >= 1e-3)
+    @variable(model, q̃ >= 0)
+    @variable(model, r̃ == 1) #TODO
     @variable(model, x̃0[1:n_states])       # initial condition
     @variable(model, x̃[1:n_states, 1:T])   # state trajectory
     @variable(model, ũ[1:n_controls, 1:T]) # input trajectory
     @constraint(model, initial_condition, x̃[:, 1] .== x̃0)
     @constraint(model, dynamics[t = 1:(T - 1)], x̃[:, t + 1] .== A * x̃[:, t] + B * ũ[:, t])
 
-    # Optimality conditions (KKT) of forward LQR show up as a constraint
+    # Optimality conditions (KKT) of forward LQR show up as a constraints
     @variable(model, λ̃[1:n_states, 1:T]) # multipliers of the forward LQR condition
     @constraint(
         model,
@@ -45,13 +48,10 @@ inverse_lqr_problem = let
     )
     @constraint(model, lqr_lagrangian_grad_u[t = 1:T], 2r̃ * R * ũ[:, t] - (λ̃[:, t]' * B)' .== 0)
 
-    # TODO: maybe add regularization
     @objective(model, Min, sum(sum((x̂[:, t] - x̃[:, t]) .^ 2) for t in 1:T) + q̃' * q̃ + r̃' * r̃)
     model
 end
 
-@test let
-    JuMP.optimize!(inverse_lqr_problem)
-    JuMP.value(inverse_lqr_problem[:q̃]) ≈ 1
-    JuMP.value(inverse_lqr_problem[:r̃]) ≈ 1
-end
+JuMP.optimize!(inverse_lqr_problem)
+@test JuMP.value(inverse_lqr_problem[:q̃]) ≈ 1
+@test JuMP.value(inverse_lqr_problem[:r̃]) ≈ 1
