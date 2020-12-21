@@ -29,10 +29,13 @@ x̂ = JuMP.value.(JuMP.value.(lqr_problem[:x]))
 
 #====================== Inverse LQR as nested constrained optimization problem =====================#
 
+Q̃ = 0.001I
+R̃ = R
+
 inverse_lqr_problem = let
     model = JuMP.Model(Ipopt.Optimizer)
-    @variable(model, q̃ >= 0)
-    @variable(model, r̃ == 1) #TODO
+    @variable(model, q̃)
+    @variable(model, r̃ == 1)               # TODO: fixed for now
     @variable(model, x̃0[1:n_states])       # initial condition
     @variable(model, x̃[1:n_states, 1:T])   # state trajectory
     @variable(model, ũ[1:n_controls, 1:T]) # input trajectory
@@ -44,14 +47,14 @@ inverse_lqr_problem = let
     @constraint(
         model,
         lqr_lagrangian_grad_x[t = 1:(T - 1)],
-        2q̃ * Q * x̃[:, t + 1] + λ̃[:, t] - (λ̃[:, t + 1]' * A)' .== 0
+        2q̃ * Q̃ * x̃[:, t + 1] + λ̃[:, t] - (λ̃[:, t + 1]' * A)' .== 0
     )
-    @constraint(model, lqr_lagrangian_grad_u[t = 1:T], 2r̃ * R * ũ[:, t] - (λ̃[:, t]' * B)' .== 0)
+    @constraint(model, lqr_lagrangian_grad_u[t = 1:T], 2r̃ * R̃ * ũ[:, t] - (λ̃[:, t]' * B)' .== 0)
 
-    @objective(model, Min, sum(sum((x̂[:, t] - x̃[:, t]) .^ 2) for t in 1:T) + q̃' * q̃ + r̃' * r̃)
+    # TODO: figure out why regularization breaks things here??? Did I forget any constraints?
+    @objective(model, Min, sum(sum((x̂[:, t] - x̃[:, t]) .^ 2) for t in 1:T)) # + (q̃^2 + r̃^2))
     model
 end
 
 JuMP.optimize!(inverse_lqr_problem)
-@test JuMP.value(inverse_lqr_problem[:q̃]) ≈ 1
-@test JuMP.value(inverse_lqr_problem[:r̃]) ≈ 1
+@test JuMP.value(inverse_lqr_problem[:q̃]) * Q̃ ≈ Q
