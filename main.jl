@@ -3,6 +3,7 @@
 
 #============================================ Preamble =============================================#
 
+import Zygote
 import JuMP: JuMP, @constraint, @objective, @variable
 import Ipopt
 using LinearAlgebra: I
@@ -22,11 +23,8 @@ x0 = [10.0, 10.0]
 
 #============================================== Utils ==============================================#
 
-function add_dynamics!(model, A, B)
-    @variable(model, x[1:n_states, 1:T])
-    @variable(model, u[1:n_controls, 1:T])
-    @constraint(model, dynamics[t = 1:(T - 1)], x[:, t + 1] .== A * x[:, t] + B * u[:, t])
-    x, u, dynamics
+function dynamics_constraints(x, u; A, B, T)
+    reduce(hcat, ((x[:, t + 1] - A * x[:, t] - B * u[:, t]) for t in 1:(T - 1)))
 end
 
 get_model_values(model, symbols...) = (; map(sym -> sym => JuMP.value.(model[sym]), symbols)...)
@@ -39,28 +37,31 @@ function forward_objective(x, u; Q, R)
 end
 
 "Solves a forward LQR problem using JuMP."
-function solve_lqr(A, B, Q, R, x0)
+function solve_lqr(A, B, Q, R, x0; T)
+    n_states, n_controls = size(B)
     model = JuMP.Model(Ipopt.Optimizer)
-    x, u, _ = add_dynamics!(model, A, B)
+    @variable(model, x[1:n_states, 1:T])
+    @variable(model, u[1:n_controls, 1:T])
+    @constraint(model, dynamics, dynamics_constraints(x, u; A, B, T) .== 0)
     @constraint(model, initial_condition, x[:, 1] .== x0)
     @objective(model, Min, forward_objective(x, u; Q, R))
     JuMP.optimize!(model)
     get_model_values(model, :x, :u), model
 end
 
-lqr_solution, _ = solve_lqr(A, B, Q, R, x0)
+lqr_solution, _ = solve_lqr(A, B, Q, R, x0; T)
 
 #=========================================== Inverse LQR ===========================================#
 
 "The performance index for the inverse optimal control problem."
-function inverse_objective(x, q, r; x̂)
+function inverse_objective(x, q, r; x̂, T)
     sum(sum((x̂[:, t] - x[:, t]) .^ 2) for t in 1:T)
 end
 
 "The lagrangian of the forward LQR problem."
-function lqr_lagrangian(x, u, λ; Q, R, A, B)
-    forward_objective(x, u; Q, R) +
-    sum(λ[:, t]' * (x[:, t + 1] - A * x[:, t] - B * u[:, t]) for t in 1:(T - 1))
+function lqr_lagrangian(x, u, λ; Q, R, A, B, T)
+    c_dyn = dynamics_constraints(x, u; A, B, T)
+    @views forward_objective(x, u; Q, R) + sum(λ[:, t]' * c_dyn[:, t] for t in 1:(T - 1))
 end
 
 "The hand-written gradient of the forward LQR problem in x."
@@ -84,50 +85,76 @@ Solves aninverse LQR problem using JuMP.
 `Q̃` and `R̃` are iterables of quadatic state and control cost matrices for which the weight
 vectors`q` and `r` are to be estimated.
 """
-function solve_inverse_lqr(x̂, A, B, Q̃, R̃)
+function solve_inverse_lqr(x̂, Q̃, R̃; A, B, T, r_sqr_min = 1e-5)
+    n_states, n_controls = size(B)
     model = JuMP.Model(Ipopt.Optimizer)
+
+    # decision variable
     @variable(model, q[1:length(Q̃)] >= 0)
     @variable(model, r[1:length(R̃)] >= 0)
-    @constraint(model, r' * r >= 1e-5)
-    @constraint(model, r' * r + q' * q == 1)
-    x, u, _ = add_dynamics!(model, A, B)
-    @constraint(model, initial_condition, x[:, 1] .== x̂[:, 1])
+    @variable(model, x[1:n_states, 1:T])
+    @variable(model, u[1:n_controls, 1:T])
+    @variable(model, λ[1:n_states, 1:T]) # multipliers of the forward LQR condition
 
+    # initial condition
+    @constraint(model, initial_condition, x[:, 1] .== x̂[:, 1])
+    # dynamics
+    @constraint(model, dynamics_constraints(x, u; A, B, T) .== 0)
+    # Optimality conditions (KKT) of forward LQR show up as a constraints
     Q = sum(q .* Q̃)
     R = sum(r .* R̃)
+    @constraint(model, ∇ₓL, lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B, T)[:, 2:end] .== 0)
+    @constraint(model, ∇ᵤL, lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B, T) .== 0)
+    # regularization
+    @constraint(model, r' * r >= r_sqr_min)
+    @constraint(model, r' * r + q' * q == 1)
 
-    # Optimality conditions (KKT) of forward LQR show up as a constraints
-    @variable(model, λ[1:n_states, 1:T]) # multipliers of the forward LQR condition
-    @constraint(
-        model,
-        lqr_lagrangian_dx,
-        lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B, T)[:, 2:end] .== 0
-    )
-    @constraint(model, lqr_lagrangian_du, lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B, T) .== 0)
-
-    # TODO: figure out why regularization breaks things here??? Did I forget any constraints?
-    @objective(model, Min, inverse_objective(x, q, r; x̂))
+    @objective(model, Min, inverse_objective(x, q, r; x̂, T))
     JuMP.optimize!(model)
     get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
 end
 #====================== Inverse LQR as nested constrained optimization problem =====================#
 
-Q̃ = [
-    [
-        1//3 0
-        0 0
-    ],
-    [
-        0 0
-        0 2//3
-    ],
-]
-R̃ = [R]
-ilqr_solution, ilqr_model, Q_est, R_est = solve_inverse_lqr(lqr_solution.x, A, B, Q̃, R̃)
-
 @testset "Inverse LQR" begin
-    @test Q_est[1, 1] / Q_est[2, 2] ≈ Q[1, 1] / Q[2, 2]
-    @test Q_est[1, 1] / R_est[1, 1] ≈ Q[1, 1] / R[1, 1]
-    @test Q_est[2, 2] / R_est[1, 1] ≈ Q[2, 2] / R[1, 1]
-    @test ilqr_solution.x ≈ first(solve_lqr(A, B, Q_est, R_est, x0)).x
+    Q̃ = [
+        [
+            1//3 0
+            0 0
+        ],
+        [
+            0 0
+            0 2//3
+        ],
+    ]
+    R̃ = [R]
+    ilqr_solution, ilqr_model, Q_est, R_est = solve_inverse_lqr(lqr_solution.x, Q̃, R̃; A, B, T)
+    ∇ₓL_sol = JuMP.value.(ilqr_model[:∇ₓL])
+    ∇ᵤL_sol = JuMP.value.(ilqr_model[:∇ᵤL])
+
+    @testset "Gradient Check" begin
+        grad_args = (ilqr_solution.x, ilqr_solution.u, ilqr_solution.λ)
+        grad_kwargs = (; Q = Q_est, R = R_est, A, B, T)
+
+        ∇ₓL_ad, ∇ᵤL_ad = Zygote.gradient(
+            (x, u) -> lqr_lagrangian(x, u, ilqr_solution.λ; grad_kwargs...),
+            ilqr_solution.x,
+            ilqr_solution.u,
+        )
+        ∇ₓL_manual = lqr_lagrangian_grad_x(grad_args...; grad_kwargs...)
+        ∇ᵤL_manual = lqr_lagrangian_grad_u(grad_args...; grad_kwargs...)
+        atol = 1e-10
+
+        @test isapprox(∇ₓL_ad, ∇ₓL_manual; atol = atol)
+        @test isapprox(∇ₓL_ad[:, 2:end], ∇ₓL_sol; atol = atol)
+        @test isapprox(∇ᵤL_ad, ∇ᵤL_manual; atol = atol)
+        @test isapprox(∇ᵤL_ad, ∇ᵤL_sol; atol = atol)
+    end
+
+    @testset "Solution Sanity" begin
+        @test JuMP.termination_status(ilqr_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
+        @test Q_est[1, 1] / Q_est[2, 2] ≈ Q[1, 1] / Q[2, 2]
+        @test Q_est[1, 1] / R_est[1, 1] ≈ Q[1, 1] / R[1, 1]
+        @test Q_est[2, 2] / R_est[1, 1] ≈ Q[2, 2] / R[1, 1]
+        @test ilqr_solution.x ≈ first(solve_lqr(A, B, Q_est, R_est, x0; T)).x
+    end
 end
