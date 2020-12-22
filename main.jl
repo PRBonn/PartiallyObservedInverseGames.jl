@@ -1,4 +1,3 @@
-# TODO: Make time-varying
 # TODO: Implement a simple converter for ControlSystems.jl
 
 #============================================ Preamble =============================================#
@@ -10,13 +9,11 @@ using LinearAlgebra: I
 using Test: @test, @testset
 
 T = 100
-n_states = 2
-n_controls = 1
-A = [
+A = repeat([[
     1 1
     0 1
-]
-B = [0, 1][:, :]
+]], T)
+B = repeat([[0, 1][:, :]], T)
 Q = I
 R = 100I
 x0 = [10.0, 10.0]
@@ -24,7 +21,7 @@ x0 = [10.0, 10.0]
 #============================================== Utils ==============================================#
 
 function dynamics_constraints(x, u; A, B, T)
-    reduce(hcat, ((x[:, t + 1] - A * x[:, t] - B * u[:, t]) for t in 1:(T - 1)))
+    reduce(hcat, ((x[:, t + 1] - A[t] * x[:, t] - B[t] * u[:, t]) for t in 1:(T - 1)))
 end
 
 get_model_values(model, symbols...) = (; map(sym -> sym => JuMP.value.(model[sym]), symbols)...)
@@ -38,7 +35,7 @@ end
 
 "Solves a forward LQR problem using JuMP."
 function solve_lqr(A, B, Q, R, x0; T)
-    n_states, n_controls = size(B)
+    n_states, n_controls = size(only(unique(B)))
     model = JuMP.Model(Ipopt.Optimizer)
     @variable(model, x[1:n_states, 1:T])
     @variable(model, u[1:n_controls, 1:T])
@@ -67,14 +64,17 @@ end
 "The hand-written gradient of the forward LQR problem in x."
 function lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B, T)
     hcat(
-        2 * Q * x[:, 1] - A' * λ[:, 1], # special handling of first time step
-        reduce(hcat, (2 * Q * x[:, t + 1] + λ[:, t] - (λ[:, t + 1]' * A)' for t in 1:(T - 1))),
+        2 * Q * x[:, 1] - A[1]' * λ[:, 1], # special handling of first time step
+        reduce(
+            hcat,
+            (2 * Q * x[:, t + 1] + λ[:, t] - (λ[:, t + 1]' * A[t + 1])' for t in 1:(T - 1)),
+        ),
     )
 end
 
 "The hand-written gradient of the forward LQR problem in u."
 function lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B, T)
-    reduce(hcat, (2 * R * u[:, t] - (λ[:, t]' * B)' for t in 1:T))
+    reduce(hcat, (2 * R * u[:, t] - (λ[:, t]' * B[t])' for t in 1:T))
 end
 
 """
@@ -86,7 +86,7 @@ Solves aninverse LQR problem using JuMP.
 vectors`q` and `r` are to be estimated.
 """
 function solve_inverse_lqr(x̂, Q̃, R̃; A, B, T, r_sqr_min = 1e-5)
-    n_states, n_controls = size(B)
+    n_states, n_controls = size(only(unique(B)))
     model = JuMP.Model(Ipopt.Optimizer)
 
     # decision variable
@@ -113,6 +113,7 @@ function solve_inverse_lqr(x̂, Q̃, R̃; A, B, T, r_sqr_min = 1e-5)
     JuMP.optimize!(model)
     get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
 end
+
 #====================== Inverse LQR as nested constrained optimization problem =====================#
 
 @testset "Inverse LQR" begin
