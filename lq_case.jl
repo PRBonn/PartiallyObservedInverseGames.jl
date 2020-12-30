@@ -8,6 +8,8 @@ using JuMP: JuMP, @constraint, @objective, @variable
 using LinearAlgebra: I
 using Test: @test, @testset
 
+include("utils.jl")
+
 T = 100
 A = repeat([[
     1 1
@@ -23,8 +25,6 @@ x0 = [10.0, 10.0]
 function dynamics_constraints(x, u; A, B, T)
     reduce(hcat, ((x[:, t + 1] - A[t] * x[:, t] - B[t] * u[:, t]) for t in 1:(T - 1)))
 end
-
-get_model_values(model, symbols...) = (; map(sym -> sym => JuMP.value.(model[sym]), symbols)...)
 
 #=========================================== Forward LQR ===========================================#
 
