@@ -34,7 +34,7 @@ function forward_objective(x, u; Q, R)
 end
 
 "Solves a forward LQR problem using JuMP."
-function solve_lqr(A, B, Q, R, x0; T)
+function solve_lqr(A, B, Q, R, x0, T)
     n_states, n_controls = size(only(unique(B)))
     model = JuMP.Model(Ipopt.Optimizer)
     @variable(model, x[1:n_states, 1:T])
@@ -46,7 +46,7 @@ function solve_lqr(A, B, Q, R, x0; T)
     get_model_values(model, :x, :u), model
 end
 
-lqr_solution, _ = solve_lqr(A, B, Q, R, x0; T)
+lqr_solution, _ = solve_lqr(A, B, Q, R, x0, T)
 
 #=========================================== Inverse LQR ===========================================#
 
@@ -85,7 +85,8 @@ Solves aninverse LQR problem using JuMP.
 `Q̃` and `R̃` are iterables of quadatic state and control cost matrices for which the weight
 vectors`q` and `r` are to be estimated.
 """
-function solve_inverse_lqr(x̂, Q̃, R̃; A, B, T, r_sqr_min = 1e-5)
+function solve_inverse_lqr(x̂, Q̃, R̃; A, B, r_sqr_min = 1e-5)
+    T = size(x̂)[2]
     n_states, n_controls = size(only(unique(B)))
     model = JuMP.Model(Ipopt.Optimizer)
 
@@ -128,7 +129,7 @@ end
         ],
     ]
     R̃ = [R]
-    ilqr_solution, ilqr_model, Q_est, R_est = solve_inverse_lqr(lqr_solution.x, Q̃, R̃; A, B, T)
+    ilqr_solution, ilqr_model, Q_est, R_est = solve_inverse_lqr(lqr_solution.x, Q̃, R̃; A, B)
     ∇ₓL_sol = JuMP.value.(ilqr_model[:∇ₓL])
     ∇ᵤL_sol = JuMP.value.(ilqr_model[:∇ᵤL])
 
@@ -156,6 +157,6 @@ end
         @test Q_est[1, 1] / Q_est[2, 2] ≈ Q[1, 1] / Q[2, 2]
         @test Q_est[1, 1] / R_est[1, 1] ≈ Q[1, 1] / R[1, 1]
         @test Q_est[2, 2] / R_est[1, 1] ≈ Q[2, 2] / R[1, 1]
-        @test ilqr_solution.x ≈ first(solve_lqr(A, B, Q_est, R_est, x0; T)).x
+        @test ilqr_solution.x ≈ first(solve_lqr(A, B, Q_est, R_est, x0, T)).x
     end
 end
