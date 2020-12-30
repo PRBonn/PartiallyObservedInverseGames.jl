@@ -3,8 +3,8 @@
 #============================================ Preamble =============================================#
 
 import Zygote
-import JuMP: JuMP, @constraint, @objective, @variable
 import Ipopt
+using JuMP: JuMP, @constraint, @objective, @variable
 using LinearAlgebra: I
 using Test: @test, @testset
 
