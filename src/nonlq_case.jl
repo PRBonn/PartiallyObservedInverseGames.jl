@@ -47,11 +47,6 @@ end
 
 #====================================== forward optimal control ====================================#
 
-"The performance index for the forward optimal control problem."
-function forward_objective(x, u; Q, R, T)
-    sum(x[:, t]' * Q * x[:, t] + u[:, t]' * R * u[:, t] for t in 1:T)
-end
-
 # TODO: think about handling of initial guees
 "Solves a forward LQR problem using JuMP."
 function solve_optimal_control(control_system, Q, R, x0, T)
@@ -60,7 +55,7 @@ function solve_optimal_control(control_system, Q, R, x0, T)
     @variable(model, u[1:(control_system.n_controls), 1:T])
     control_system.dynamics_constraints!(model, x, u, T)
     @constraint(model, initial_condition, x[:, 1] .== x0)
-    @objective(model, Min, forward_objective(x, u; Q, R, T))
+    @objective(model, Min, forward_objective(x, u; Q, R))
     JuMP.optimize!(model)
     get_model_values(model, :x, :u), model
 end
@@ -82,11 +77,6 @@ end
 # The basis function for the cost model.
 
 #===================================== Inverse Optimal Control =====================================#
-
-"The performance index for the inverse optimal control problem."
-function inverse_objective(x, q, r; x̂, T)
-    sum(sum((x̂[:, t] - x[:, t]) .^ 2) for t in 1:T)
-end
 
 Q̃ = [
     [
@@ -134,7 +124,7 @@ function solve_inverse_optimal_control(x̂, Q̃, R̃; control_system, r_sqr_min 
     @constraint(model, r' * r >= r_sqr_min)
     @constraint(model, r' * r + q' * q == 1)
 
-    @objective(model, Min, inverse_objective(x, q, r; x̂, T))
+    @objective(model, Min, inverse_objective(x; x̂))
     JuMP.optimize!(model)
     get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
 end

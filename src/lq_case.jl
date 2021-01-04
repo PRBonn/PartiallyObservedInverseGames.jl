@@ -28,11 +28,6 @@ end
 
 #=========================================== Forward LQR ===========================================#
 
-"The performance index for the forward optimal control problem."
-function forward_objective(x, u; Q, R)
-    sum(x[:, t]' * Q * x[:, t] + u[:, t]' * R * u[:, t] for t in 1:T)
-end
-
 "Solves a forward LQR problem using JuMP."
 function solve_lqr(A, B, Q, R, x0, T)
     n_states, n_controls = size(only(unique(B)))
@@ -49,11 +44,6 @@ end
 lqr_solution, _ = solve_lqr(A, B, Q, R, x0, T)
 
 #=========================================== Inverse LQR ===========================================#
-
-"The performance index for the inverse optimal control problem."
-function inverse_objective(x, q, r; x̂, T)
-    sum(sum((x̂[:, t] - x[:, t]) .^ 2) for t in 1:T)
-end
 
 "The lagrangian of the forward LQR problem."
 function lqr_lagrangian(x, u, λ; Q, R, A, B, T)
@@ -110,7 +100,7 @@ function solve_inverse_lqr(x̂, Q̃, R̃; A, B, r_sqr_min = 1e-5)
     @constraint(model, r' * r >= r_sqr_min)
     @constraint(model, r' * r + q' * q == 1)
 
-    @objective(model, Min, inverse_objective(x, q, r; x̂, T))
+    @objective(model, Min, inverse_objective(x; x̂))
     JuMP.optimize!(model)
     get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
 end
