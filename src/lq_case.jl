@@ -59,7 +59,7 @@ function lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B)
         reduce(
             hcat,
             (
-                2 * Q * x[:, t + 1] + λ[:, t] - (λ[:, t + 1]' * A[t + 1])'
+                2 * Q * x[:, t + 1] + λ[:, t] - A[t + 1]' * λ[:, t + 1]
                 for t in axes(x)[2][1:(end - 1)]
             ),
         ),
@@ -68,7 +68,7 @@ end
 
 "The hand-written gradient of the forward LQR problem in u."
 function lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B)
-    reduce(hcat, (2 * R * u[:, t] - (λ[:, t]' * B[t])' for t in axes(x)[2]))
+    reduce(hcat, (2 * R * u[:, t] - B[t]' *  λ[:, t] for t in axes(x)[2]))
 end
 
 """
