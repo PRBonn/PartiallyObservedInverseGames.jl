@@ -29,19 +29,34 @@ end
 #=========================================== Forward LQR ===========================================#
 
 "Solves a forward LQR problem using JuMP."
-function solve_lqr(A, B, Q, R, x0, T)
+function solve_lqr(
+    A,
+    B,
+    Q,
+    R,
+    x0,
+    T;
+    solver = Ipopt.Optimizer,
+    silent = true,
+    solver_attributes = (;)
+)
     n_states, n_controls = size(only(unique(B)))
-    model = JuMP.Model(Ipopt.Optimizer)
+    model = JuMP.Model(solver)
+    set_solver_attributes!(model; silent, solver_attributes...)
+
     @variable(model, x[1:n_states, 1:T])
     @variable(model, u[1:n_controls, 1:T])
     @constraint(model, dynamics, dynamics_constraints(x, u; A, B) .== 0)
     @constraint(model, initial_condition, x[:, 1] .== x0)
     @objective(model, Min, forward_objective(x, u; Q, R))
-    JuMP.optimize!(model)
+    @time JuMP.optimize!(model)
     get_model_values(model, :x, :u), model
 end
 
-lqr_solution, _ = solve_lqr(A, B, Q, R, x0, T)
+forward_solution, forward_model = solve_lqr(A, B, Q, R, x0, T)
+@testset "Forward LQR" begin
+    @test JuMP.termination_status(forward_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
+end
 
 #=========================================== Inverse LQR ===========================================#
 
@@ -68,7 +83,7 @@ end
 
 "The hand-written gradient of the forward LQR problem in u."
 function lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B)
-    reduce(hcat, (2 * R * u[:, t] - B[t]' *  λ[:, t] for t in axes(x)[2]))
+    reduce(hcat, (2 * R * u[:, t] - B[t]' * λ[:, t] for t in axes(x)[2]))
 end
 
 """
@@ -79,10 +94,21 @@ Solves aninverse LQR problem using JuMP.
 `Q̃` and `R̃` are iterables of quadatic state and control cost matrices for which the weight
 vectors`q` and `r` are to be estimated.
 """
-function solve_inverse_lqr(x̂, Q̃, R̃; A, B, r_sqr_min = 1e-5)
+function solve_inverse_lqr(
+    x̂,
+    Q̃,
+    R̃;
+    A,
+    B,
+    r_sqr_min = 1e-5,
+    solver = Ipopt.Optimizer,
+    solver_attributes = (;),
+    silent = true,
+)
     T = size(x̂)[2]
     n_states, n_controls = size(only(unique(B)))
-    model = JuMP.Model(Ipopt.Optimizer)
+    model = JuMP.Model(solver)
+    set_solver_attributes!(model; silent, solver_attributes...)
 
     # decision variable
     @variable(model, q[1:length(Q̃)] >= 0)
@@ -105,7 +131,7 @@ function solve_inverse_lqr(x̂, Q̃, R̃; A, B, r_sqr_min = 1e-5)
     @constraint(model, r' * r + q' * q == 1)
 
     @objective(model, Min, inverse_objective(x; x̂))
-    JuMP.optimize!(model)
+    @time JuMP.optimize!(model)
     get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
 end
 
@@ -123,18 +149,19 @@ end
         ],
     ]
     R̃ = [R]
-    ilqr_solution, ilqr_model, Q_est, R_est = solve_inverse_lqr(lqr_solution.x, Q̃, R̃; A, B)
-    ∇ₓL_sol = JuMP.value.(ilqr_model[:∇ₓL])
-    ∇ᵤL_sol = JuMP.value.(ilqr_model[:∇ᵤL])
+    inverse_solution, inverse_model, Q_est, R_est =
+        solve_inverse_lqr(forward_solution.x, Q̃, R̃; A, B)
+    ∇ₓL_sol = JuMP.value.(inverse_model[:∇ₓL])
+    ∇ᵤL_sol = JuMP.value.(inverse_model[:∇ᵤL])
 
     @testset "Gradient Check" begin
-        grad_args = (ilqr_solution.x, ilqr_solution.u, ilqr_solution.λ)
+        grad_args = (inverse_solution.x, inverse_solution.u, inverse_solution.λ)
         grad_kwargs = (; Q = Q_est, R = R_est, A, B)
 
         ∇ₓL_ad, ∇ᵤL_ad = Zygote.gradient(
-            (x, u) -> lqr_lagrangian(x, u, ilqr_solution.λ; grad_kwargs...),
-            ilqr_solution.x,
-            ilqr_solution.u,
+            (x, u) -> lqr_lagrangian(x, u, inverse_solution.λ; grad_kwargs...),
+            inverse_solution.x,
+            inverse_solution.u,
         )
         ∇ₓL_manual = lqr_lagrangian_grad_x(grad_args...; grad_kwargs...)
         ∇ᵤL_manual = lqr_lagrangian_grad_u(grad_args...; grad_kwargs...)
@@ -147,10 +174,10 @@ end
     end
 
     @testset "Solution Sanity" begin
-        @test JuMP.termination_status(ilqr_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
+        @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
         @test Q_est[1, 1] / Q_est[2, 2] ≈ Q[1, 1] / Q[2, 2]
         @test Q_est[1, 1] / R_est[1, 1] ≈ Q[1, 1] / R[1, 1]
         @test Q_est[2, 2] / R_est[1, 1] ≈ Q[2, 2] / R[1, 1]
-        @test ilqr_solution.x ≈ first(solve_lqr(A, B, Q_est, R_est, x0, T)).x
+        @test inverse_solution.x ≈ first(solve_lqr(A, B, Q_est, R_est, x0, T)).x
     end
 end
