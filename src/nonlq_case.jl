@@ -55,14 +55,25 @@ T = 100
 
 # TODO: think about handling of initial guees
 "Solves a forward LQR problem using JuMP."
-function solve_optimal_control(control_system, Q, R, x0, T)
-    model = JuMP.Model(Ipopt.Optimizer)
+function solve_optimal_control(
+    control_system,
+    Q,
+    R,
+    x0,
+    T;
+    solver = Ipopt.Optimizer,
+    solver_attributes = (;),
+    silent = true,
+)
+    model = JuMP.Model(solver)
+    set_solver_attributes!(model; silent, solver_attributes...)
+
     @variable(model, x[1:(control_system.n_states), 1:T])
     @variable(model, u[1:(control_system.n_controls), 1:T])
     control_system.dynamics_constraints!(model, x, u)
     @constraint(model, initial_condition, x[:, 1] .== x0)
     @objective(model, Min, forward_objective(x, u; Q, R))
-    JuMP.optimize!(model)
+    @time JuMP.optimize!(model)
     get_model_values(model, :x, :u), model
 end
 
@@ -81,9 +92,19 @@ visualize_unicycle_trajectory(forward_solution.x)
 
 #===================================== Inverse Optimal Control =====================================#
 
-function solve_inverse_optimal_control(x̂, Q̃, R̃; control_system, r_sqr_min = 1e-5)
+function solve_inverse_optimal_control(
+    x̂,
+    Q̃,
+    R̃;
+    control_system,
+    r_sqr_min = 1e-5,
+    solver = Ipopt.Optimizer,
+    solver_attributes = (;),
+    silent = true,
+)
     T = size(x̂)[2]
-    model = JuMP.Model(Ipopt.Optimizer)
+    model = JuMP.Model(solver)
+    set_solver_attributes!(model; silent, solver_attributes...)
 
     # decision variable
     @variable(model, q[1:length(Q̃)] >= 0)
@@ -146,7 +167,7 @@ function solve_inverse_optimal_control(x̂, Q̃, R̃; control_system, r_sqr_min 
     @constraint(model, r' * r + q' * q == 1)
 
     @objective(model, Min, inverse_objective(x; x̂))
-    JuMP.optimize!(model)
+    @time JuMP.optimize!(model)
     get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
 end
 
