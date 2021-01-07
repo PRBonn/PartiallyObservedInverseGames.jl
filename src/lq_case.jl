@@ -6,19 +6,15 @@ using JuMP: JuMP, @constraint, @objective, @variable
 using LinearAlgebra: I
 using Test: @test, @testset
 
+#============================================== Utils ==============================================#
+
 include("utils.jl")
 
-T = 100
-A = repeat([[
-    1 1
-    0 1
-]], T)
-B = repeat([[0, 1][:, :]], T)
-Q = I
-R = 100I
-x0 = [10.0, 10.0]
-
-#============================================== Utils ==============================================#
+"The performance index for the forward optimal control problem."
+function forward_objective(x, u; Q, R)
+    T = last(size(x))
+    sum(x[:, t]' * Q * x[:, t] + u[:, t]' * R * u[:, t] for t in 1:T)
+end
 
 function dynamics_constraints(x, u; A, B)
     reduce(hcat, ((x[:, t + 1] - A[t] * x[:, t] - B[t] * u[:, t]) for t in axes(x)[2][1:(end - 1)]))
@@ -51,7 +47,18 @@ function solve_lqr(
     get_model_values(model, :x, :u), model
 end
 
+T = 100
+A = repeat([[
+    1 1
+    0 1
+]], T)
+B = repeat([[0, 1][:, :]], T)
+Q = I
+R = 100I
+x0 = [10.0, 10.0]
+
 forward_solution, forward_model = solve_lqr(A, B, Q, R, x0, T)
+
 @testset "Forward LQR" begin
     @test JuMP.termination_status(forward_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
 end
