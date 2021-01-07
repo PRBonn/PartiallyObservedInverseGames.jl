@@ -154,11 +154,7 @@ function solve_inverse_optimal_control(
         ])
     end
 
-    # TODO: think about these contraints; What do they need to be in the nonlinear case?
-    # @constraint(model, ∇ₓL, lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B, T)[:, 2:end] .== 0)
-    # @constraint(model, ∇ᵤL, lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B, T) .== 0)
     # TODO: for now implement them by hand. Check later how much we would loose by doing AD.
-    # TODO: think about off-by-one-error
     @constraint(model, dLdx[t = 2:T], dgdx[:, t] + λ[:, t - 1] - dfdx[:, :, t]' * λ[:, t] .== 0)
     @constraint(model, dLdu[t = 2:T], dgdu[:, t] - dfdu[:, :, t]' * λ[:, t] .== 0)
 

@@ -1,5 +1,3 @@
-# TODO: Implement a simple converter for ControlSystems.jl
-
 #============================================ Preamble =============================================#
 
 import Zygote
