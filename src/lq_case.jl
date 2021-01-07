@@ -74,8 +74,8 @@ function lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B)
         reduce(
             hcat,
             (
-                2 * Q * x[:, t + 1] + λ[:, t] - A[t + 1]' * λ[:, t + 1]
-                for t in axes(x)[2][1:(end - 1)]
+                2 * Q * x[:, t] + λ[:, t - 1] - A[t]' * λ[:, t]
+                for t in axes(x)[2][2:end]
             ),
         ),
     )
