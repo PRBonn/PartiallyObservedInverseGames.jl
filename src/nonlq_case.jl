@@ -1,4 +1,5 @@
 using Test: @test, @testset
+using UnPack: @unpack
 
 # Optimization
 using JuMP: JuMP, @NLconstraint, @constraint, @objective, @variable, @expression
@@ -23,6 +24,7 @@ function add_unicycle_dynamics_constraints(model, x, u)
     # auxiliary variables for nonlinearities
     @variable(model, cosθ[1:T])
     @NLconstraint(model, [t = 1:T], cosθ[t] == cos(x[4, t]))
+
     @variable(model, sinθ[1:T])
     @NLconstraint(model, [t = 1:T], sinθ[t] == sin(x[4, t]))
 
@@ -39,13 +41,15 @@ function add_unicycle_dynamics_constraints(model, x, u)
 end
 
 function add_unicycle_dynamics_jacobians!(model, x, u)
+    n_states, T = size(x)
+    n_controls, _ = size(u)
     # TODO it's a bit ugly that we rely on these constraints to be present. We could check with
     # `haskey`.
     cosθ = model[:cosθ]
     sinθ = model[:sinθ]
 
     # jacobians of the dynamics in x
-    @variable(model, dfdx[1:(control_system.n_states), 1:(control_system.n_states), 1:T])
+    @variable(model, dfdx[1:n_states, 1:n_states, 1:T])
     @constraint(
         model,
         [t = 1:T],
@@ -56,6 +60,7 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
             0 0 0 1
         ]
     )
+
     # jacobians of the dynamics in u
     @variable(model, dfdu[1:(control_system.n_states), 1:(control_system.n_controls), 1:T])
     @constraint(model, [t = 1:T], dfdu[:, :, t] .== [
@@ -64,6 +69,17 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
         1 0
         0 1
     ])
+    # TODO: check which one works better in general
+    # @expression(
+    #     model,
+    #     dfdu,
+    #     [
+    #         0 0
+    #         0 0
+    #         1 0
+    #         0 1
+    #     ] .* reshape(ones(T), 1, 1, :)
+    # )
 
     (; dx = dfdx, du = dfdu)
 end
@@ -109,11 +125,14 @@ function solve_optimal_control(
     solver_attributes = (),
     silent = false,
 )
+    @unpack n_states, n_controls = control_system
+    @unpack Q, R = cost_model
+
     model = JuMP.Model(solver)
     set_solver_attributes!(model; silent, solver_attributes...)
 
-    @variable(model, x[1:(control_system.n_states), 1:T])
-    @variable(model, u[1:(control_system.n_controls), 1:T])
+    @variable(model, x[1:(n_states), 1:T])
+    @variable(model, u[1:(n_controls), 1:T])
     control_system.add_dynamics_constraints!(model, x, u)
     @constraint(model, initial_condition, x[:, 1] .== x0)
     cost_model.add_objective!(model, x, u; cost_model.Q, cost_model.R)
@@ -148,15 +167,17 @@ function solve_inverse_optimal_control(
     silent = false,
 )
     T = size(x̂)[2]
+    @unpack n_states, n_controls = control_system
+
     model = JuMP.Model(solver)
     set_solver_attributes!(model; silent, solver_attributes...)
 
     # decision variable
     @variable(model, q[1:length(Q̃)] >= 0)
     @variable(model, r[1:length(R̃)] >= 0)
-    @variable(model, x[1:(control_system.n_states), 1:T])
-    @variable(model, u[1:(control_system.n_controls), 1:T])
-    @variable(model, λ[1:(control_system.n_states), 1:T]) # multipliers of the forward optimality condition
+    @variable(model, x[1:(n_states), 1:T])
+    @variable(model, u[1:(n_controls), 1:T])
+    @variable(model, λ[1:(n_states), 1:T]) # multipliers of the forward optimality condition
 
     # initial condition
     @constraint(model, initial_condition, x[:, 1] .== x̂[:, 1])
@@ -167,7 +188,11 @@ function solve_inverse_optimal_control(
     R = sum(r .* R̃)
     df = control_system.add_dynamics_jacobians!(model, x, u)
     dg = cost_model.add_objective_gradients!(model, x, u; Q, R)
-    @constraint(model, dLdx[t = 2:T], dg.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0)
+    @constraint(
+        model,
+        dLdx[t = 2:T],
+        dg.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0
+    )
     @constraint(model, dLdu[t = 2:T], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
 
     # regularization
