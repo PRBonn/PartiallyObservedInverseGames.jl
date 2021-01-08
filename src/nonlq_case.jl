@@ -18,7 +18,7 @@ include("utils.jl")
 
 # These constraints encode the dynamics of a unicycle with state layout x_t = [px, py, v, θ] and
 # inputs u_t = [Δv, Δθ].
-function add_unicycle_dynamics_constraints(model, x, u)
+function add_unicycle_dynamics_constraints!(model, x, u)
     T = size(x)[2]
 
     # auxiliary variables for nonlinearities
@@ -86,7 +86,7 @@ function add_forward_objective_gradients!(model, x, u; weights)
 end
 
 control_system = (
-    add_dynamics_constraints! = add_unicycle_dynamics_constraints,
+    add_dynamics_constraints! = add_unicycle_dynamics_constraints!,
     add_dynamics_jacobians! = add_unicycle_dynamics_jacobians!,
     n_states = 4,
     n_controls = 2,
