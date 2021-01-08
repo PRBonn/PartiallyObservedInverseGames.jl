@@ -1,7 +1,7 @@
 using Test: @test, @testset
 
 # Optimization
-using JuMP: JuMP, @NLconstraint, @constraint, @objective, @variable
+using JuMP: JuMP, @NLconstraint, @constraint, @objective, @variable, @expression
 using LinearAlgebra: I, diagm
 import Ipopt
 
@@ -69,17 +69,15 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
 end
 
 function add_forward_objective!(model, x, u; Q, R)
-    @objective(model, Min, sum(x[:, t]' * Q * x[:, t] + u[:, t]' * R * u[:, t] for t in axes(x)[2]))
+    time_span = axes(x)[2]
+    @expression(model, g_state, sum(x[:, t]' * Q * x[:, t] for t in time_span))
+    @expression(model, g_control, sum(u[:, t]' * R * u[:, t] for t in time_span))
+    @objective(model, Min, g_state + g_control)
 end
 
 function add_forward_objective_gradients!(model, x, u; Q, R)
-    # partials of the cost in x
-    @variable(model, dgdx[1:(control_system.n_states), axes(x)[2]])
-    @constraint(model, dgdx .== 2 * Q * x)
-    # partials of the cost in u
-    @variable(model, dgdu[1:(control_system.n_controls), axes(x)[2]])
-    @constraint(model, dgdu .== 2 * R * u)
-
+    @expression(model, dgdx, 2 * Q * x)
+    @expression(model, dgdu, 2 * R * u)
     (; dx = dgdx, du = dgdu)
 end
 
@@ -169,8 +167,8 @@ function solve_inverse_optimal_control(
     R = sum(r .* R̃)
     df = control_system.add_dynamics_jacobians!(model, x, u)
     dg = cost_model.add_objective_gradients!(model, x, u; Q, R)
-    @constraint(model, dLdx[t = 2:T], dg.dx[:, t] + λ[:, t - 1] - df.dx[:, :, t]' * λ[:, t] .== 0)
-    @constraint(model, dLdu[t = 2:T], dg.du[:, t] - df.du[:, :, t]' * λ[:, t] .== 0)
+    @constraint(model, dLdx[t = 2:T], dg.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0)
+    @constraint(model, dLdu[t = 2:T], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
 
     # regularization
     @constraint(model, r' * r >= r_sqr_min)
