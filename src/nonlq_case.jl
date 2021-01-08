@@ -62,38 +62,26 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
     )
 
     # jacobians of the dynamics in u
-    @variable(model, dfdu[1:(control_system.n_states), 1:(control_system.n_controls), 1:T])
-    @constraint(model, [t = 1:T], dfdu[:, :, t] .== [
+    @expression(model, dfdu, [
         0 0
         0 0
         1 0
         0 1
-    ])
-    # TODO: check which one works better in general
-    # @expression(
-    #     model,
-    #     dfdu,
-    #     [
-    #         0 0
-    #         0 0
-    #         1 0
-    #         0 1
-    #     ] .* reshape(ones(T), 1, 1, :)
-    # )
+    ] .* reshape(ones(T), 1, 1, :))
 
     (; dx = dfdx, du = dfdu)
 end
 
-function add_forward_objective!(model, x, u; Q, R)
+function add_forward_objective!(model, x, u; weights)
     time_span = axes(x)[2]
-    @expression(model, g_state, sum(x[:, t]' * Q * x[:, t] for t in time_span))
-    @expression(model, g_control, sum(u[:, t]' * R * u[:, t] for t in time_span))
+    @expression(model, g_state, sum(weights[:state] * x[:, t]' * x[:, t] for t in time_span))
+    @expression(model, g_control, sum(weights[:control] * u[:, t]' * u[:, t] for t in time_span))
     @objective(model, Min, g_state + g_control)
 end
 
-function add_forward_objective_gradients!(model, x, u; Q, R)
-    @expression(model, dgdx, 2 * Q * x)
-    @expression(model, dgdu, 2 * R * u)
+function add_forward_objective_gradients!(model, x, u; weights)
+    @expression(model, dgdx, 2 * weights[:state] * x)
+    @expression(model, dgdu, 2 * weights[:control] * u)
     (; dx = dgdx, du = dgdu)
 end
 
@@ -104,8 +92,7 @@ control_system = (
     n_controls = 2,
 )
 cost_model = (
-    Q = I,
-    R = 100I,
+    weights = Dict(:state => 1, :control => 100),
     add_objective! = add_forward_objective!,
     add_objective_gradients! = add_forward_objective_gradients!,
 )
@@ -114,7 +101,6 @@ T = 100
 
 #====================================== forward optimal control ====================================#
 
-# TODO: think about handling of initial guees
 "Solves a forward LQR problem using JuMP."
 function solve_optimal_control(
     control_system,
@@ -126,16 +112,15 @@ function solve_optimal_control(
     silent = false,
 )
     @unpack n_states, n_controls = control_system
-    @unpack Q, R = cost_model
 
     model = JuMP.Model(solver)
     set_solver_attributes!(model; silent, solver_attributes...)
 
-    @variable(model, x[1:(n_states), 1:T])
-    @variable(model, u[1:(n_controls), 1:T])
+    @variable(model, x[1:n_states, 1:T])
+    @variable(model, u[1:n_controls, 1:T])
     control_system.add_dynamics_constraints!(model, x, u)
     @constraint(model, initial_condition, x[:, 1] .== x0)
-    cost_model.add_objective!(model, x, u; cost_model.Q, cost_model.R)
+    cost_model.add_objective!(model, x, u; cost_model.weights)
     @time JuMP.optimize!(model)
     get_model_values(model, :x, :u), model
 end
@@ -156,15 +141,13 @@ visualize_unicycle_trajectory(forward_solution.x)
 #===================================== Inverse Optimal Control =====================================#
 
 function solve_inverse_optimal_control(
-    x̂,
-    Q̃,
-    R̃;
+    x̂;
     control_system,
     cost_model,
-    r_sqr_min = 1e-5,
     solver = Ipopt.Optimizer,
     solver_attributes = (),
     silent = false,
+    cmin = 1e-5
 )
     T = size(x̂)[2]
     @unpack n_states, n_controls = control_system
@@ -173,47 +156,46 @@ function solve_inverse_optimal_control(
     set_solver_attributes!(model; silent, solver_attributes...)
 
     # decision variable
-    @variable(model, q[1:length(Q̃)] >= 0)
-    @variable(model, r[1:length(R̃)] >= 0)
-    @variable(model, x[1:(n_states), 1:T])
-    @variable(model, u[1:(n_controls), 1:T])
-    @variable(model, λ[1:(n_states), 1:T]) # multipliers of the forward optimality condition
+    @variable(
+        model,
+        weights[keys(cost_model.weights)],
+        start = 1 / sqrt(length(cost_model.weights))
+    )
+    @variable(model, x[1:n_states, 1:T])
+    JuMP.set_start_value.(x, x̂)
+
+    @variable(model, u[1:n_controls, 1:T])
+    @variable(model, λ[1:n_states, 1:T]) # multipliers of the forward optimality condition
 
     # initial condition
     @constraint(model, initial_condition, x[:, 1] .== x̂[:, 1])
     control_system.add_dynamics_constraints!(model, x, u)
-
     # KKT conditions as constraints for forward optimality
-    Q = sum(q .* Q̃)
-    R = sum(r .* R̃)
     df = control_system.add_dynamics_jacobians!(model, x, u)
-    dg = cost_model.add_objective_gradients!(model, x, u; Q, R)
+    dg = cost_model.add_objective_gradients!(model, x, u; weights)
     @constraint(
         model,
         dLdx[t = 2:T],
         dg.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0
     )
     @constraint(model, dLdu[t = 2:T], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
-
     # regularization
-    @constraint(model, r' * r >= r_sqr_min)
-    @constraint(model, r' * r + q' * q == 1)
-
+    # TODO: Think about what would be the right regularization now
+    # --> @DFK any ideas for how to make this more robust?
+    @constraint(model, weights .>= cmin)
+    @constraint(model, weights' * weights == 1)
     @objective(model, Min, inverse_objective(x; x̂))
+
     @time JuMP.optimize!(model)
-    get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
+    get_model_values(model, :weights, :x, :u, :λ), model
 end
 
-# The basis function for the cost model.
-Q̃ = [diagm([1 // 3, 1 // 3, 0, 0]), diagm([0, 0, 2 // 3, 2 // 3])]
-R̃ = [cost_model.R]
-
-inverse_solution, inverse_model, Q_est, R_est =
-    solve_inverse_optimal_control(forward_solution.x, Q̃, R̃; control_system, cost_model)
+inverse_solution, inverse_model =
+    solve_inverse_optimal_control(forward_solution.x; control_system, cost_model)
 
 @testset "Solution Sanity" begin
     @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
-    @test Q_est[1, 1] / Q_est[4, 4] ≈ cost_model.Q[1, 1] / cost_model.Q[4, 4]
-    @test Q_est[1, 1] / R_est[1, 1] ≈ cost_model.Q[1, 1] / cost_model.R[1, 1]
-    @test Q_est[4, 4] / R_est[1, 1] ≈ cost_model.Q[4, 4] / cost_model.R[1, 1]
+    @test inverse_solution.weights[:state] / inverse_solution.weights[:control] ≈
+          cost_model.weights[:state] / cost_model.weights[:control]
+    @test isapprox(JuMP.objective_value(inverse_model), 0; atol = 1e-10)
 end
