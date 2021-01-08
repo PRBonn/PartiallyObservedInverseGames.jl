@@ -72,16 +72,44 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
     (; dx = dfdx, du = dfdu)
 end
 
+symbol(s::Symbol) = s
+symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
+
+# TODO: [@DFK] Implement a "cost component library".
+#
+# Instructions: For every cost component:
+#
+# 1. Add a new weight to the `cost_model` NamedTuple below where the key is the component name and
+# the value is the weight for the *true* true forward optimal control problem (the one that
+# generates x̂)
+#
+# 2. Add a new key-value pair to the `g̃` NamedTuple in `add_forward_objective!`. The key is the same
+# is for the `cost_model`.  The value computes thes *unweighted* cost for that component (e.g.
+# collision cost).
+#
+# 3. Add the stage cost gradients to the NamedTuples `dg̃dx` and `dg̃du` in
+# `add_forward_objective_gradients!`. Again, use the same keys as you used in the `cost_model`.
+#
+# Note: If you have non-quadratic/affine cost components, introduce an auxiliary variable +
+# constraint (see e.g. the jacobian in line 51).
 function add_forward_objective!(model, x, u; weights)
-    time_span = axes(x)[2]
-    @expression(model, g_state, sum(weights[:state] * x[:, t]' * x[:, t] for t in time_span))
-    @expression(model, g_control, sum(weights[:control] * u[:, t]' * u[:, t] for t in time_span))
-    @objective(model, Min, g_state + g_control)
+    _, T = size(x)
+
+    g̃ = (;
+        state = sum(x[:, t]' * x[:, t] for t in 1:T),
+        control = sum(u[:, t]' * u[:, t] for t in 1:T),
+    )
+
+    @objective(model, Min, sum(weights[k] * g̃[symbol(k)] for k in keys(weights)))
 end
 
 function add_forward_objective_gradients!(model, x, u; weights)
-    @expression(model, dgdx, 2 * weights[:state] * x)
-    @expression(model, dgdu, 2 * weights[:control] * u)
+    dg̃dx = (; state = 2 * x, control = zeros(size(x)))
+    dgdx = sum(weights[k] * dg̃dx[symbol(k)] for k in keys(weights))
+
+    dg̃du = (; state = zeros(size(u)), control = 2 * u)
+    dgdu = sum(weights[k] * dg̃du[symbol(k)] for k in keys(weights))
+
     (; dx = dgdx, du = dgdu)
 end
 
@@ -92,7 +120,7 @@ control_system = (
     n_controls = 2,
 )
 cost_model = (
-    weights = Dict(:state => 1, :control => 100),
+    weights = (; state = 1, control = 100),
     add_objective! = add_forward_objective!,
     add_objective_gradients! = add_forward_objective_gradients!,
 )
@@ -147,7 +175,7 @@ function solve_inverse_optimal_control(
     solver = Ipopt.Optimizer,
     solver_attributes = (),
     silent = false,
-    cmin = 1e-5
+    cmin = 1e-5,
 )
     T = size(x̂)[2]
     @unpack n_states, n_controls = control_system
@@ -181,7 +209,6 @@ function solve_inverse_optimal_control(
     @constraint(model, dLdu[t = 2:T], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
     # regularization
     # TODO: Think about what would be the right regularization now
-    # --> @DFK any ideas for how to make this more robust?
     @constraint(model, weights .>= cmin)
     @constraint(model, weights' * weights == 1)
     @objective(model, Min, inverse_objective(x; x̂))
