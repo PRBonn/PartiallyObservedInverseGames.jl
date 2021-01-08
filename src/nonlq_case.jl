@@ -15,10 +15,6 @@ include("utils.jl")
 
 #======================================== Global parameters ========================================#
 
-# TODO: generalize this to take arbitrary nonlinear, vector-valued functions NOTE: This seems to be
-# non-trivial to generalize; This would require some meta programming macromagic or generated
-# function perhaps.
-#
 # These constraints encode the dynamics of a unicycle with state layout x_t = [px, py, v, θ] and
 # inputs u_t = [Δv, Δθ].
 function add_unicycle_dynamics_constraints(model, x, u)
@@ -40,13 +36,10 @@ function add_unicycle_dynamics_constraints(model, x, u)
             x[4, t] + u[2, t],
         ]
     )
-
-    cosθ, sinθ
 end
 
-# TODO: Think about whether these should be expressions or aux-constraints
 function add_unicycle_dynamics_jacobians!(model, x, u)
-    # TODO it's a bit ugly taht we rely on these constraints to be present. We could check with
+    # TODO it's a bit ugly that we rely on these constraints to be present. We could check with
     # `haskey`.
     cosθ = model[:cosθ]
     sinθ = model[:sinθ]
@@ -75,15 +68,33 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
     (; dx = dfdx, du = dfdu)
 end
 
+function add_forward_objective!(model, x, u; Q, R)
+    @objective(model, Min, sum(x[:, t]' * Q * x[:, t] + u[:, t]' * R * u[:, t] for t in axes(x)[2]))
+end
+
+function add_forward_objective_gradients!(model, x, u; Q, R)
+    # partials of the cost in x
+    @variable(model, dgdx[1:(control_system.n_states), axes(x)[2]])
+    @constraint(model, dgdx .== 2 * Q * x)
+    # partials of the cost in u
+    @variable(model, dgdu[1:(control_system.n_controls), axes(x)[2]])
+    @constraint(model, dgdu .== 2 * R * u)
+
+    (; dx = dgdx, du = dgdu)
+end
+
 control_system = (
     add_dynamics_constraints! = add_unicycle_dynamics_constraints,
     add_dynamics_jacobians! = add_unicycle_dynamics_jacobians!,
     n_states = 4,
     n_controls = 2,
 )
-
-Q = I
-R = 100I
+cost_model = (
+    Q = I,
+    R = 100I,
+    add_objective! = add_forward_objective!,
+    add_objective_gradients! = add_forward_objective_gradients!,
+)
 x0 = [1, 1, 0, 0]
 T = 100
 
@@ -93,13 +104,12 @@ T = 100
 "Solves a forward LQR problem using JuMP."
 function solve_optimal_control(
     control_system,
-    Q,
-    R,
+    cost_model,
     x0,
     T;
     solver = Ipopt.Optimizer,
     solver_attributes = (),
-    silent = true,
+    silent = false,
 )
     model = JuMP.Model(solver)
     set_solver_attributes!(model; silent, solver_attributes...)
@@ -108,7 +118,7 @@ function solve_optimal_control(
     @variable(model, u[1:(control_system.n_controls), 1:T])
     control_system.add_dynamics_constraints!(model, x, u)
     @constraint(model, initial_condition, x[:, 1] .== x0)
-    @objective(model, Min, forward_objective(x, u; Q, R))
+    cost_model.add_objective!(model, x, u; cost_model.Q, cost_model.R)
     @time JuMP.optimize!(model)
     get_model_values(model, :x, :u), model
 end
@@ -123,7 +133,7 @@ function visualize_unicycle_trajectory(x)
     )
 end
 
-forward_solution, forward_model = solve_optimal_control(control_system, Q, R, x0, T)
+forward_solution, forward_model = solve_optimal_control(control_system, cost_model, x0, T)
 visualize_unicycle_trajectory(forward_solution.x)
 
 #===================================== Inverse Optimal Control =====================================#
@@ -133,10 +143,11 @@ function solve_inverse_optimal_control(
     Q̃,
     R̃;
     control_system,
+    cost_model,
     r_sqr_min = 1e-5,
     solver = Ipopt.Optimizer,
     solver_attributes = (),
-    silent = true,
+    silent = false,
 )
     T = size(x̂)[2]
     model = JuMP.Model(solver)
@@ -151,28 +162,15 @@ function solve_inverse_optimal_control(
 
     # initial condition
     @constraint(model, initial_condition, x[:, 1] .== x̂[:, 1])
-    # TODO: introduce less dirty hack
     control_system.add_dynamics_constraints!(model, x, u)
 
-    # Optimality conditions (KKT) of forward LQR show up as a constraints
+    # KKT conditions as constraints for forward optimality
     Q = sum(q .* Q̃)
     R = sum(r .* R̃)
     df = control_system.add_dynamics_jacobians!(model, x, u)
-
-    # Auxiliary variable trick (https://jump.dev/JuMP.jl/v0.19/nlp/)
-    # TODO: For non-quadratic costs this will have to be different
-    begin
-        # partials of the cost in x
-        @variable(model, dgdx[1:(control_system.n_states), 1:T])
-        @constraint(model, dgdx .== 2 * Q * x)
-        # partials of the cost in u
-        @variable(model, dgdu[1:(control_system.n_controls), 1:T])
-        @constraint(model, dgdu .== 2 * R * u)
-    end
-
-    # TODO: for now implement them by hand. Check later how much we would loose by doing AD.
-    @constraint(model, dLdx[t = 2:T], dgdx[:, t] + λ[:, t - 1] - df.dx[:, :, t]' * λ[:, t] .== 0)
-    @constraint(model, dLdu[t = 2:T], dgdu[:, t] - df.du[:, :, t]' * λ[:, t] .== 0)
+    dg = cost_model.add_objective_gradients!(model, x, u; Q, R)
+    @constraint(model, dLdx[t = 2:T], dg.dx[:, t] + λ[:, t - 1] - df.dx[:, :, t]' * λ[:, t] .== 0)
+    @constraint(model, dLdu[t = 2:T], dg.du[:, t] - df.du[:, :, t]' * λ[:, t] .== 0)
 
     # regularization
     @constraint(model, r' * r >= r_sqr_min)
@@ -185,14 +183,14 @@ end
 
 # The basis function for the cost model.
 Q̃ = [diagm([1 // 3, 1 // 3, 0, 0]), diagm([0, 0, 2 // 3, 2 // 3])]
-R̃ = [R]
+R̃ = [cost_model.R]
 
 inverse_solution, inverse_model, Q_est, R_est =
-    solve_inverse_optimal_control(forward_solution.x, Q̃, R̃; control_system)
+    solve_inverse_optimal_control(forward_solution.x, Q̃, R̃; control_system, cost_model)
 
 @testset "Solution Sanity" begin
     @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
-    @test Q_est[1, 1] / Q_est[4, 4] ≈ Q[1, 1] / Q[4, 4]
-    @test Q_est[1, 1] / R_est[1, 1] ≈ Q[1, 1] / R[1, 1]
-    @test Q_est[4, 4] / R_est[1, 1] ≈ Q[4, 4] / R[1, 1]
+    @test Q_est[1, 1] / Q_est[4, 4] ≈ cost_model.Q[1, 1] / cost_model.Q[4, 4]
+    @test Q_est[1, 1] / R_est[1, 1] ≈ cost_model.Q[1, 1] / cost_model.R[1, 1]
+    @test Q_est[4, 4] / R_est[1, 1] ≈ cost_model.Q[4, 4] / cost_model.R[1, 1]
 end
