@@ -21,7 +21,7 @@ include("utils.jl")
 #
 # These constraints encode the dynamics of a unicycle with state layout x_t = [px, py, v, θ] and
 # inputs u_t = [Δv, Δθ].
-function unicycle_dynamics_constraints!(model, x, u)
+function add_unicycle_dynamics_constraints(model, x, u)
     T = size(x)[2]
 
     # auxiliary variables for nonlinearities
@@ -44,8 +44,44 @@ function unicycle_dynamics_constraints!(model, x, u)
     cosθ, sinθ
 end
 
-control_system =
-    (dynamics_constraints! = unicycle_dynamics_constraints!, n_states = 4, n_controls = 2)
+# TODO: Think about whether these should be expressions or aux-constraints
+function add_unicycle_dynamics_jacobians!(model, x, u)
+    # TODO it's a bit ugly taht we rely on these constraints to be present. We could check with
+    # `haskey`.
+    cosθ = model[:cosθ]
+    sinθ = model[:sinθ]
+
+    # jacobians of the dynamics in x
+    @variable(model, dfdx[1:(control_system.n_states), 1:(control_system.n_states), 1:T])
+    @constraint(
+        model,
+        [t = 1:T],
+        dfdx[:, :, t] .== [
+            1 0 cosθ[t] -x[3, t]*sinθ[t]
+            0 1 sinθ[t] x[3, t]*cosθ[t]
+            0 0 1 0
+            0 0 0 1
+        ]
+    )
+    # jacobians of the dynamics in u
+    @variable(model, dfdu[1:(control_system.n_states), 1:(control_system.n_controls), 1:T])
+    @constraint(model, [t = 1:T], dfdu[:, :, t] .== [
+        0 0
+        0 0
+        1 0
+        0 1
+    ])
+
+    (; dx = dfdx, du = dfdu)
+end
+
+control_system = (
+    add_dynamics_constraints! = add_unicycle_dynamics_constraints,
+    add_dynamics_jacobians! = add_unicycle_dynamics_jacobians!,
+    n_states = 4,
+    n_controls = 2,
+)
+
 Q = I
 R = 100I
 x0 = [1, 1, 0, 0]
@@ -62,7 +98,7 @@ function solve_optimal_control(
     x0,
     T;
     solver = Ipopt.Optimizer,
-    solver_attributes = (;),
+    solver_attributes = (),
     silent = true,
 )
     model = JuMP.Model(solver)
@@ -70,7 +106,7 @@ function solve_optimal_control(
 
     @variable(model, x[1:(control_system.n_states), 1:T])
     @variable(model, u[1:(control_system.n_controls), 1:T])
-    control_system.dynamics_constraints!(model, x, u)
+    control_system.add_dynamics_constraints!(model, x, u)
     @constraint(model, initial_condition, x[:, 1] .== x0)
     @objective(model, Min, forward_objective(x, u; Q, R))
     @time JuMP.optimize!(model)
@@ -99,7 +135,7 @@ function solve_inverse_optimal_control(
     control_system,
     r_sqr_min = 1e-5,
     solver = Ipopt.Optimizer,
-    solver_attributes = (;),
+    solver_attributes = (),
     silent = true,
 )
     T = size(x̂)[2]
@@ -116,11 +152,12 @@ function solve_inverse_optimal_control(
     # initial condition
     @constraint(model, initial_condition, x[:, 1] .== x̂[:, 1])
     # TODO: introduce less dirty hack
-    cosθ, sinθ = control_system.dynamics_constraints!(model, x, u)
+    control_system.add_dynamics_constraints!(model, x, u)
 
     # Optimality conditions (KKT) of forward LQR show up as a constraints
     Q = sum(q .* Q̃)
     R = sum(r .* R̃)
+    df = control_system.add_dynamics_jacobians!(model, x, u)
 
     # Auxiliary variable trick (https://jump.dev/JuMP.jl/v0.19/nlp/)
     # TODO: For non-quadratic costs this will have to be different
@@ -131,32 +168,11 @@ function solve_inverse_optimal_control(
         # partials of the cost in u
         @variable(model, dgdu[1:(control_system.n_controls), 1:T])
         @constraint(model, dgdu .== 2 * R * u)
-
-        # jacobians of the dynamics in x
-        @variable(model, dfdx[1:(control_system.n_states), 1:(control_system.n_states), 1:T])
-        @constraint(
-            model,
-            [t = 1:T],
-            dfdx[:, :, t] .== [
-                1 0 cosθ[t] -x[3, t]*sinθ[t]
-                0 1 sinθ[t] x[3, t]*cosθ[t]
-                0 0 1 0
-                0 0 0 1
-            ]
-        )
-        # jacobians of the dynamics in u
-        @variable(model, dfdu[1:(control_system.n_states), 1:(control_system.n_controls), 1:T])
-        @constraint(model, [t = 1:T], dfdu[:, :, t] .== [
-            0 0
-            0 0
-            1 0
-            0 1
-        ])
     end
 
     # TODO: for now implement them by hand. Check later how much we would loose by doing AD.
-    @constraint(model, dLdx[t = 2:T], dgdx[:, t] + λ[:, t - 1] - dfdx[:, :, t]' * λ[:, t] .== 0)
-    @constraint(model, dLdu[t = 2:T], dgdu[:, t] - dfdu[:, :, t]' * λ[:, t] .== 0)
+    @constraint(model, dLdx[t = 2:T], dgdx[:, t] + λ[:, t - 1] - df.dx[:, :, t]' * λ[:, t] .== 0)
+    @constraint(model, dLdu[t = 2:T], dgdu[:, t] - df.du[:, :, t]' * λ[:, t] .== 0)
 
     # regularization
     @constraint(model, r' * r >= r_sqr_min)
