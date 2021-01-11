@@ -2,7 +2,7 @@ using Test: @test, @testset
 using UnPack: @unpack
 
 # Optimization
-using JuMP: JuMP, @NLconstraint, @constraint, @objective, @variable, @expression
+using JuMP: JuMP, @NLconstraint, @constraint, @objective, @variable, @NLexpression, @expression
 using LinearAlgebra: I, diagm
 import Ipopt
 
@@ -92,22 +92,48 @@ symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
 #
 # Note: If you have non-quadratic/affine cost components, introduce an auxiliary variable +
 # constraint (see e.g. the jacobian in line 51).
+
+obstacle = [2, 3] # Point to avoid.
+
 function add_forward_objective!(model, x, u; weights)
     _, T = size(x)
 
+    # Avoid a point. Assumes x = [px, py, ...]. Functional form is -log(|(x, y) - p|^2).
+    @variable(model, sq_diff[t = 1:T])
+    @constraint(model, sq_diff_eq[t = 1:T], sq_diff[t] ==
+                (model[:x][1, t] - obstacle[1])^2 +
+                (model[:x][2, t] - obstacle[2])^2)
+    @variable(model, prox_cost[t = 1:T])
+    @NLconstraint(model, log_eq[t = 1:T], prox_cost[t] == -log(sq_diff[t]))
+
     g̃ = (;
-        state = sum(x[:, t]' * x[:, t] for t in 1:T),
-        control = sum(u[:, t]' * u[:, t] for t in 1:T),
-    )
+         goal = sum(x[:, t]' * x[:, t] for t in 1:T),
+         control = sum(u[:, t]' * u[:, t] for t in 1:T),
+         proximity = sum(prox_cost[t] for t in 1:T),
+         )
 
     @objective(model, Min, sum(weights[k] * g̃[symbol(k)] for k in keys(weights)))
 end
 
 function add_forward_objective_gradients!(model, x, u; weights)
-    dg̃dx = (; state = 2 * x, control = zeros(size(x)))
+    # ∇ₓ of the proximity cost above.
+    # ERROR(@lassepe): sq_diff key does not exist for some reason.
+    @NLexpression(model, inv_sq_diff[t = 1:T], 1 / model[:sq_diff][t])
+    @expression(model, dproxdx[t = 1:T], (model[:x][1, t] - obstacle[1]) * inv_sq_diff[t])
+    @expression(model, dproxdy[t = 1:T], (model[:x][2, t] - obstacle[2]) * inv_sq_diff[t])
+
+    dg̃dx = (;
+            goal = 2 * x,
+            control = zeros(size(x)),
+            proximity = vcat(dproxdx', dproxdy', zeros(size(x, 1) - 2, T))
+            )
     dgdx = sum(weights[k] * dg̃dx[symbol(k)] for k in keys(weights))
 
-    dg̃du = (; state = zeros(size(u)), control = 2 * u)
+    dg̃du = (;
+            goal = zeros(size(u)),
+            control = 2 * u,
+            proximity = zeros(size(u)),
+            )
     dgdu = sum(weights[k] * dg̃du[symbol(k)] for k in keys(weights))
 
     (; dx = dgdx, du = dgdu)
@@ -120,7 +146,7 @@ control_system = (
     n_controls = 2,
 )
 cost_model = (
-    weights = (; state = 1, control = 100),
+    weights = (; goal = 1, control = 100),
     add_objective! = add_forward_objective!,
     add_objective_gradients! = add_forward_objective_gradients!,
 )
@@ -222,7 +248,7 @@ inverse_solution, inverse_model =
 
 @testset "Solution Sanity" begin
     @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
-    @test inverse_solution.weights[:state] / inverse_solution.weights[:control] ≈
-          cost_model.weights[:state] / cost_model.weights[:control]
+    @test inverse_solution.weights[:goal] / inverse_solution.weights[:control] ≈
+          cost_model.weights[:goal] / cost_model.weights[:control]
     @test isapprox(JuMP.objective_value(inverse_model), 0; atol = 1e-10)
 end
