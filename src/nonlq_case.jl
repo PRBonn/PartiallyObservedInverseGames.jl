@@ -42,7 +42,7 @@ end
 
 function add_unicycle_dynamics_jacobians!(model, x, u)
     n_states, T = size(x)
-    n_controls, _ = size(u)
+    n_controls = size(u, 1)
     # TODO it's a bit ugly that we rely on these constraints to be present. We could check with
     # `haskey`.
     cosθ = model[:cosθ]
@@ -93,45 +93,57 @@ symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
 # Note: If you have non-quadratic/affine cost components, introduce an auxiliary variable +
 # constraint (see e.g. the jacobian in line 51).
 
-obstacle = (-0.5, 0.0) # Point to avoid.
+# TODO: Visualize this as well
+const obstacle = (0.5, 0.5) # Point to avoid.
+
+function register_shared_forward_cost_expressions!(model, x, u; prox_min = 0.1)
+    T = size(x, 2)
+    @NLexpression(
+        model,
+        regularized_sq_dist[t = 1:T],
+        (x[1, t] - obstacle[1])^2 + (x[2, t] - obstacle[2])^2 + prox_min
+    )
+end
 
 function add_forward_objective!(model, x, u; weights)
-    _, T = size(x)
+    T = size(x, 2)
+    register_shared_forward_cost_expressions!(model, x, u)
 
     # Avoid a point. Assumes x = [px, py, ...]. Functional form is -log(|(x, y) - p|^2).
-    @variable(model, sq_diff[t = 1:T])
-    @constraint(model, [t = 1:T], sq_diff[t] == (x[1, t] - obstacle[1])^2 + (x[2, t] - obstacle[2])^2)
     @variable(model, prox_cost[t = 1:T])
-    @NLconstraint(model, [t = 1:T], prox_cost[t] == -log(sq_diff[t] + 0.1))
+    @NLconstraint(model, [t = 1:T], prox_cost[t] == -log(model[:regularized_sq_dist][t]))
 
-    g̃ = (;
-         goal = sum(x[:, t]' * x[:, t] for t in 1:T),
-         control = sum(u[:, t]' * u[:, t] for t in 1:T),
-         proximity = sum(prox_cost[t] for t in 1:T),
-         )
+    g̃ = (; goal = sum(x .^ 2), control = sum(u .^ 2), proximity = sum(prox_cost))
 
     @objective(model, Min, sum(weights[k] * g̃[symbol(k)] for k in keys(weights)))
 end
 
 function add_forward_objective_gradients!(model, x, u; weights)
+    T = size(x, 2)
+    register_shared_forward_cost_expressions!(model, x, u)
     # ∇ₓ of the proximity cost above.
-    # ERROR(@lassepe): sq_diff key does not exist for some reason.
-    @NLexpression(model, inv_sq_diff[t = 1:T], 1 / model[:sq_diff][t])
-    @expression(model, dproxdx[t = 1:T], -(model[:x][1, t] - obstacle[1]) * inv_sq_diff[t])
-    @expression(model, dproxdy[t = 1:T], -(model[:x][2, t] - obstacle[2]) * inv_sq_diff[t])
+    # TODO: think about this derivative. I think is correct now.
+    @variable(model, dproxdx[1:T])
+    @NLconstraint(
+        model,
+        [t = 1:T],
+        dproxdx[t] == -2 * (x[1, t] - obstacle[1]) / (model[:regularized_sq_dist][t])
+    )
+    @variable(model, dproxdy[1:T])
+    @NLconstraint(
+        model,
+        [t = 1:T],
+        dproxdy[t] == -2 * (x[2, t] - obstacle[2]) / (model[:regularized_sq_dist][t])
+    )
 
     dg̃dx = (;
-            goal = 2 * x,
-            control = zeros(size(x)),
-            proximity = vcat(dproxdx', dproxdy', zeros(size(x, 1) - 2, T))
-            )
+        goal = 2 * x,
+        control = zeros(size(x)),
+        proximity = vcat(dproxdx', dproxdy', zeros(size(x, 1) - 2, T)),
+    )
     dgdx = sum(weights[k] * dg̃dx[symbol(k)] for k in keys(weights))
 
-    dg̃du = (;
-            goal = zeros(size(u)),
-            control = 2 * u,
-            proximity = zeros(size(u)),
-            )
+    dg̃du = (; goal = zeros(size(u)), control = 2 * u, proximity = zeros(size(u)))
     dgdu = sum(weights[k] * dg̃du[symbol(k)] for k in keys(weights))
 
     (; dx = dgdx, du = dgdu)
@@ -144,7 +156,7 @@ control_system = (
     n_controls = 2,
 )
 cost_model = (
-    weights = (; goal = 1, control = 100, proximity = 0.5),
+    weights = (; goal = 1, control = 100, proximity = 1),
     add_objective! = add_forward_objective!,
     add_objective_gradients! = add_forward_objective_gradients!,
 )
@@ -208,11 +220,9 @@ function solve_inverse_optimal_control(
     set_solver_attributes!(model; silent, solver_attributes...)
 
     # decision variable
-    @variable(
-        model,
-        weights[keys(cost_model.weights)],
-        start = 1 / sqrt(length(cost_model.weights))
-    )
+    @variable(model, weights[keys(cost_model.weights)],)
+    JuMP.set_start_value.(weights, 1 / sqrt(length(cost_model.weights)))
+
     @variable(model, x[1:n_states, 1:T])
     JuMP.set_start_value.(x, x̂)
 
@@ -246,7 +256,15 @@ inverse_solution, inverse_model =
 
 @testset "Solution Sanity" begin
     @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
-    @test inverse_solution.weights[:goal] / inverse_solution.weights[:control] ≈
-          cost_model.weights[:goal] / cost_model.weights[:control]
+
+    for k in keys(cost_model.weights)
+        @info k
+        @test isapprox(
+            inverse_solution.weights[k] / inverse_solution.weights[:goal],
+            cost_model.weights[k] / cost_model.weights[:goal];
+            atol = 1e-5,
+        )
+    end
+
     @test isapprox(JuMP.objective_value(inverse_model), 0; atol = 1e-10)
 end
