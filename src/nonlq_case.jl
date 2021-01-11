@@ -93,18 +93,16 @@ symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
 # Note: If you have non-quadratic/affine cost components, introduce an auxiliary variable +
 # constraint (see e.g. the jacobian in line 51).
 
-obstacle = [2, 3] # Point to avoid.
+obstacle = (-0.5, 0.0) # Point to avoid.
 
 function add_forward_objective!(model, x, u; weights)
     _, T = size(x)
 
     # Avoid a point. Assumes x = [px, py, ...]. Functional form is -log(|(x, y) - p|^2).
     @variable(model, sq_diff[t = 1:T])
-    @constraint(model, sq_diff_eq[t = 1:T], sq_diff[t] ==
-                (model[:x][1, t] - obstacle[1])^2 +
-                (model[:x][2, t] - obstacle[2])^2)
+    @constraint(model, [t = 1:T], sq_diff[t] == (x[1, t] - obstacle[1])^2 + (x[2, t] - obstacle[2])^2)
     @variable(model, prox_cost[t = 1:T])
-    @NLconstraint(model, log_eq[t = 1:T], prox_cost[t] == -log(sq_diff[t]))
+    @NLconstraint(model, [t = 1:T], prox_cost[t] == -log(sq_diff[t] + 0.1))
 
     g̃ = (;
          goal = sum(x[:, t]' * x[:, t] for t in 1:T),
@@ -119,8 +117,8 @@ function add_forward_objective_gradients!(model, x, u; weights)
     # ∇ₓ of the proximity cost above.
     # ERROR(@lassepe): sq_diff key does not exist for some reason.
     @NLexpression(model, inv_sq_diff[t = 1:T], 1 / model[:sq_diff][t])
-    @expression(model, dproxdx[t = 1:T], (model[:x][1, t] - obstacle[1]) * inv_sq_diff[t])
-    @expression(model, dproxdy[t = 1:T], (model[:x][2, t] - obstacle[2]) * inv_sq_diff[t])
+    @expression(model, dproxdx[t = 1:T], -(model[:x][1, t] - obstacle[1]) * inv_sq_diff[t])
+    @expression(model, dproxdy[t = 1:T], -(model[:x][2, t] - obstacle[2]) * inv_sq_diff[t])
 
     dg̃dx = (;
             goal = 2 * x,
@@ -146,7 +144,7 @@ control_system = (
     n_controls = 2,
 )
 cost_model = (
-    weights = (; goal = 1, control = 100),
+    weights = (; goal = 1, control = 100, proximity = 0.5),
     add_objective! = add_forward_objective!,
     add_objective_gradients! = add_forward_objective_gradients!,
 )
