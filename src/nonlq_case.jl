@@ -93,9 +93,9 @@ symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
 # Note: If you have non-quadratic/affine cost components, introduce an auxiliary variable +
 # constraint (see e.g. the jacobian in line 51).
 
-# TODO: Visualize this as well
+# TODO: Visualize obstacle cost
 const obstacle = (0.5, 0.5) # Point to avoid.
-
+# TODO: maybe limit the region of this cost
 function register_shared_forward_cost_expressions!(model, x, u; prox_min = 0.1)
     T = size(x, 2)
     @NLexpression(
@@ -121,8 +121,6 @@ end
 function add_forward_objective_gradients!(model, x, u; weights)
     T = size(x, 2)
     register_shared_forward_cost_expressions!(model, x, u)
-    # ∇ₓ of the proximity cost above.
-    # TODO: think about this derivative. I think is correct now.
     @variable(model, dproxdx[1:T])
     @NLconstraint(
         model,
