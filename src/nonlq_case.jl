@@ -219,7 +219,7 @@ function solve_inverse_optimal_control(
 
     # decision variable
     @variable(model, weights[keys(cost_model.weights)],)
-    JuMP.set_start_value.(weights, 1 / sqrt(length(cost_model.weights)))
+    JuMP.set_start_value.(weights, 1 / length(cost_model.weights))
 
     @variable(model, x[1:n_states, 1:T])
     JuMP.set_start_value.(x, x̂)
@@ -242,7 +242,7 @@ function solve_inverse_optimal_control(
     # regularization
     # TODO: Think about what would be the right regularization now
     @constraint(model, weights .>= cmin)
-    @constraint(model, weights' * weights == 1)
+    @constraint(model, sum(weights) == 1)
     @objective(model, Min, inverse_objective(x; x̂))
 
     @time JuMP.optimize!(model)
