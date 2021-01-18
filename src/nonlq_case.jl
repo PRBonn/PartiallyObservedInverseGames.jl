@@ -4,7 +4,7 @@ using UnPack: @unpack
 # Optimization
 using JuMP: JuMP, @NLconstraint, @constraint, @objective, @variable, @NLexpression, @expression
 using LinearAlgebra: I, diagm
-using Random: MersenneTwister
+import Random
 import Ipopt
 
 # Visualization
@@ -187,19 +187,11 @@ visualize_unicycle_trajectory(forward_solution.x)
 
 #===================================== Inverse Optimal Control =====================================#
 
-function expected_observation(x)
-    @view x[[1,2,3,4], :]
-end
-
-function observation(x; rng, σ)
-    ŷ = expected_observation(x)
-    ŷ + randn(size(ŷ)) .* σ
-end
-
 function solve_inverse_optimal_control(
     y;
     control_system,
     cost_model,
+    observation_model,
     solver = Ipopt.Optimizer,
     solver_attributes = (),
     silent = false,
@@ -238,18 +230,24 @@ function solve_inverse_optimal_control(
     @constraint(model, sum(weights) == 1)
 
     # The inverse objective: match the observed demonstration
-    @objective(model, Min, sum((expected_observation(x) .- y) .^ 2))
+    @objective(model, Min, sum((observation_model.expected_observation(x) .- y) .^ 2))
 
     @time JuMP.optimize!(model)
     get_model_values(model, :weights, :x, :u, :λ), model
 end
 
-y = observation(forward_solution.x; rng = MersenneTwister(1), σ = 0.01)
-inverse_solution, inverse_model = solve_inverse_optimal_control(y; control_system, cost_model)
+observation_model = (; σ = 0.0, expected_observation = identity)
+
+y = let
+    ŷ = observation_model.expected_observation(forward_solution.x)
+    ŷ + randn(Random.MersenneTwister(1), size(ŷ)) .* observation_model.σ
+end
+
+inverse_solution, inverse_model =
+    solve_inverse_optimal_control(y; control_system, cost_model, observation_model)
 
 @testset "Solution Sanity" begin
     @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
-
 
     for k in keys(cost_model.weights)
         atol = 1e-2 * cost_model.weights[k]
@@ -257,11 +255,11 @@ inverse_solution, inverse_model = solve_inverse_optimal_control(y; control_syste
         @test isapprox(
             inverse_solution.weights[k] / inverse_solution.weights[:goal],
             cost_model.weights[k] / cost_model.weights[:goal];
-            atol = atol
+            atol = atol,
         )
     end
 
-    ŷ = expected_observation(forward_solution.x)
-    ê_sq = sum((ŷ .- y).^2)
+    ŷ = observation_model.expected_observation(forward_solution.x)
+    ê_sq = sum((ŷ .- y) .^ 2)
     @test JuMP.objective_value(inverse_model) <= ê_sq + 1e-2
 end
