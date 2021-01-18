@@ -135,7 +135,7 @@ function solve_inverse_lqr(
     @constraint(model, r' * r >= r_sqr_min)
     @constraint(model, r' * r + q' * q == 1)
 
-    @objective(model, Min, inverse_objective(x; x̂))
+    @objective(model, Min, sum((x .- x̂).^2))
     @time JuMP.optimize!(model)
     get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
 end
