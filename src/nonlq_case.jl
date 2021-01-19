@@ -4,6 +4,7 @@ using UnPack: @unpack
 # Optimization
 using JuMP: JuMP, @NLconstraint, @constraint, @objective, @variable, @NLexpression, @expression
 using LinearAlgebra: I, diagm
+using SparseArrays: spzeros
 import Random
 import Ipopt
 
@@ -101,10 +102,6 @@ end
 symbol(s::Symbol) = s
 symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
 
-# TODO: maybe limit the region of this cost
-# TODO: Visualize obstacle cost
-const obstacle = (0.5, 0.5) # Point to avoid.
-
 function register_shared_forward_cost_expressions!(model, x, u; prox_min = 0.1)
     T = size(x, 2)
     @NLexpression(
@@ -122,13 +119,21 @@ function add_forward_objective!(model, x, u; weights)
     @variable(model, prox_cost[t = 1:T])
     @NLconstraint(model, [t = 1:T], prox_cost[t] == -log(model[:regularized_sq_dist][t]))
 
-    g̃ = (; goal = sum(x .^ 2), control = sum(u .^ 2), proximity = sum(prox_cost))
+    g̃ = (;
+        state_goal = sum(x[1:2, T_activate_goalcost:T] .^ 2),
+        state_velocity = sum(x[3, :] .^ 2),
+        state_proximity = sum(prox_cost),
+        control_Δv = sum(u[1, :] .^ 2),
+        control_Δθ = sum(u[2, :] .^ 2),
+        control = sum(u .^ 2),
+    )
 
     @objective(model, Min, sum(weights[k] * g̃[symbol(k)] for k in keys(weights)))
 end
 
 function add_forward_objective_gradients!(model, x, u; weights)
-    T = size(x, 2)
+    n_states, T = size(x)
+    n_controls = size(u, 1)
     register_shared_forward_cost_expressions!(model, x, u)
     @variable(model, dproxdx[1:T])
     @NLconstraint(
@@ -144,14 +149,26 @@ function add_forward_objective_gradients!(model, x, u; weights)
     )
 
     dg̃dx = (;
-        goal = 2 * x,
-        control = zeros(size(x)),
-        proximity = vcat(dproxdx', dproxdy', zeros(size(x, 1) - 2, T)),
+        state_goal = 2 * [
+            zeros(2, T_activate_goalcost - 1) x[1:2, T_activate_goalcost:T]
+            zeros(n_states - 2, T)
+        ],
+        state_velocity = 2 * [spzeros(T, 2) x[3, :] spzeros(T)]',
+        state_proximity = [dproxdx dproxdy spzeros(T, n_states - 2)]',
+        control_Δv = spzeros(n_states, T),
+        control_Δθ = spzeros(n_states, T),
+        control = spzeros(n_states, T),
     )
-
     dgdx = sum(weights[k] * dg̃dx[symbol(k)] for k in keys(weights))
 
-    dg̃du = (; goal = zeros(size(u)), control = 2 * u, proximity = zeros(size(u)))
+    dg̃du = (;
+        state_goal = spzeros(n_controls, T),
+        state_velocity = spzeros(n_controls, T),
+        state_proximity = spzeros(n_controls, T),
+        control_Δv = 2 * [u[1, :] zeros(T)]',
+        control_Δθ = 2 * [spzeros(T) u[2, :]]',
+        control = 2 * u,
+    )
     dgdu = sum(weights[k] * dg̃du[symbol(k)] for k in keys(weights))
 
     (; dx = dgdx, du = dgdu)
@@ -163,13 +180,24 @@ control_system = (
     n_states = 4,
     n_controls = 2,
 )
+
+# TODO: maybe limit the region of proximity cost
+const x0 = [-1, 1, 0, 0]
+const T = 100
+const obstacle = (-0.5, 0.25) # Point to avoid.
+const T_activate_goalcost = 50
 cost_model = (
-    weights = (; goal = 1, control = 10, proximity = 1),
+    weights = (;
+        state_goal = 100,
+        state_velocity = 1_000, # TODO: have a higher cost for driving backwards
+        state_proximity = 1,
+        control_Δv = 100,
+        control_Δθ = 10, # TODO: Delay orientation input once more
+        # control = 100,
+    ),
     add_objective! = add_forward_objective!,
     add_objective_gradients! = add_forward_objective_gradients!,
 )
-x0 = [1, 1, 0, 0]
-T = 100
 
 #====================================== forward optimal control ====================================#
 
@@ -281,13 +309,16 @@ inverse_solution, inverse_model = solve_inverse_optimal_control(
 
 @testset "Solution Sanity" begin
     @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
+    atol = 1e-2
+
+    w_total_inverse = sum(inverse_solution.weights)
+    w_total_forward = sum(cost_model.weights)
 
     for k in keys(cost_model.weights)
-        atol = 1e-2 * cost_model.weights[k]
         @info k
         @test isapprox(
-            inverse_solution.weights[k] / inverse_solution.weights[:goal],
-            cost_model.weights[k] / cost_model.weights[:goal];
+            inverse_solution.weights[k] / w_total_inverse,
+            cost_model.weights[k] / w_total_forward;
             atol = atol,
         )
     end
