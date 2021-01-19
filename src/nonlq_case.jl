@@ -17,6 +17,31 @@ include("utils.jl")
 
 #======================================== Global parameters ========================================#
 
+function visualize_unicycle_trajectory(x)
+    (x_min, x_max) = extrema(x[1, :]) .+ (-0.5, 0.5)
+    (y_min, y_max) = extrema(x[2, :]) .+ (-0.5, 0.5)
+
+    prox_cost = if haskey(cost_model.weights, :state_proximity)
+        Plots.plot(
+            x_min:0.01:x_max,
+            y_min:0.01:y_max,
+            (x, y) -> cost_model.weights.state_proximity * -log(sum(((x, y) .- obstacle) .^ 2)),
+            st = :contour,
+        )
+    else
+        Plots.plot()
+    end
+
+    unicycle_viz = Plots.plot!(
+        prox_cost,
+        x[1, :],
+        x[2, :],
+        quiver = (abs.(x[3, :]) .* cos.(x[4, :]), abs.(x[3, :]) .* sin.(x[4, :])),
+        # line_z = axes(x)[2],
+        st = :quiver,
+    )
+end
+
 # These constraints encode the dynamics of a unicycle with state layout x_t = [px, py, v, θ] and
 # inputs u_t = [Δv, Δθ].
 function add_unicycle_dynamics_constraints!(model, x, u)
@@ -170,16 +195,6 @@ function solve_optimal_control(
     cost_model.add_objective!(model, x, u; cost_model.weights)
     @time JuMP.optimize!(model)
     get_model_values(model, :x, :u), model
-end
-
-function visualize_unicycle_trajectory(x)
-    unicycle_viz = Plots.plot(
-        x[1, :],
-        x[2, :],
-        quiver = (abs.(x[3, :]) .* cos.(x[4, :]), abs.(x[3, :]) .* sin.(x[4, :])),
-        line_z = axes(x)[2],
-        st = :quiver,
-    )
 end
 
 forward_solution, forward_model = solve_optimal_control(control_system, cost_model, x0, T)
