@@ -203,7 +203,8 @@ visualize_unicycle_trajectory(forward_solution.x)
 #===================================== Inverse Optimal Control =====================================#
 
 function solve_inverse_optimal_control(
-    y;
+    y,
+    û = nothing;
     control_system,
     cost_model,
     observation_model,
@@ -211,6 +212,7 @@ function solve_inverse_optimal_control(
     solver_attributes = (),
     silent = false,
     cmin = 1e-5,
+    max_trajectory_error = nothing,
 )
     T = size(y)[2]
     @unpack n_states, n_controls = control_system
@@ -223,11 +225,20 @@ function solve_inverse_optimal_control(
     @variable(model, x[1:n_states, 1:T])
     @variable(model, u[1:n_controls, 1:T])
     @variable(model, λ[1:n_states, 1:T]) # multipliers of the forward optimality condition
-
     # TODO: Are there smarter initial guesses that we can make for `u` and `λ`?
     JuMP.set_start_value.(weights, 1 / length(cost_model.weights))
     JuMP.set_start_value.(x[CartesianIndices(y)], y)
+    if !isnothing(û)
+        JuMP.set_start_value.(u[CartesianIndices(û)], û)
+    end
 
+    # constraints
+    if !isnothing(max_trajectory_error)
+        @constraint(model, sum(x .- y) .^ 2 <= max_trajectory_error)
+    end
+    if iszero(observation_model.σ)
+        @constraint(model, observation_model.expected_observation(x[:, 1]) .== y[:, 1])
+    end
     control_system.add_dynamics_constraints!(model, x, u)
     # KKT conditions as constraints for forward optimality
     df = control_system.add_dynamics_jacobians!(model, x, u)
@@ -258,8 +269,15 @@ y = let
     ŷ + randn(Random.MersenneTwister(1), size(ŷ)) .* observation_model.σ
 end
 
-inverse_solution, inverse_model =
-    solve_inverse_optimal_control(y; control_system, cost_model, observation_model)
+inverse_solution, inverse_model = solve_inverse_optimal_control(
+    y,
+    forward_solution.u;
+    control_system,
+    cost_model,
+    observation_model,
+)
+
+#============================================== Tests ==============================================#
 
 @testset "Solution Sanity" begin
     @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
