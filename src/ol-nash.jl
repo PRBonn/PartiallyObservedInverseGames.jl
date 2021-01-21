@@ -119,10 +119,6 @@ function solve_ol_nash(
     get_model_values(model, :x, :u1, :u2, :λ1, :λ2), model
 end
 
-# TODO: debug... does not converge right now.
-forward_solution, forward_model = solve_ol_nash(control_system, cost_model, x0, T)
-
-# TODO gradient checks
 @testset "Gradient check" begin
     x = rand(4, 100)
     u = rand(2, 100)
@@ -139,6 +135,9 @@ forward_solution, forward_model = solve_ol_nash(control_system, cost_model, x0, 
     @test dg2dx == dg2.dx
     @test dg2du2 == dg2.du2
 end
+
+# TODO: debug... does not converge right now.
+forward_solution, forward_model = solve_ol_nash(control_system, cost_model, x0, T)
 
 
 # TODO: check forward optimal solution with single-player implementation (this could also be solved
