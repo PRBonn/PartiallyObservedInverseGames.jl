@@ -53,9 +53,9 @@ version = "0.5.1"
 
 [[ChainRules]]
 deps = ["ChainRulesCore", "Compat", "LinearAlgebra", "Random", "Reexport", "Requires", "Statistics"]
-git-tree-sha1 = "0af5c12e5528fc2df87a5f084195f10bfbf03a28"
+git-tree-sha1 = "6ba8100fa9356807f1d0df6468ae463c67627c30"
 uuid = "082447d4-558c-5d27-93f4-14fc19e9eca2"
-version = "0.7.48"
+version = "0.7.49"
 
 [[ChainRulesCore]]
 deps = ["Compat", "LinearAlgebra", "SparseArrays"]
@@ -124,9 +124,9 @@ version = "1.4.0"
 
 [[DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
-git-tree-sha1 = "fb0aa371da91c1ff9dc7fbed6122d3e411420b9c"
+git-tree-sha1 = "4437b64df1e0adccc3e5d1adbc3ac741095e4677"
 uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
-version = "0.18.8"
+version = "0.18.9"
 
 [[DataValueInterfaces]]
 git-tree-sha1 = "bfc1187b79289637fa0ef6d4436ebdfe6905cbd6"
@@ -237,9 +237,9 @@ version = "0.4.2"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "NaNMath", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "8de2519a83c6c1c2442c2f481dd9a8364855daf4"
+git-tree-sha1 = "c26b56e9b9f0687f7ca887f6b6ded03d269e0e35"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.14"
+version = "0.10.15"
 
 [[FreeType2_jll]]
 deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
@@ -273,9 +273,9 @@ version = "0.53.0+0"
 
 [[GeometryBasics]]
 deps = ["EarCut_jll", "IterTools", "LinearAlgebra", "StaticArrays", "StructArrays", "Tables"]
-git-tree-sha1 = "876f77f0d3253e882ff588af1c95d0e4a86c9766"
+git-tree-sha1 = "a28d728c2d825285fe27f38ca322399d35d1a5b9"
 uuid = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
-version = "0.3.5"
+version = "0.3.6"
 
 [[Gettext_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Pkg", "XML2_jll"]
@@ -929,9 +929,9 @@ version = "1.4.5+2"
 
 [[Zygote]]
 deps = ["AbstractFFTs", "ChainRules", "DiffRules", "Distributed", "FillArrays", "ForwardDiff", "IRTools", "InteractiveUtils", "LinearAlgebra", "MacroTools", "NaNMath", "Random", "Requires", "SpecialFunctions", "Statistics", "ZygoteRules"]
-git-tree-sha1 = "52032f3eb3bf383df34f5455c031457632e8c6d4"
+git-tree-sha1 = "746c9de7fb87a341c809437007cbd172c4d494b4"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.6.1"
+version = "0.6.2"
 
 [[ZygoteRules]]
 deps = ["MacroTools"]
