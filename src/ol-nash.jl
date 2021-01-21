@@ -7,18 +7,20 @@ using JuMP: @variable, @constraint
 using UnPack: @unpack
 using SparseArrays: spzeros
 
+import Plots, ElectronDisplay
+
 include("utils.jl")
 include("unicycle.jl")
 
 #======================================== Global parameters ========================================#
 
 function objective_p1(x, u1; weights)
-    weights[:state_velocity_p1] * sum((x[3, :] .- 1).^2) + weights[:control_Δv_p1] * sum(u1.^2)
+    weights[:state_velocity_p1] * sum((x[3, :] .- 0.1).^2) + weights[:control_Δv_p1] * sum(u1.^2)
 end
 
 function objective_gradients_p1(x, u1; weights)
     T = size(x, 2)
-    dg1dx = 2 * weights[:state_velocity_p1] * [zeros(2, T); x[3:3, :] .- 1; zeros(1, T)]
+    dg1dx = 2 * weights[:state_velocity_p1] * [zeros(2, T); x[3:3, :] .- 0.1; zeros(1, T)]
     dg1du1 = 2 * weights[:control_Δv_p1] * u1
     (; dx = dg1dx, du1 = dg1du1)
 end
@@ -41,14 +43,14 @@ control_system = (
     n_controls = 2,
 )
 
-const x0 = [-1, 1, 1, 0]
-const T = 100
+x0 = [-1, 1, 0.1, 0]
+T = 100
 cost_model = (;
     weights = (;
-        state_goal_p2 = 10,
-        state_velocity_p1 = 100,
+        state_goal_p2 = 1,
+        state_velocity_p1 = 10,
         control_Δv_p1 = 10,
-        control_Δθ_p2 = 1,
+        control_Δθ_p2 = 100,
     ),
     objective_p1,
     objective_gradients_p1,
@@ -79,6 +81,16 @@ function solve_ol_nash(
     # TODO: think about where/if we have to share lagrange multipliers
     λ1 = @variable(model, λ1[1:n_states, 1:T])
     λ2 = @variable(model, λ2[1:n_states, 1:T])
+
+
+    # TODO: fix ugly hack. Hard-code a dynamically feasible initial trajectory
+    x_init = reduce(1:T-1; init = x0) do x, t
+        [x x[:, end] + [x0[3], 0, 0, 0]]
+    end
+    JuMP.set_start_value.(x, x_init)
+    JuMP.set_start_value.(u1, zeros(size(u1)))
+    JuMP.set_start_value.(u2, zeros(size(u2)))
+
     u = [u1; u2]
 
     # constraints
@@ -104,7 +116,7 @@ function solve_ol_nash(
     @constraint(model, [i=eachindex(dL2du2)], dL2du2[i] .== 0)
 
     @time JuMP.optimize!(model)
-    get_model_values(model, :x, #=:u1,=# :u2, :λ1, :λ2), model
+    get_model_values(model, :x, :u1, :u2, :λ1, :λ2), model
 end
 
 # TODO: debug... does not converge right now.
