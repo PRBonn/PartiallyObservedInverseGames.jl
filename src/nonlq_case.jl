@@ -128,8 +128,10 @@ function solve_optimal_control(
     cost_model,
     x0,
     T;
+    fixed_inputs = nothing,
+    init = nothing,
     solver = Ipopt.Optimizer,
-    solver_attributes = (),
+    solver_attributes = (;x = nothing, u = nothing),
     silent = false,
 )
     @unpack n_states, n_controls = control_system
@@ -137,8 +139,25 @@ function solve_optimal_control(
     model = JuMP.Model(solver)
     set_solver_attributes!(model; silent, solver_attributes...)
 
-    @variable(model, x[1:n_states, 1:T])
-    @variable(model, u[1:n_controls, 1:T])
+    x = @variable(model, x[1:n_states, 1:T])
+    u = @variable(model, u[1:n_controls, 1:T])
+
+    # initial guess
+    if !isnothing(init.x)
+        JuMP.set_start_value.(x, init.x)
+    end
+    if !isnothing(init.u)
+        JuMP.set_start_value.(u, init.u)
+    end
+
+    # fix certain inputs
+    if !isnothing(fixed_inputs)
+        for i in fixed_inputs
+            # TODO: maybe not use init.u here for genericity
+            @constraint(model, u[i, :] .== init.u[i, :])
+        end
+    end
+
     control_system.add_dynamics_constraints!(model, x, u)
     @constraint(model, initial_condition, x[:, 1] .== x0)
     cost_model.add_objective!(model, x, u; cost_model.weights)

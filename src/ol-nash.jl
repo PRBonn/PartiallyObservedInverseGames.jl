@@ -136,8 +136,36 @@ end
     @test dJ2du2 == dJ2.du2
 end
 
-# TODO: debug... does not converge right now.
-forward_solution, forward_model = solve_ol_nash(control_system, cost_model, x0, T)
+# TODO: make an IBR version for comparison
+function solve_ol_nash_ibr(
+    control_system,
+    cost_models,
+    x0,
+    T;
+    inner_solver_kwargs = (),
+    max_ibr_rounds = 10,
+)
+    @unpack n_states, n_controls = control_system
+    last_solution = (; x = zeros(n_states, T), u = zeros(n_controls, T))
+
+    for i in 1:max_ibr_rounds, (player, player_cost_model) in enumerate(cost_models)
+        player_solution, player_model = solve_optimal_control(
+            control_system,
+            player_cost_model,
+            x0,
+            T;
+            fix_input = i,
+            init = last_solution,
+            inner_solver_kwargs...,
+        )
+
+        if sum(x -> x^2, player_solution.x - last_solution.x) < 0.01
+            @info "Convereged!"
+            return player_solution
+        end
+
+        last_solution = player_solution
+    end
 
 end
 
