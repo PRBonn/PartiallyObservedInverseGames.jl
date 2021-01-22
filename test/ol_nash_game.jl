@@ -3,7 +3,7 @@ import Ipopt
 import Zygote
 
 using JuMP: @variable, @constraint, @objective
-using JuMPOptimalControl.ForwardGame: solve_ol_nash_ibr
+using JuMPOptimalControl.ForwardGame: solve_ol_nash_ibr, solve_ol_nash_kkt
 using SparseArrays: spzeros
 using Test: @test, @testset
 using UnPack: @unpack
@@ -59,19 +59,21 @@ cost_model = (;
     objective_gradients_p2,
 )
 
-# TODO: continue here
-c1 = merge(
-    cost_model,
-    (; add_objective! = function (model, x, u; weights)
-        @objective(model, Min, objective_p1(x, u[1, :]; weights))
-    end),
-)
-
-c2 = merge(
-    cost_model,
-    (; add_objective! = function (model, x, u; weights)
-        @objective(model, Min, objective_p2(x, u[2, :]; weights))
-    end),
+player_cost_models = (
+    # cost_model P1
+    merge(
+        cost_model,
+        (; add_objective! = function (model, x, u; weights)
+            @objective(model, Min, objective_p1(x, u[1, :]; weights))
+        end),
+    ),
+    # cost_model P2
+    merge(
+        cost_model,
+        (; add_objective! = function (model, x, u; weights)
+            @objective(model, Min, objective_p2(x, u[2, :]; weights))
+        end),
+    ),
 )
 
 #====================================== forward optimal control ====================================#
@@ -93,10 +95,23 @@ c2 = merge(
     @test dJ2du2 == dJ2.du2
 end
 
-ibr_solution = solve_ol_nash_ibr(control_system, [c1, c2], x0, T)
+ibr_nash, ibr_converged = solve_ol_nash_ibr(
+    control_system,
+    player_cost_models,
+    x0,
+    T;
+    inner_solver_kwargs = (; silent = true),
+)
+
+@test ibr_converged
+
+# TODO: fix ugly hack. Hard-code a dynamically feasible initial trajectory
+# x_init = reduce(1:(T - 1); init = x0) do x, t
+#     [x x[:, end] + [x0[3], 0, 0, 0]]
+# end
 
 # TODO: debug... does not converge right now.
-# forward_solution, forward_model = solve_ol_nash_kkt(control_system, cost_model, x0, T)
+kkt_nash, kkt_model = solve_ol_nash_kkt(control_system, cost_model, x0, T)
 
 # TODO: check forward optimal solution with single-player implementation (this could also be solved
 # as an optimal problem)
