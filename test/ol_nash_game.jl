@@ -63,56 +63,141 @@ player_cost_models = (
     # cost_model P1
     merge(
         cost_model,
-        (; add_objective! = function (model, x, u; weights)
-            @objective(model, Min, objective_p1(x, u[1, :]; weights))
-        end),
+        (;
+            add_objective! = function (model, x, u; weights)
+                @objective(model, Min, cost_model.objective_p1(x, u[1, :]; weights))
+            end,
+        ),
     ),
     # cost_model P2
     merge(
         cost_model,
-        (; add_objective! = function (model, x, u; weights)
-            @objective(model, Min, objective_p2(x, u[2, :]; weights))
-        end),
+        (;
+            add_objective! = function (model, x, u; weights)
+                @objective(model, Min, cost_model.objective_p2(x, u[2, :]; weights))
+            end,
+        ),
     ),
 )
 
-#====================================== forward optimal control ====================================#
+#=============================================== Tests =============================================#
 
 @testset "Gradient check" begin
     x = rand(4, 100)
     u = rand(2, 100)
 
-    J1 = objective_p1(x, u[1, :]; cost_model.weights)
-    dJ1dx, dJ1du1 = Zygote.gradient((x, u1) -> objective_p1(x, u1; cost_model.weights), x, u[1, :])
+    dJ1dx_ad, dJ1du1_ad =
+        Zygote.gradient((x, u1) -> objective_p1(x, u1; cost_model.weights), x, u[1, :])
     dJ1 = objective_gradients_p1(x, u[1, :]; cost_model.weights)
-    @test dJ1dx == dJ1.dx
-    @test dJ1du1 == dJ1.du1
+    @test dJ1dx_ad == dJ1.dx
+    @test dJ1du1_ad == dJ1.du1
 
-    J2 = objective_p2(x, u[2, :]; cost_model.weights)
-    dJ2dx, dJ2du2 = Zygote.gradient((x, u2) -> objective_p2(x, u2; cost_model.weights), x, u[2, :])
+    dJ2dx_ad, dJ2du2_ad =
+        Zygote.gradient((x, u2) -> objective_p2(x, u2; cost_model.weights), x, u[2, :])
     dJ2 = objective_gradients_p2(x, u[2, :]; cost_model.weights)
-    @test dJ2dx == dJ2.dx
-    @test dJ2du2 == dJ2.du2
+    @test dJ2dx_ad == dJ2.dx
+    @test dJ2du2_ad == dJ2.du2
 end
 
-ibr_nash, ibr_converged = solve_ol_nash_ibr(
-    control_system,
-    player_cost_models,
-    x0,
-    T;
-    inner_solver_kwargs = (; silent = true),
-)
+@testset "Iterated Best Open-Loop Response" begin
 
-@test ibr_converged
+    global ibr_nash, ibr_converged = solve_ol_nash_ibr(
+        control_system,
+        player_cost_models,
+        x0,
+        T;
+        inner_solver_kwargs = (; silent = true),
+    )
 
-# TODO: fix ugly hack. Hard-code a dynamically feasible initial trajectory
-# x_init = reduce(1:(T - 1); init = x0) do x, t
-#     [x x[:, end] + [x0[3], 0, 0, 0]]
-# end
+    @test ibr_converged
+end
+
+# precompute lagrange multipliers
+begin
+
+    df = let x = ibr_nash.x
+        As = [
+            [
+                1 0 cos(x[4, t]) -x[3, t]*sin(x[4, t])
+                0 1 sin(x[4, t]) +x[3, t]*cos(x[4, t])
+                0 0 1 0
+                0 0 0 1
+            ] for t in 1:T
+        ]
+
+        Bs = [[
+            0 0
+            0 0
+            1 0
+            0 1
+        ] for t in 1:T]
+
+        (;
+            dx = reduce((A, x) -> cat(A, x; dims = 3), As),
+            du = reduce((A, x) -> cat(A, x; dims = 3), Bs),
+        )
+    end
+
+    λ1 = zeros(control_system.n_states, T)
+    @testset "λ1" begin
+        dJ1 = cost_model.objective_gradients_p1(ibr_nash.x, ibr_nash.u[1:1, :]; cost_model.weights)
+
+        dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T]
+        dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 2:T]
+
+        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1dx)
+        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1du1)
+    end
+
+    λ2 = let
+        model = JuMP.Model(Ipopt.Optimizer)
+        λ2 = @variable(model, [1:(control_system.n_states), 1:T])
+
+        # TODO: remove
+        # λ[t]' * (x[t+1] - f(x[t], u[t]))
+
+        dJ2 = cost_model.objective_gradients_p2(ibr_nash.x, ibr_nash.u[2:2, :]; cost_model.weights)
+        dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T]
+        dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T]
+
+        @constraint(model, [t = eachindex(dL2dx)], dL2dx[t] .== 0)
+        # @constraint(model, [t = eachindex(dL2du2)], dL2du2[t] .== 0)
+
+        JuMP.optimize!(model)
+        JuMP.value.(λ2)
+    end
+
+    @testset "λ2" begin
+        dJ2 = cost_model.objective_gradients_p2(ibr_nash.x, ibr_nash.u[2:2, :]; cost_model.weights)
+        dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T]
+        dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T]
+
+        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2dx)
+        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2du2)
+    end
+end
 
 # TODO: debug... does not converge right now.
-kkt_nash, kkt_model = solve_ol_nash_kkt(control_system, cost_model, x0, T)
+# - warm start the solver with the IBR solution
+#   - [done] only initialize "primal" variables (x, u)
+#   - also initialize Lagrange multipliers `λ`
+#       - [done] λ1 should be zero,
+#       - not sure how to compute `λ2` (@DFK)
+#   - [done] reduce the solver tolerance
+#   - check multipliers from IBR
+#       - same as manually computed up to a sign
+#       - 0 for P1
+#       - non-zero for P2
+#   - try another simpler problem
+#       - with decoupled dynamics for P1 and P2
+#       - try a fully cooperative version of the problem
+kkt_nash, kkt_model = solve_ol_nash_kkt(
+    control_system,
+    cost_model,
+    x0,
+    T;
+    init = merge(ibr_nash, (; λ1 = 0, λ2 = 1)),
+    # solver_attributes = (; constr_viol_tol = 1e-10, tol = 1e-10)
+)
 
-# TODO: check forward optimal solution with single-player implementation (this could also be solved
-# as an optimal problem)
-#   - If that works, see if we can warmstart the solver
+# visualize_unicycle_trajectory(kkt_nash.x)
