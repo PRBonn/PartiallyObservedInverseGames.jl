@@ -66,16 +66,13 @@ function solve_optimal_control(
     model = JuMP.Model(solver)
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
+    # decision variables
     x = @variable(model, x[1:n_states, 1:T])
     u = @variable(model, u[1:n_controls, 1:T])
 
     # initial guess
-    if !isnothing(init.x)
-        JuMP.set_start_value.(x, init.x)
-    end
-    if !isnothing(init.u)
-        JuMP.set_start_value.(u, init.u)
-    end
+    isnothing(init.x) || JuMP.set_start_value.(x, init.x)
+    isnothing(init.u) || JuMP.set_start_value.(u, init.u)
 
     # fix certain inputs
     for i in fix_inputs

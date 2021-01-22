@@ -3,7 +3,7 @@ module ForwardGame
 import JuMP
 import Ipopt
 
-using JuMP: @variable, @constraint
+using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
 using ..ForwardOptimalControl: solve_optimal_control
 using ..SolverUtils
@@ -59,6 +59,7 @@ end
 
 # TODO: Share containers between players to make implementation more generic (agnostic to different
 # numbers of players) (u's and λ's)
+# TODO handle missing "init" keys more gracefully (also in other solvers)
 function solve_ol_nash_kkt(
     control_system,
     cost_model,
@@ -84,18 +85,13 @@ function solve_ol_nash_kkt(
     u = [u1; u2]
 
     # Initialization
-    if !isnothing(init.λ)
-        JuMP.set_start_value.(λ1, init.λ)
-    end
-    if !isnothing(init.x)
-        JuMP.set_start_value.(x, init.x)
-    end
-    if !isnothing(init.u)
-        JuMP.set_start_value.(u, init.u)
-    end
+    isnothing(init.λ1) || JuMP.set_start_value.(λ1, init.λ1)
+    isnothing(init.λ2) || JuMP.set_start_value.(λ2, init.λ2)
+    isnothing(init.x) || JuMP.set_start_value.(x, init.x)
+    isnothing(init.u) || JuMP.set_start_value.(u, init.u)
 
     # constraints
-    initial_condition = @constraint(model, x[:, 1] .== x0)
+    @constraint(model, x[:, 1] .== x0)
     control_system.add_dynamics_constraints!(model, x, u)
     df = control_system.add_dynamics_jacobians!(model, x, u)
     dJ1 = cost_model.objective_gradients_p1(x, u1; cost_model.weights)
