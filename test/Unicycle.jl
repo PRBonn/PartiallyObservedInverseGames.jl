@@ -15,7 +15,7 @@ function visualize_unicycle_trajectory(x; cost_model = nothing, kwargs...)
         Plots.plot(
             x_min:0.01:x_max,
             y_min:0.01:y_max,
-            (x, y) -> cost_model.weights.state_proximity * -log(sum(((x, y) .- obstacle) .^ 2)),
+            (x, y) -> cost_model.weights.state_proximity * -log(sum(((x, y) .- cost_model.obstacle) .^ 2)),
             st = :contour,
         )
     else
