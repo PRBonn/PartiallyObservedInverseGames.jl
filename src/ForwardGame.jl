@@ -103,12 +103,12 @@ function solve_ol_nash_kkt(
     # TODO: figure out whether/which multipliers need to be shared
     # P1 KKT
     dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T]
-    dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 2:T]
+    dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:T]
     @constraint(model, [t = eachindex(dL1dx)], dL1dx[t] .== 0)
     @constraint(model, [t = eachindex(dL1du1)], dL1du1[t] .== 0)
     # P2 KKT
     dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T]
-    dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 2:T]
+    dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T]
     @constraint(model, [t = eachindex(dL2dx)], dL2dx[t] .== 0)
     @constraint(model, [t = eachindex(dL2du2)], dL2du2[t] .== 0)
 

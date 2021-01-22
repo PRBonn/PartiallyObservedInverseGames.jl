@@ -137,7 +137,7 @@ function solve_inverse_optimal_control(
         dLdx[t = 2:T],
         dg.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0
     )
-    @constraint(model, dLdu[t = 2:T], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
+    @constraint(model, dLdu[t = 1:T], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
     # regularization
     # TODO: There might be a smarter regularization here. Rather, we want there to be non-zero cost
     # for all inputs.
