@@ -1,24 +1,19 @@
 using Test: @test, @testset
-using UnPack: @unpack
 
-# Optimization
-using JuMP: JuMP, @NLconstraint, @constraint, @objective, @variable, @NLexpression, @expression
-using LinearAlgebra: I, diagm
-using SparseArrays: spzeros
 import Random
-import Ipopt
 
-# Visualization
-import ElectronDisplay
-import Plots
-Plots.gr()
-Plots.theme(:vibrant)
+using JuMP: JuMP, @NLconstraint, @objective, @variable, @NLexpression
+using SparseArrays: spzeros
+using JuMPOptimalControl.ForwardOptimalControl: solve_optimal_control
+using JuMPOptimalControl.InverseOptimalControl: solve_inverse_optimal_control
 
-include("utils.jl")
-include("unicycle.jl")
+include("Unicycle.jl")
+using .Unicycle:
+    add_unicycle_dynamics_constraints!,
+    add_unicycle_dynamics_jacobians!,
+    visualize_unicycle_trajectory
 
-#======================================== Global parameters ========================================#
-
+#========================================== Cost Library ===========================================#
 
 symbol(s::Symbol) = s
 symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
@@ -103,10 +98,10 @@ control_system = (
 )
 
 # TODO: maybe limit the region of proximity cost
-const x0 = [-1, 1, 0, 0]
-const T = 100
-const obstacle = (-0.5, 0.25) # Point to avoid.
-const T_activate_goalcost = 50
+x0 = [-1, 1, 0, 0]
+T = 100
+obstacle = (-0.5, 0.25) # Point to avoid.
+T_activate_goalcost = 50
 cost_model = (
     weights = (;
         state_goal = 100,
@@ -122,113 +117,10 @@ cost_model = (
 
 #====================================== forward optimal control ====================================#
 
-"Solves a forward LQR problem using JuMP."
-function solve_optimal_control(
-    control_system,
-    cost_model,
-    x0,
-    T;
-    fixed_inputs = nothing,
-    init = nothing,
-    solver = Ipopt.Optimizer,
-    solver_attributes = (;x = nothing, u = nothing),
-    silent = false,
-)
-    @unpack n_states, n_controls = control_system
-
-    model = JuMP.Model(solver)
-    set_solver_attributes!(model; silent, solver_attributes...)
-
-    x = @variable(model, x[1:n_states, 1:T])
-    u = @variable(model, u[1:n_controls, 1:T])
-
-    # initial guess
-    if !isnothing(init.x)
-        JuMP.set_start_value.(x, init.x)
-    end
-    if !isnothing(init.u)
-        JuMP.set_start_value.(u, init.u)
-    end
-
-    # fix certain inputs
-    if !isnothing(fixed_inputs)
-        for i in fixed_inputs
-            # TODO: maybe not use init.u here for genericity
-            @constraint(model, u[i, :] .== init.u[i, :])
-        end
-    end
-
-    control_system.add_dynamics_constraints!(model, x, u)
-    @constraint(model, initial_condition, x[:, 1] .== x0)
-    cost_model.add_objective!(model, x, u; cost_model.weights)
-    @time JuMP.optimize!(model)
-    get_model_values(model, :x, :u), model
-end
-
 forward_solution, forward_model = solve_optimal_control(control_system, cost_model, x0, T)
 visualize_unicycle_trajectory(forward_solution.x)
 
 #===================================== Inverse Optimal Control =====================================#
-
-function solve_inverse_optimal_control(
-    y,
-    û = nothing;
-    control_system,
-    cost_model,
-    observation_model,
-    solver = Ipopt.Optimizer,
-    solver_attributes = (),
-    silent = false,
-    cmin = 1e-5,
-    max_trajectory_error = nothing,
-)
-    T = size(y)[2]
-    @unpack n_states, n_controls = control_system
-
-    model = JuMP.Model(solver)
-    set_solver_attributes!(model; silent, solver_attributes...)
-
-    # decision variable
-    @variable(model, weights[keys(cost_model.weights)],)
-    @variable(model, x[1:n_states, 1:T])
-    @variable(model, u[1:n_controls, 1:T])
-    @variable(model, λ[1:n_states, 1:T]) # multipliers of the forward optimality condition
-    # TODO: Are there smarter initial guesses that we can make for `u` and `λ`?
-    JuMP.set_start_value.(weights, 1 / length(cost_model.weights))
-    JuMP.set_start_value.(x[CartesianIndices(y)], y)
-    if !isnothing(û)
-        JuMP.set_start_value.(u[CartesianIndices(û)], û)
-    end
-
-    # constraints
-    if !isnothing(max_trajectory_error)
-        @constraint(model, sum(x .- y) .^ 2 <= max_trajectory_error)
-    end
-    if iszero(observation_model.σ)
-        @constraint(model, observation_model.expected_observation(x[:, 1]) .== y[:, 1])
-    end
-    control_system.add_dynamics_constraints!(model, x, u)
-    # KKT conditions as constraints for forward optimality
-    df = control_system.add_dynamics_jacobians!(model, x, u)
-    dg = cost_model.add_objective_gradients!(model, x, u; weights)
-    @constraint(
-        model,
-        dLdx[t = 2:T],
-        dg.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0
-    )
-    @constraint(model, dLdu[t = 2:T], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
-    # regularization
-    # TODO: There might be a smarter regularization here. Rather, we want there to be non-zero cost
-    # for all inputs.
-    @constraint(model, weights .>= cmin)
-    @constraint(model, sum(weights) == 1)
-
-    # The inverse objective: match the observed demonstration
-    @objective(model, Min, sum((observation_model.expected_observation(x) .- y) .^ 2))
-
-    @time JuMP.optimize!(model)
-    get_model_values(model, :weights, :x, :u, :λ), model
-end
 
 observation_model = (; σ = 0.0, expected_observation = identity)
 
@@ -247,7 +139,7 @@ inverse_solution, inverse_model = solve_inverse_optimal_control(
 
 #============================================== Tests ==============================================#
 
-@testset "Solution Sanity" begin
+@testset "Inverse Solution Sanity" begin
     @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
     atol = 1e-2
 

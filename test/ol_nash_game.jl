@@ -49,13 +49,25 @@ T = 100
 cost_model = (;
     weights = (; state_goal_p2 = 1, state_velocity_p1 = 10, control_Δv_p1 = 10, control_Δθ_p2 = 1),
     # TODO: remove. Dummy objective to solve fully-collaborative version of the game.
-    add_objective! = function (model, x, u; weights)
-        @objective(model, Min, objective_p1(x, u; weights) + objective_p2(x, u; weights))
-    end,
     objective_p1,
     objective_gradients_p1,
     objective_p2,
     objective_gradients_p2,
+)
+
+# TODO: continue here
+c1 = merge(
+    cost_model,
+    (; add_objective! = function (model, x, u; weights)
+        @objective(model, Min, objective_p1(x, u[1, :]; weights))
+    end),
+)
+
+c2 = merge(
+    cost_model,
+    (; add_objective! = function (model, x, u; weights)
+        @objective(model, Min, objective_p2(x, u[2, :]; weights))
+    end),
 )
 
 #====================================== forward optimal control ====================================#
@@ -154,23 +166,22 @@ function solve_ol_nash_ibr(
             player_cost_model,
             x0,
             T;
-            fix_input = i,
+            fix_inputs = filter(!=(i), eachindex(cost_models)),
             init = last_solution,
             inner_solver_kwargs...,
         )
 
-        if sum(x -> x^2, player_solution.x - last_solution.x) < 0.01
-            @info "Convereged!"
+        if i > 1 && sum(x -> x^2, player_solution.x - last_solution.x) < 0.01
+            @info "Convereged at IBR iterate $i"
             return player_solution
         end
 
         last_solution = player_solution
     end
-
 end
 
 # TODO: debug... does not converge right now.
-forward_solution, forward_model = solve_ol_nash_kkt(control_system, cost_model, x0, T)
+# forward_solution, forward_model = solve_ol_nash_kkt(control_system, cost_model, x0, T)
 
 # TODO: check forward optimal solution with single-player implementation (this could also be solved
 # as an optimal problem)

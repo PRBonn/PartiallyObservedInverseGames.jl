@@ -1,10 +1,17 @@
+module Unicycle
+
+import Plots
 using JuMP: @variable, @constraint, @NLconstraint
 
-function visualize_unicycle_trajectory(x; kwargs...)
+export visualize_unicycle_trajectory,
+    add_unicycle_dynamics_jacobians!, add_unicycle_dynamics_jacobians!
+
+function visualize_unicycle_trajectory(x; cost_model = nothing, kwargs...)
     (x_min, x_max) = extrema(x[1, :]) .+ (-0.5, 0.5)
     (y_min, y_max) = extrema(x[2, :]) .+ (-0.5, 0.5)
 
-    prox_cost = if haskey(cost_model.weights, :state_proximity)
+    # TODO: this is a rather ugly hack for quick visualization of the proximity cost
+    prox_cost = if !isnothing(cost_model) && haskey(cost_model.weights, :state_proximity)
         Plots.plot(
             x_min:0.01:x_max,
             y_min:0.01:y_max,
@@ -22,7 +29,7 @@ function visualize_unicycle_trajectory(x; kwargs...)
         quiver = (abs.(x[3, :]) .* cos.(x[4, :]), abs.(x[3, :]) .* sin.(x[4, :])),
         # line_z = axes(x)[2],
         st = :quiver,
-        kwargs...
+        kwargs...,
     )
 end
 
@@ -80,4 +87,6 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
     ] .* reshape(ones(T), 1, 1, :)
 
     (; dx = dfdx, du = dfdu)
+end
+
 end
