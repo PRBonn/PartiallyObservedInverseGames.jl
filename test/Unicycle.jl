@@ -15,7 +15,9 @@ function visualize_unicycle_trajectory(x; cost_model = nothing, kwargs...)
         Plots.plot(
             x_min:0.01:x_max,
             y_min:0.01:y_max,
-            (x, y) -> cost_model.weights.state_proximity * -log(sum(((x, y) .- cost_model.obstacle) .^ 2)),
+            (x, y) ->
+                cost_model.weights.state_proximity *
+                -log(sum(((x, y) .- cost_model.obstacle) .^ 2)),
             st = :contour,
         )
     else
@@ -72,7 +74,7 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
         [t = 1:T],
         dfdx[:, :, t] .== [
             1 0 cosθ[t] -x[3, t]*sinθ[t]
-            0 1 sinθ[t] x[3, t]*cosθ[t]
+            0 1 sinθ[t] +x[3, t]*cosθ[t]
             0 0 1 0
             0 0 0 1
         ]
