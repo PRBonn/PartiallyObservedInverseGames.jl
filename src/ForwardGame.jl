@@ -28,10 +28,11 @@ function solve_ol_nash_ibr(
     last_ibr_solution = (; x = zeros(n_states, T), u = zeros(n_controls, T))
     last_player_solution = last_ibr_solution
     converged = false
+    player_opt_models = Any[nothing, nothing]
 
     for i_ibr in 1:max_ibr_rounds
         for (player_idx, player_cost_model) in enumerate(cost_models)
-            last_player_solution, _ = solve_optimal_control(
+            last_player_solution, player_opt_models[player_idx] = solve_optimal_control(
                 control_system,
                 player_cost_model,
                 x0,
@@ -52,7 +53,7 @@ function solve_ol_nash_ibr(
         end
     end
 
-    last_ibr_solution, converged
+    last_ibr_solution, converged, player_opt_models
 end
 
 #================================= Open-Loop KKT Nash Constraints ==================================#
@@ -68,7 +69,7 @@ function solve_ol_nash_kkt(
     solver = Ipopt.Optimizer,
     solver_attributes = (),
     silent = false,
-    init = (; λ = nothing, x = nothing, u = nothing),
+    init = (; λ1 = nothing, λ2 = nothing, x = nothing, u = nothing),
 )
     @unpack n_states = control_system
     model = JuMP.Model(solver)
@@ -80,8 +81,8 @@ function solve_ol_nash_kkt(
     u1 = @variable(model, u1[1:1, 1:T])
     u2 = @variable(model, u2[1:1, 1:T])
     # TODO: think about where/if we have to share lagrange multipliers
-    λ1 = @variable(model, λ1[1:n_states, 1:T])
-    λ2 = @variable(model, λ2[1:n_states, 1:T])
+    λ1 = @variable(model, λ1[1:n_states, 1:T-1])
+    λ2 = @variable(model, λ2[1:n_states, 1:T-1])
     u = [u1; u2]
 
     # Initialization
@@ -98,13 +99,13 @@ function solve_ol_nash_kkt(
     dJ2 = cost_model.objective_gradients_p2(x, u2; cost_model.weights)
     # TODO: figure out whether/which multipliers need to be shared
     # P1 KKT
-    dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T]
-    dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:T]
+    dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T-1]
+    dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:T-1]
     @constraint(model, [t = eachindex(dL1dx)], dL1dx[t] .== 0)
     @constraint(model, [t = eachindex(dL1du1)], dL1du1[t] .== 0)
     # P2 KKT
-    dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T]
-    dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T]
+    dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T-1]
+    dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T-1]
     @constraint(model, [t = eachindex(dL2dx)], dL2dx[t] .== 0)
     @constraint(model, [t = eachindex(dL2du2)], dL2du2[t] .== 0)
 

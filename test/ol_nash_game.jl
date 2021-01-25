@@ -101,19 +101,28 @@ end
 
 @testset "Iterated Best Open-Loop Response" begin
 
-    global ibr_nash, ibr_converged = solve_ol_nash_ibr(
+    global ibr_nash, ibr_converged, ibr_models = solve_ol_nash_ibr(
         control_system,
         player_cost_models,
         x0,
         T;
         inner_solver_kwargs = (; silent = true),
     )
-
     @test ibr_converged
-end
 
-# precompute lagrange multipliers
-begin
+    # extract constraint multipliers
+    global λ1_ibr = let
+        mapreduce(hcat, ibr_models[1][:dynamics]) do c
+            JuMP.dual.(c)
+        end
+    end
+
+
+    global λ2_ibr = let
+        mapreduce(hcat, ibr_models[2][:dynamics]) do c
+            JuMP.dual.(c)
+        end
+    end
 
     df = let x = ibr_nash.x
         As = [
@@ -138,43 +147,27 @@ begin
         )
     end
 
-    λ1 = zeros(control_system.n_states, T)
-    @testset "λ1" begin
-        dJ1 = cost_model.objective_gradients_p1(ibr_nash.x, ibr_nash.u[1:1, :]; cost_model.weights)
+     @testset "λ1" begin
+         λ1 = -λ1_ibr # Note: The sign flip required due to internal constraint representation in JuMP
+         dJ1 = cost_model.objective_gradients_p1(ibr_nash.x, ibr_nash.u[1:1, :]; cost_model.weights)
 
-        dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T]
-        dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 2:T]
+         dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T-1]
+         dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:T-1]
 
-        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1dx)
-        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1du1)
-    end
+         @test all(isapprox(0; atol = 1e-16), λ1_ibr)
+         @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1dx)
+         @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1du1)
+     end
 
-    λ2 = let
-        model = JuMP.Model(Ipopt.Optimizer)
-        λ2 = @variable(model, [1:(control_system.n_states), 1:T])
+     @testset "λ2" begin
+         λ2 = -λ2_ibr # Note: The sign flip required due to internal constraint representation in JuMP
+         dJ2 = cost_model.objective_gradients_p2(ibr_nash.x, ibr_nash.u[2:2, :]; cost_model.weights)
+         dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T-1]
+         dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T-1]
 
-        # TODO: remove
-        # λ[t]' * (x[t+1] - f(x[t], u[t]))
-
-        dJ2 = cost_model.objective_gradients_p2(ibr_nash.x, ibr_nash.u[2:2, :]; cost_model.weights)
-        dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T]
-        dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T]
-
-        @constraint(model, [t = eachindex(dL2dx)], dL2dx[t] .== 0)
-        # @constraint(model, [t = eachindex(dL2du2)], dL2du2[t] .== 0)
-
-        JuMP.optimize!(model)
-        JuMP.value.(λ2)
-    end
-
-    @testset "λ2" begin
-        dJ2 = cost_model.objective_gradients_p2(ibr_nash.x, ibr_nash.u[2:2, :]; cost_model.weights)
-        dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T]
-        dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T]
-
-        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2dx)
-        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2du2)
-    end
+         @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2dx)
+         @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2du2)
+     end
 end
 
 # TODO: debug... does not converge right now.
