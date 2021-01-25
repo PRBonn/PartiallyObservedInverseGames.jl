@@ -177,20 +177,31 @@ end
 #       - [done] λ1 should be zero,
 #       - not sure how to compute `λ2` (@DFK)
 #   - [done] reduce the solver tolerance
-#   - check multipliers from IBR
-#       - same as manually computed up to a sign
-#       - 0 for P1
-#       - non-zero for P2
+#   - [done] double-check the jacobians
+#   - [done] check multipliers from IBR
+#       - [done] same as manually computed up to a sign
+#       - [done] 0 for P1
+#       - [done] non-zero for P2
+#       - [note] When warmstarted with the exact multipliers, the solver *does* accept the solution!
+#   - [done] Think about lagrange multiplier indexing once more
+#   - try a version with state copies for each player + constraint
 #   - try another simpler problem
+#       - [done] try a cost structure which excites fewer nonlinearities
+#       - linear dynamics (todo: DoubleIntegrator.jl)
 #       - with decoupled dynamics for P1 and P2
 #       - try a fully cooperative version of the problem
+#   - Try another solver than Ipopt just to make sure it's not a bug
+#
+# Interesting data points:
+#  - The IBR solution *does* fulfill the KKT conditions if we drop the gradient of the Lagrangian in x
+#       - But in this case it is underconstrained
 kkt_nash, kkt_model = solve_ol_nash_kkt(
     control_system,
     cost_model,
     x0,
     T;
-    init = merge(ibr_nash, (; λ1 = 0, λ2 = 1)),
-    # solver_attributes = (; constr_viol_tol = 1e-10, tol = 1e-10)
+    init = (; x = ibr_nash.x, u = nothing, λ1 = nothing, λ2 = nothing),
+    solver_attributes = (; constr_viol_tol = 1e-20, tol = 1e-20)
 )
 
 # visualize_unicycle_trajectory(kkt_nash.x)
