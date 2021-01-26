@@ -81,8 +81,8 @@ function solve_ol_nash_kkt(
     u1 = @variable(model, u1[1:1, 1:T])
     u2 = @variable(model, u2[1:1, 1:T])
     # TODO: think about where/if we have to share lagrange multipliers
-    λ1 = @variable(model, λ1[1:n_states, 1:T-1])
-    λ2 = @variable(model, λ2[1:n_states, 1:T-1])
+    λ1 = @variable(model, λ1[1:n_states, 1:(T - 1)])
+    λ2 = @variable(model, λ2[1:n_states, 1:(T - 1)])
     u = [u1; u2]
 
     # Initialization
@@ -99,15 +99,27 @@ function solve_ol_nash_kkt(
     dJ2 = cost_model.objective_gradients_p2(x, u2; cost_model.weights)
     # TODO: figure out whether/which multipliers need to be shared
     # P1 KKT
-    dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T-1]
-    dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:T-1]
-    @constraint(model, [t = eachindex(dL1dx)], dL1dx[t] .== 0)
-    @constraint(model, [t = eachindex(dL1du1)], dL1du1[t] .== 0)
+    @constraint(
+        model,
+        KKT1_x[t = 2:T-1],
+        dJ1.dx[:, t] + λ1[:, t - 1] - (λ1[:, t]' * df.dx[:, :, t])'  .== 0
+    )
+    @constraint(
+        model,
+        KKT1_u[t = 1:T-1],
+        dJ1.du1[:, t] - (λ1[:, t]' * df.du[:, 1:1, t])' .== 0
+    )
     # P2 KKT
-    dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T-1]
-    dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T-1]
-    @constraint(model, [t = eachindex(dL2dx)], dL2dx[t] .== 0)
-    @constraint(model, [t = eachindex(dL2du2)], dL2du2[t] .== 0)
+    @constraint(
+        model,
+        KKT2_x[t = 2:T-1],
+        dJ2.dx[:, t] + λ2[:, t - 1] - (λ2[:, t]' * df.dx[:, :, t])' .== 0
+    )
+    @constraint(
+        model,
+        KKT2_u[t = 1:T-1],
+        dJ2.du2[:, t] - (λ2[:, t]' * df.du[:, 2:2, t])' .== 0
+    )
 
     @time JuMP.optimize!(model)
     SolverUtils.get_model_values(model, :x, :u1, :u2, :λ1, :λ2), model
@@ -130,7 +142,7 @@ function solve_ol_nash_kkt_cloning(
     # P1's copy of the decision variables
     x1 = @variable(model, x1[1:n_states, 1:T])
     u1 = @variable(model, u1[1:1, 1:T])
-    λ1 = @variable(model, λ1[1:n_states, 1:T-1])
+    λ1 = @variable(model, λ1[1:n_states, 1:(T - 1)])
     isnothing(init.x) || JuMP.set_start_value.(x1, init.x)
     isnothing(init.u) || JuMP.set_start_value.(u1, init.u[1, :])
     isnothing(init.λ1) || JuMP.set_start_value.(λ1, init.λ1)
@@ -138,7 +150,7 @@ function solve_ol_nash_kkt_cloning(
     # P2
     x2 = @variable(model, x2[1:n_states, 1:T])
     u2 = @variable(model, u2[1:1, 1:T])
-    λ2 = @variable(model, λ2[1:n_states, 1:T-1])
+    λ2 = @variable(model, λ2[1:n_states, 1:(T - 1)])
     isnothing(init.x) || JuMP.set_start_value.(x2, init.x)
     isnothing(init.u) || JuMP.set_start_value.(u2, init.u[2, :])
     isnothing(init.λ2) || JuMP.set_start_value.(λ2, init.λ2)
@@ -157,15 +169,15 @@ function solve_ol_nash_kkt_cloning(
 
     # P1 constraints
     dJ1 = cost_model.objective_gradients_p1(x1, u1; cost_model.weights)
-    dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T-1]
-    dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:T-1]
+    dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:(T - 1)]
+    dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:(T - 1)]
     @constraint(model, [t = eachindex(dL1dx)], dL1dx[t] .== 0)
     @constraint(model, [t = eachindex(dL1du1)], dL1du1[t] .== 0)
 
     # P2 constraints
     dJ2 = cost_model.objective_gradients_p2(x2, u2; cost_model.weights)
-    dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T-1]
-    dL2du2 = [dJ2.du2[:, t] - (df.du[:, 1:1, t]' * λ2[:, t]) for t in 1:T-1]
+    dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:(T - 1)]
+    dL2du2 = [dJ2.du2[:, t] - (df.du[:, 1:1, t]' * λ2[:, t]) for t in 1:(T - 1)]
     @constraint(model, [t = eachindex(dL2dx)], dL2dx[t] .== 0)
     @constraint(model, [t = eachindex(dL2du2)], dL2du2[t] .== 0)
 
