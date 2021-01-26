@@ -71,19 +71,17 @@ function solve_ol_nash_kkt(
     silent = false,
     init = (; λ1 = nothing, λ2 = nothing, x = nothing, u = nothing),
 )
-    @unpack n_states = control_system
+    @unpack n_states, n_controls = control_system
     model = JuMP.Model(solver)
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
     # Decision Variables
     # TODO: fix the variable access here.
     x = @variable(model, x[1:n_states, 1:T])
-    u1 = @variable(model, u1[1:1, 1:T])
-    u2 = @variable(model, u2[1:1, 1:T])
+    u = @variable(model, u[1:n_controls, 1:T])
     # TODO: think about where/if we have to share lagrange multipliers
     λ1 = @variable(model, λ1[1:n_states, 1:(T - 1)])
     λ2 = @variable(model, λ2[1:n_states, 1:(T - 1)])
-    u = [u1; u2]
 
     # Initialization
     isnothing(init.λ1) || JuMP.set_start_value.(λ1, init.λ1)
@@ -95,8 +93,8 @@ function solve_ol_nash_kkt(
     @constraint(model, x[:, 1] .== x0)
     control_system.add_dynamics_constraints!(model, x, u)
     df = control_system.add_dynamics_jacobians!(model, x, u)
-    dJ1 = cost_model.objective_gradients_p1(x, u1; cost_model.weights)
-    dJ2 = cost_model.objective_gradients_p2(x, u2; cost_model.weights)
+    dJ1 = cost_model.objective_gradients_p1(x, u[1:1, :]; cost_model.weights)
+    dJ2 = cost_model.objective_gradients_p2(x, u[2:2, :]; cost_model.weights)
     # TODO: figure out whether/which multipliers need to be shared
     # P1 KKT
     @constraint(
@@ -104,6 +102,7 @@ function solve_ol_nash_kkt(
         KKT1_x[t = 2:T-1],
         dJ1.dx[:, t] + λ1[:, t - 1] - (λ1[:, t]' * df.dx[:, :, t])'  .== 0
     )
+    @constraint(model, dJ1.dx[:, T] + λ1[:, T - 1] .== 0)
     @constraint(
         model,
         KKT1_u[t = 1:T-1],
@@ -115,6 +114,7 @@ function solve_ol_nash_kkt(
         KKT2_x[t = 2:T-1],
         dJ2.dx[:, t] + λ2[:, t - 1] - (λ2[:, t]' * df.dx[:, :, t])' .== 0
     )
+    @constraint(model, dJ2.dx[:, T] + λ2[:, T - 1] .== 0)
     @constraint(
         model,
         KKT2_u[t = 1:T-1],

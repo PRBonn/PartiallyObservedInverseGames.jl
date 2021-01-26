@@ -52,7 +52,12 @@ control_system = (
 x0 = [-1, 1, 0.1, 0]
 T = 100
 cost_model = (;
-    weights = (; state_goal_p2 = 1, state_velocity_p1 = 10, control_Δv_p1 = 10, control_Δθ_p2 = 1),
+    weights = (;
+        state_goal_p2 = 0.1,
+        state_velocity_p1 = 10,
+        control_Δv_p1 = 100,
+        control_Δθ_p2 = 10,
+    ),
     # TODO: remove. Dummy objective to solve fully-collaborative version of the game.
     objective_p1,
     objective_gradients_p1,
@@ -100,31 +105,9 @@ player_cost_models = (
     @test dJ2du2_ad == dJ2.du2
 end
 
-@testset "Iterated Best Open-Loop Response" begin
+function sanity_check_unicycle_multipliers(λ1, λ2, x, u; cost_model)
 
-    global ibr_nash, ibr_converged, ibr_models = solve_ol_nash_ibr(
-        control_system,
-        player_cost_models,
-        x0,
-        T;
-        inner_solver_kwargs = (; silent = true),
-    )
-    @test ibr_converged
-
-    # extract constraint multipliers
-    global λ1_ibr = let
-        mapreduce(hcat, ibr_models[1][:dynamics]) do c
-            JuMP.dual.(c)
-        end
-    end
-
-    global λ2_ibr = let
-        mapreduce(hcat, ibr_models[2][:dynamics]) do c
-            JuMP.dual.(c)
-        end
-    end
-
-    df = let x = ibr_nash.x
+    df = let
         As = [
             [
                 1 0 cos(x[4, t]) -x[3, t]*sin(x[4, t])
@@ -148,40 +131,62 @@ end
     end
 
     @testset "λ1" begin
-        λ1 = -λ1_ibr # Note: The sign flip required due to internal constraint representation in JuMP
-        dJ1 = cost_model.objective_gradients_p1(ibr_nash.x, ibr_nash.u[1:1, :]; cost_model.weights)
+        dJ1 = cost_model.objective_gradients_p1(x, u[1:1, :]; cost_model.weights)
 
         dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:(T - 1)]
         dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:(T - 1)]
 
-        @test all(isapprox(0; atol = 1e-16), λ1_ibr)
-        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1dx)
-        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1du1)
+        @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dL1dx)
+        @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dL1du1)
     end
 
     @testset "λ2" begin
-        λ2 = -λ2_ibr # Note: The sign flip required due to internal constraint representation in JuMP
-        dJ2 = cost_model.objective_gradients_p2(ibr_nash.x, ibr_nash.u[2:2, :]; cost_model.weights)
+        dJ2 = cost_model.objective_gradients_p2(x, u[2:2, :]; cost_model.weights)
         dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:(T - 1)]
         dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:(T - 1)]
 
-        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2dx)
-        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2du2)
+        @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dL2dx)
+        @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dL2du2)
     end
 end
 
-# TODO: debug... does not converge right now.
-kkt_nash, kkt_model = solve_ol_nash_kkt(
-    control_system,
-    cost_model,
-    x0,
-    T;
-    init = (; x = ibr_nash.x, u = ibr_nash.u, λ1 = nothing, λ2 = nothing),
-    solver = Ipopt.Optimizer,
-    solver_attributes = (;
-        constr_viol_tol = 1e-10,
-        tol = 1e-10
-    ),
-)
+@testset "Iterated Best Open-Loop Response" begin
+    global ibr_nash, ibr_converged, ibr_models = solve_ol_nash_ibr(
+        control_system,
+        player_cost_models,
+        x0,
+        T;
+        inner_solver_kwargs = (; silent = true),
+    )
+    @test ibr_converged
 
-visualize_unicycle_trajectory(kkt_nash.x)
+    # extract constraint multipliers
+    global λ1_ibr = let
+        mapreduce(hcat, ibr_models[1][:dynamics]) do c
+            JuMP.dual.(c)
+        end
+    end
+
+    global λ2_ibr = let
+        mapreduce(hcat, ibr_models[2][:dynamics]) do c
+            JuMP.dual.(c)
+        end
+    end
+
+    sanity_check_unicycle_multipliers(-λ1_ibr, -λ2_ibr, ibr_nash.x, ibr_nash.u; cost_model)
+end
+
+@testset "KKT Nash" begin
+    global kkt_nash, kkt_model = solve_ol_nash_kkt(
+        control_system,
+        cost_model,
+        x0,
+        T;
+        init = (; x = ibr_nash.x, u = ibr_nash.u, λ1 = nothing, λ2 = nothing),
+        solver = Ipopt.Optimizer,
+    )
+
+    visualize_unicycle_trajectory(kkt_nash.x)
+
+    sanity_check_unicycle_multipliers(kkt_nash.λ1, kkt_nash.λ2, kkt_nash.x, kkt_nash.u; cost_model)
+end
