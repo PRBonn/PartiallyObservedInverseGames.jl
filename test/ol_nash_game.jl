@@ -3,7 +3,8 @@ import Ipopt
 import Zygote
 
 using JuMP: @variable, @constraint, @objective
-using JuMPOptimalControl.ForwardGame: solve_ol_nash_ibr, solve_ol_nash_kkt
+using JuMPOptimalControl.ForwardGame:
+    solve_ol_nash_ibr, solve_ol_nash_kkt, solve_ol_nash_kkt_cloning
 using SparseArrays: spzeros
 using Test: @test, @testset
 using UnPack: @unpack
@@ -117,7 +118,6 @@ end
         end
     end
 
-
     global λ2_ibr = let
         mapreduce(hcat, ibr_models[2][:dynamics]) do c
             JuMP.dual.(c)
@@ -147,27 +147,27 @@ end
         )
     end
 
-     @testset "λ1" begin
-         λ1 = -λ1_ibr # Note: The sign flip required due to internal constraint representation in JuMP
-         dJ1 = cost_model.objective_gradients_p1(ibr_nash.x, ibr_nash.u[1:1, :]; cost_model.weights)
+    @testset "λ1" begin
+        λ1 = -λ1_ibr # Note: The sign flip required due to internal constraint representation in JuMP
+        dJ1 = cost_model.objective_gradients_p1(ibr_nash.x, ibr_nash.u[1:1, :]; cost_model.weights)
 
-         dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:T-1]
-         dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:T-1]
+        dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:(T - 1)]
+        dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:(T - 1)]
 
-         @test all(isapprox(0; atol = 1e-16), λ1_ibr)
-         @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1dx)
-         @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1du1)
-     end
+        @test all(isapprox(0; atol = 1e-16), λ1_ibr)
+        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1dx)
+        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL1du1)
+    end
 
-     @testset "λ2" begin
-         λ2 = -λ2_ibr # Note: The sign flip required due to internal constraint representation in JuMP
-         dJ2 = cost_model.objective_gradients_p2(ibr_nash.x, ibr_nash.u[2:2, :]; cost_model.weights)
-         dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:T-1]
-         dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:T-1]
+    @testset "λ2" begin
+        λ2 = -λ2_ibr # Note: The sign flip required due to internal constraint representation in JuMP
+        dJ2 = cost_model.objective_gradients_p2(ibr_nash.x, ibr_nash.u[2:2, :]; cost_model.weights)
+        dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:(T - 1)]
+        dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:(T - 1)]
 
-         @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2dx)
-         @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2du2)
-     end
+        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2dx)
+        @test all(all(isapprox.(x, 0; atol = 1e-10)) for x in dL2du2)
+    end
 end
 
 # TODO: debug... does not converge right now.
@@ -176,8 +176,12 @@ kkt_nash, kkt_model = solve_ol_nash_kkt(
     cost_model,
     x0,
     T;
-    init = (; x = ibr_nash.x, u = nothing, λ1 = nothing, λ2 = nothing),
-    solver_attributes = (; constr_viol_tol = 1e-20, tol = 1e-20)
+    init = (; x = ibr_nash.x, u = ibr_nash.u, λ1 = nothing, λ2 = nothing),
+    solver = Ipopt.Optimizer,
+    solver_attributes = (;
+        constr_viol_tol = 1e-10,
+        tol = 1e-10
+    ),
 )
 
-# visualize_unicycle_trajectory(kkt_nash.x)
+visualize_unicycle_trajectory(kkt_nash.x)
