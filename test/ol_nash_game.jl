@@ -3,8 +3,7 @@ import Ipopt
 import Zygote
 
 using JuMP: @variable, @constraint, @objective
-using JuMPOptimalControl.ForwardGame:
-    solve_ol_nash_ibr, solve_ol_nash_kkt, solve_ol_nash_kkt_cloning
+using JuMPOptimalControl.ForwardGame: solve_ol_nash_ibr, solve_ol_nash_kkt
 using SparseArrays: spzeros
 using Test: @test, @testset
 using UnPack: @unpack
