@@ -21,21 +21,24 @@ end
 
 "The hand-written gradient of the forward LQR problem in x."
 function lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B)
+    T = size(x, 2)
     hcat(
         2 * Q * x[:, 1] - A[1]' * λ[:, 1], # special handling of first time step
         reduce(
             hcat,
             (
                 2 * Q * x[:, t] + λ[:, t - 1] - A[t]' * λ[:, t]
-                for t in axes(x)[2][2:end]
+                for t in 2:T-1
             ),
         ),
+        2 * Q * x[:, T] + λ[:, T - 1]
     )
 end
 
 "The hand-written gradient of the forward LQR problem in u."
 function lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B)
-    reduce(hcat, (2 * R * u[:, t] - B[t]' * λ[:, t] for t in axes(x)[2]))
+    T = size(x, 2)
+    hcat(reduce(hcat, (2 * R * u[:, t] - B[t]' * λ[:, t] for t in 1:T-1)), 2 * R * u[:, T])
 end
 
 """
@@ -67,7 +70,7 @@ function solve_inverse_lqr(
     @variable(model, r[1:length(R̃)] >= 0)
     @variable(model, x[1:n_states, 1:T])
     @variable(model, u[1:n_controls, 1:T])
-    @variable(model, λ[1:n_states, 1:T]) # multipliers of the forward LQR condition
+    @variable(model, λ[1:n_states, 1:T-1]) # multipliers of the forward LQR condition
 
     # initial condition
     @constraint(model, initial_condition, x[:, 1] .== x̂[:, 1])
