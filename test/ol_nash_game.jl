@@ -4,6 +4,7 @@ import Zygote
 
 using JuMP: @variable, @constraint, @objective
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
+using JuMPOptimalControl.InverseGames: solve_inverse_game
 using SparseArrays: spzeros
 using Test: @test, @testset
 using UnPack: @unpack
@@ -134,7 +135,7 @@ function sanity_check_unicycle_multipliers(λ, x, u; player_cost_models)
     end
 end
 
-@testset "Iterated Best Open-Loop Response" begin
+@testset "Forward IBR" begin
     global ibr_nash, ibr_converged, ibr_models = solve_game(
         IBRGameSolver(),
         control_system,
@@ -156,7 +157,7 @@ end
     sanity_check_unicycle_multipliers(λ_ibr, ibr_nash.x, ibr_nash.u; player_cost_models)
 end
 
-@testset "KKT Nash" begin
+@testset "Forward KKT Nash" begin
     global kkt_nash, kkt_model = solve_game(
         KKTGameSolver(),
         control_system,
@@ -170,4 +171,15 @@ end
     visualize_unicycle_trajectory(kkt_nash.x)
 
     sanity_check_unicycle_multipliers(kkt_nash.λ, kkt_nash.x, kkt_nash.u; player_cost_models)
+end
+
+# TODO: robustify
+@testset "Inverse KKT Nash" begin
+    global inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+        kkt_nash.x,
+        kkt_nash.u;
+        # λ_init = kkt_nash.λ,
+        control_system,
+        player_cost_models,
+    )
 end
