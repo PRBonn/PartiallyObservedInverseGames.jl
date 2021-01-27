@@ -3,7 +3,7 @@ import Ipopt
 import Zygote
 
 using JuMP: @variable, @constraint, @objective
-using JuMPOptimalControl.ForwardGame: solve_ol_nash_ibr, solve_ol_nash_kkt
+using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
 using SparseArrays: spzeros
 using Test: @test, @testset
 using UnPack: @unpack
@@ -18,27 +18,27 @@ using .Unicycle:
 
 #======================================== Global parameters ========================================#
 
-function objective_p1(x, u1; weights)
+function objective_p1(x, u; weights)
     weights[:state_velocity_p1] * sum((x[3, :] .- 0.1) .^ 2) +
-    weights[:control_Δv_p1] * sum(u1 .^ 2)
+    weights[:control_Δv_p1] * sum(u[1, :] .^ 2)
 end
 
-function objective_gradients_p1(x, u1; weights)
+function objective_gradients_p1(x, u; weights)
     T = size(x, 2)
-    dJ1dx = 2 * weights[:state_velocity_p1] * [zeros(2, T); x[3:3, :] .- 0.1; zeros(1, T)]
-    dJ1du1 = 2 * weights[:control_Δv_p1] * u1
-    (; dx = dJ1dx, du1 = dJ1du1)
+    dJdx = 2 * weights[:state_velocity_p1] * [zeros(2, T); x[3:3, :] .- 0.1; zeros(1, T)]
+    dJdu = 2 * weights[:control_Δv_p1] * [u[1:1, :]; zeros(1, T)]
+    (; dx = dJdx, du = dJdu)
 end
 
 function objective_p2(x, u2; weights)
     weights[:state_goal_p2] * sum(x[1:2, :] .^ 2) + weights[:control_Δθ_p2] * sum(u2 .^ 2)
 end
 
-function objective_gradients_p2(x, u2; weights)
+function objective_gradients_p2(x, u; weights)
     T = size(x, 2)
-    dJ2dx = 2 * [x[1:2, :]; zeros(2, T)] * weights[:state_goal_p2]
-    dJ2du2 = 2 * u2 * weights[:control_Δθ_p2]
-    (; dx = dJ2dx, du2 = dJ2du2)
+    dJdx = 2 * weights[:state_goal_p2] * [x[1:2, :]; zeros(2, T)]
+    dJdu = 2 * weights[:control_Δθ_p2] * [zeros(1, T); u[2:2, :]]
+    (; dx = dJdx, du = dJdu)
 end
 
 control_system = (
@@ -50,38 +50,27 @@ control_system = (
 
 x0 = [-1, 1, 0.1, 0]
 T = 100
-cost_model = (;
-    weights = (;
-        state_goal_p2 = 0.1,
-        state_velocity_p1 = 10,
-        control_Δv_p1 = 100,
-        control_Δθ_p2 = 10,
-    ),
-    # TODO: remove. Dummy objective to solve fully-collaborative version of the game.
-    objective_p1,
-    objective_gradients_p1,
-    objective_p2,
-    objective_gradients_p2,
-)
 
 player_cost_models = (
-    # cost_model P1
-    merge(
-        cost_model,
-        (;
-            add_objective! = function (model, x, u; weights)
-                @objective(model, Min, cost_model.objective_p1(x, u[1, :]; weights))
-            end,
-        ),
+    (;
+        weights = (; state_velocity_p1 = 10, control_Δv_p1 = 100),
+        objective = objective_p1,
+        objective_gradients = objective_gradients_p1,
+        # TODO: redundant. Handle in target function.
+        add_objective! = function (model, args...; kwargs...)
+            @objective(model, Min, objective_p1(args...; kwargs...))
+        end,
+        player_inputs = [1],
     ),
-    # cost_model P2
-    merge(
-        cost_model,
-        (;
-            add_objective! = function (model, x, u; weights)
-                @objective(model, Min, cost_model.objective_p2(x, u[2, :]; weights))
-            end,
-        ),
+    (;
+        weights = (; state_goal_p2 = 0.1, control_Δθ_p2 = 10),
+        objective = objective_p2,
+        objective_gradients = objective_gradients_p2,
+        # TODO: redundant. Handle in target function.
+        add_objective! = function (model, args...; kwargs...)
+            @objective(model, Min, objective_p2(args...; kwargs...))
+        end,
+        player_inputs = [2],
     ),
 )
 
@@ -91,20 +80,16 @@ player_cost_models = (
     x = rand(4, 100)
     u = rand(2, 100)
 
-    dJ1dx_ad, dJ1du1_ad =
-        Zygote.gradient((x, u1) -> objective_p1(x, u1; cost_model.weights), x, u[1, :])
-    dJ1 = objective_gradients_p1(x, u[1, :]; cost_model.weights)
-    @test dJ1dx_ad == dJ1.dx
-    @test dJ1du1_ad == dJ1.du1
-
-    dJ2dx_ad, dJ2du2_ad =
-        Zygote.gradient((x, u2) -> objective_p2(x, u2; cost_model.weights), x, u[2, :])
-    dJ2 = objective_gradients_p2(x, u[2, :]; cost_model.weights)
-    @test dJ2dx_ad == dJ2.dx
-    @test dJ2du2_ad == dJ2.du2
+    for (player_idx, cost_model) in enumerate(player_cost_models)
+        dJdx_ad, dJdu_ad =
+            Zygote.gradient((x, u) -> cost_model.objective(x, u; cost_model.weights), x, u)
+        dJ = cost_model.objective_gradients(x, u; cost_model.weights)
+        @test dJdx_ad == dJ.dx
+        @test dJdu_ad[player_idx, :] == dJ.du[player_idx, :]
+    end
 end
 
-function sanity_check_unicycle_multipliers(λ1, λ2, x, u; cost_model)
+function sanity_check_unicycle_multipliers(λ, x, u; player_cost_models)
 
     df = let
         As = [
@@ -129,28 +114,29 @@ function sanity_check_unicycle_multipliers(λ1, λ2, x, u; cost_model)
         )
     end
 
-    @testset "λ1" begin
-        dJ1 = cost_model.objective_gradients_p1(x, u[1:1, :]; cost_model.weights)
+    for (player_idx, cost_model) in enumerate(player_cost_models)
+        @testset "λ$player_idx" begin
+            dJ = cost_model.objective_gradients(x, u; cost_model.weights)
 
-        dL1dx = [dJ1.dx[:, t] + λ1[:, t - 1] - df.dx[:, :, t]' * λ1[:, t] for t in 2:(T - 1)]
-        dL1du1 = [dJ1.du1[:, t] - (df.du[:, 1:1, t]' * λ1[:, t]) for t in 1:(T - 1)]
+            dLdx = [
+                dJ.dx[:, t] + λ[:, t - 1, player_idx] - df.dx[:, :, t]' * λ[:, t, player_idx]
+                for t in 2:(T - 1)
+            ]
+            dLdu = [
+                dJ.du[cost_model.player_inputs, t] -
+                (df.du[:, cost_model.player_inputs, t]' * λ[:, t, player_idx])
+                for t in 1:(T - 1)
+            ]
 
-        @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dL1dx)
-        @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dL1du1)
-    end
-
-    @testset "λ2" begin
-        dJ2 = cost_model.objective_gradients_p2(x, u[2:2, :]; cost_model.weights)
-        dL2dx = [dJ2.dx[:, t] + λ2[:, t - 1] - df.dx[:, :, t]' * λ2[:, t] for t in 2:(T - 1)]
-        dL2du2 = [dJ2.du2[:, t] - (df.du[:, 2:2, t]' * λ2[:, t]) for t in 1:(T - 1)]
-
-        @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dL2dx)
-        @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dL2du2)
+            @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dLdx)
+            @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dLdu)
+        end
     end
 end
 
 @testset "Iterated Best Open-Loop Response" begin
-    global ibr_nash, ibr_converged, ibr_models = solve_ol_nash_ibr(
+    global ibr_nash, ibr_converged, ibr_models = solve_game(
+        IBRGameSolver(),
         control_system,
         player_cost_models,
         x0,
@@ -160,32 +146,28 @@ end
     @test ibr_converged
 
     # extract constraint multipliers
-    global λ1_ibr = let
-        mapreduce(hcat, ibr_models[1][:dynamics]) do c
-            JuMP.dual.(c)
+    global λ_ibr = mapreduce((a, b) -> cat(a, b; dims = 3), ibr_models) do model
+        mapreduce(hcat, model[:dynamics]) do c
+            # Sign flipped due to internal convention of JuMP
+            -JuMP.dual.(c)
         end
     end
 
-    global λ2_ibr = let
-        mapreduce(hcat, ibr_models[2][:dynamics]) do c
-            JuMP.dual.(c)
-        end
-    end
-
-    sanity_check_unicycle_multipliers(-λ1_ibr, -λ2_ibr, ibr_nash.x, ibr_nash.u; cost_model)
+    sanity_check_unicycle_multipliers(λ_ibr, ibr_nash.x, ibr_nash.u; player_cost_models)
 end
 
 @testset "KKT Nash" begin
-    global kkt_nash, kkt_model = solve_ol_nash_kkt(
+    global kkt_nash, kkt_model = solve_game(
+        KKTGameSolver(),
         control_system,
-        cost_model,
+        player_cost_models,
         x0,
         T;
-        init = (; x = ibr_nash.x, u = ibr_nash.u, λ1 = nothing, λ2 = nothing),
+        init = (; x = ibr_nash.x, u = ibr_nash.u),
         solver = Ipopt.Optimizer,
     )
 
     visualize_unicycle_trajectory(kkt_nash.x)
 
-    sanity_check_unicycle_multipliers(kkt_nash.λ1, kkt_nash.λ2, kkt_nash.x, kkt_nash.u; cost_model)
+    sanity_check_unicycle_multipliers(kkt_nash.λ, kkt_nash.x, kkt_nash.u; player_cost_models)
 end
