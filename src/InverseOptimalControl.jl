@@ -60,28 +60,28 @@ function solve_inverse_lqr(
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
     # decision variable
-    @variable(model, q[1:length(Q̃)] >= 0)
-    @variable(model, r[1:length(R̃)] >= 0)
-    @variable(model, x[1:n_states, 1:T])
-    @variable(model, u[1:n_controls, 1:T])
-    @variable(model, λ[1:n_states, 1:(T - 1)]) # multipliers of the forward LQR condition
+    q = @variable(model, [1:length(Q̃)], lower_bound = 0)
+    r = @variable(model, [1:length(R̃)], lower_bound = 0)
+    x = @variable(model, [1:n_states, 1:T])
+    u = @variable(model, [1:n_controls, 1:T])
+    λ = @variable(model, [1:n_states, 1:(T - 1)]) # multipliers of the forward LQR condition
 
     # initial condition
-    @constraint(model, initial_condition, x[:, 1] .== x̂[:, 1])
+    @constraint(model, x[:, 1] .== x̂[:, 1])
     # dynamics
     @constraint(model, linear_dynamics_constraints(x, u; A, B) .== 0)
     # Optimality conditions (KKT) of forward LQR show up as a constraints
     Q = sum(q .* Q̃)
     R = sum(r .* R̃)
-    @constraint(model, ∇ₓL, lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B)[:, 2:end] .== 0)
-    @constraint(model, ∇ᵤL, lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B) .== 0)
+    ∇ₓL = @constraint(model, lqr_lagrangian_grad_x(x, u, λ; Q, R, A, B)[:, 2:end] .== 0)
+    ∇ᵤL = @constraint(model, lqr_lagrangian_grad_u(x, u, λ; Q, R, A, B) .== 0)
     # regularization
     @constraint(model, r' * r >= r_sqr_min)
     @constraint(model, r' * r + q' * q == 1)
 
     @objective(model, Min, sum((x .- x̂) .^ 2))
     @time JuMP.optimize!(model)
-    SolverUtils.get_model_values(model, :q, :r, :x, :u, :λ), model, JuMP.value.(Q), JuMP.value.(R)
+    SolverUtils.get_values(; q, r, x, u, λ, ∇ₓL, ∇ᵤL), model, JuMP.value.(Q), JuMP.value.(R)
 end
 
 #=========================================== Non-LQ-Case ===========================================#
@@ -105,10 +105,10 @@ function solve_inverse_optimal_control(
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
     # decision variable
-    @variable(model, weights[keys(cost_model.weights)],)
-    @variable(model, x[1:n_states, 1:T])
-    @variable(model, u[1:n_controls, 1:T])
-    @variable(model, λ[1:n_states, 1:(T - 1)]) # multipliers of the forward optimality condition
+    weights = @variable(model, [keys(cost_model.weights)],)
+    x = @variable(model, [1:n_states, 1:T])
+    u = @variable(model, [1:n_controls, 1:T])
+    λ = @variable(model, [1:n_states, 1:(T - 1)]) # multipliers of the forward optimality condition
     # TODO: Are there smarter initial guesses that we can make for `u` and `λ`?
     JuMP.set_start_value.(weights, 1 / length(cost_model.weights))
     # TODO: This is not always correct. Technically we would want to use an inverse observation
@@ -135,7 +135,7 @@ function solve_inverse_optimal_control(
         dg.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0
     )
     @constraint(model, dg.dx[:, T] + λ[:, T - 1] .== 0)
-    @constraint(model, dLdu[t = 1:(T - 1)], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
+    @constraint(model, [t = 1:(T - 1)], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
     @constraint(model, dg.du[:, T] .== 0)
     # regularization
     # TODO: There might be a smarter regularization here. Rather, we want there to be non-zero cost
@@ -147,7 +147,7 @@ function solve_inverse_optimal_control(
     @objective(model, Min, sum((observation_model.expected_observation(x) .- y) .^ 2))
 
     @time JuMP.optimize!(model)
-    SolverUtils.get_model_values(model, :weights, :x, :u, :λ), model
+    SolverUtils.get_values(; weights, x, u, λ), model
 end
 
 end

@@ -37,13 +37,13 @@ function solve_lqr(
     model = JuMP.Model(solver)
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
-    @variable(model, x[1:n_states, 1:T])
-    @variable(model, u[1:n_controls, 1:T])
-    @constraint(model, dynamics, linear_dynamics_constraints(x, u; A, B) .== 0)
-    @constraint(model, initial_condition, x[:, 1] .== x0)
+    x = @variable(model, [1:n_states, 1:T])
+    u = @variable(model, [1:n_controls, 1:T])
+    @constraint(model, linear_dynamics_constraints(x, u; A, B) .== 0)
+    @constraint(model, x[:, 1] .== x0)
     @objective(model, Min, forward_quadratic_objective(x, u; Q, R))
     @time JuMP.optimize!(model)
-    SolverUtils.get_model_values(model, :x, :u), model
+    SolverUtils.get_values(; x, u), model
 end
 
 #=========================================== Non-LQ-Case ===========================================#
@@ -56,7 +56,7 @@ function solve_optimal_control(
     x0,
     T;
     fix_inputs = (),
-    init = (; x = nothing, u = nothing),
+    init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (),
     silent = false,
@@ -67,24 +67,23 @@ function solve_optimal_control(
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
     # decision variables
-    x = @variable(model, x[1:n_states, 1:T])
-    u = @variable(model, u[1:n_controls, 1:T])
+    x = @variable(model, [1:n_states, 1:T])
+    u = @variable(model, [1:n_controls, 1:T])
 
     # initial guess
-    isnothing(init.x) || JuMP.set_start_value.(x, init.x)
-    isnothing(init.u) || JuMP.set_start_value.(u, init.u)
+    SolverUtils.init_if_hasproperty!(x, init, :x)
+    SolverUtils.init_if_hasproperty!(u, init, :u)
 
     # fix certain inputs
     for i in fix_inputs
-        # TODO: maybe not use init.u here for genericity
-        @constraint(model, u[i, :] .== init.u[i, :])
+        @constraint(model, u[fix_inputs, :] .== init.u[fix_inputs, :])
     end
 
     control_system.add_dynamics_constraints!(model, x, u)
-    @constraint(model, initial_condition, x[:, 1] .== x0)
+    @constraint(model, x[:, 1] .== x0)
     cost_model.add_objective!(model, x, u; cost_model.weights)
     @time JuMP.optimize!(model)
-    SolverUtils.get_model_values(model, :x, :u), model
+    SolverUtils.get_values(; x, u), model
 end
 
 end

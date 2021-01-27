@@ -41,8 +41,6 @@ end
     R̃ = [R]
     inverse_solution, inverse_model, Q_est, R_est =
         solve_inverse_lqr(forward_solution.x, Q̃, R̃; A, B)
-    ∇ₓL_sol = JuMP.value.(inverse_model[:∇ₓL])
-    ∇ᵤL_sol = JuMP.value.(inverse_model[:∇ᵤL])
 
     @testset "Gradient Check" begin
         grad_args = (inverse_solution.x, inverse_solution.u, inverse_solution.λ)
@@ -58,9 +56,9 @@ end
         atol = 1e-10
 
         @test isapprox(∇ₓL_ad, ∇ₓL_manual; atol = atol)
-        @test isapprox(∇ₓL_ad[:, 2:end], ∇ₓL_sol; atol = atol)
+        @test isapprox(∇ₓL_ad[:, 2:end], inverse_solution.∇ₓL; atol = atol)
         @test isapprox(∇ᵤL_ad, ∇ᵤL_manual; atol = atol)
-        @test isapprox(∇ᵤL_ad, ∇ᵤL_sol; atol = atol)
+        @test isapprox(∇ᵤL_ad, inverse_solution.∇ᵤL; atol = atol)
     end
 
     @testset "Solution Sanity" begin

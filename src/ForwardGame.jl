@@ -2,13 +2,13 @@ module ForwardGame
 
 import JuMP
 import Ipopt
+import ..SolverUtils
+import ..ForwardOptimalControl
 
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
-using ..ForwardOptimalControl: solve_optimal_control
-using ..SolverUtils
 
-export solve_game
+export IBRGameSolver, KKTGameSolver, solve_game
 
 #================================ Iterated Best Open-Loop Response =================================#
 
@@ -35,15 +35,16 @@ function solve_game(
 
     for i_ibr in 1:max_ibr_rounds
         for (player_idx, player_cost_model) in enumerate(player_cost_models)
-            last_player_solution, player_opt_models[player_idx] = solve_optimal_control(
-                control_system,
-                player_cost_model,
-                x0,
-                T;
-                fix_inputs = filter(i -> i ∉ player_cost_model.player_inputs, 1:n_controls),
-                init = last_player_solution,
-                inner_solver_kwargs...,
-            )
+            last_player_solution, player_opt_models[player_idx] =
+                ForwardOptimalControl.solve_optimal_control(
+                    control_system,
+                    player_cost_model,
+                    x0,
+                    T;
+                    fix_inputs = filter(i -> i ∉ player_cost_model.player_inputs, 1:n_controls),
+                    init = last_player_solution,
+                    inner_solver_kwargs...,
+                )
         end
 
         converged =
@@ -76,14 +77,9 @@ function solve_game(
     init = (),
 )
 
-    function init_if_hasproperty!(v, init, sym)
-        if hasproperty(init, sym)
-            JuMP.set_start_value.(v, getproperty(init, sym))
-        end
-    end
-
-    n_players = 2
+    n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
+
     model = JuMP.Model(solver)
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
@@ -94,9 +90,9 @@ function solve_game(
     λ = @variable(model, [1:n_states, 1:(T - 1), 1:n_players])
 
     # Initialization
-    init_if_hasproperty!(λ, init, :λ)
-    init_if_hasproperty!(x, init, :x)
-    init_if_hasproperty!(u, init, :u)
+    SolverUtils.init_if_hasproperty!(λ, init, :λ)
+    SolverUtils.init_if_hasproperty!(x, init, :x)
+    SolverUtils.init_if_hasproperty!(u, init, :u)
 
     # constraints
     @constraint(model, x[:, 1] .== x0)
