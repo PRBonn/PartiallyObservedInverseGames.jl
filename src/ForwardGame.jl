@@ -30,8 +30,8 @@ function solve_game(
 
     last_ibr_solution = (; x = zeros(n_states, T), u = zeros(n_controls, T))
     last_player_solution = last_ibr_solution
-    converged = false
     player_opt_models = resize!(JuMP.Model[], n_players)
+    converged = false
 
     for i_ibr in 1:max_ibr_rounds
         for (player_idx, player_cost_model) in enumerate(player_cost_models)
@@ -41,7 +41,7 @@ function solve_game(
                     player_cost_model,
                     x0,
                     T;
-                    fix_inputs = filter(i -> i ∉ player_cost_model.player_inputs, 1:n_controls),
+                    fixed_inputs = filter(i -> i ∉ player_cost_model.player_inputs, 1:n_controls),
                     init = last_player_solution,
                     inner_solver_kwargs...,
                 )
@@ -57,14 +57,15 @@ function solve_game(
         end
     end
 
-    last_ibr_solution, converged, player_opt_models
+    converged || @warn "IBR terminated pre-maturely."
+
+    converged, last_ibr_solution, player_opt_models
 end
 
 #================================= Open-Loop KKT Nash Constraints ==================================#
 
 struct KKTGameSolver end
 
-# TODO handle missing "init" keys more gracefully (also in other solvers)
 function solve_game(
     ::KKTGameSolver,
     control_system,

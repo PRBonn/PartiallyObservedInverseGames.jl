@@ -55,7 +55,7 @@ function solve_optimal_control(
     cost_model,
     x0,
     T;
-    fix_inputs = (),
+    fixed_inputs = (),
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (),
@@ -75,8 +75,8 @@ function solve_optimal_control(
     SolverUtils.init_if_hasproperty!(u, init, :u)
 
     # fix certain inputs
-    for i in fix_inputs
-        @constraint(model, u[fix_inputs, :] .== init.u[fix_inputs, :])
+    for i in fixed_inputs
+        @constraint(model, u[fixed_inputs, :] .== init.u[fixed_inputs, :])
     end
 
     control_system.add_dynamics_constraints!(model, x, u)
