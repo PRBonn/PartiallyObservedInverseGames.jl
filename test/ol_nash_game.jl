@@ -4,15 +4,16 @@ import Zygote
 
 using JuMP: @variable, @constraint, @objective
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
-using JuMPOptimalControl.InverseGames: solve_inverse_game
+using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTSolver, solve_inverse_game
 using SparseArrays: spzeros
-using Test: @test, @testset
+using Test: @test, @testset, @test_broken
 using UnPack: @unpack
 
 import Plots, ElectronDisplay
 
-include("Unicycle.jl")
-using .Unicycle:
+unique!(push!(LOAD_PATH, @__DIR__))
+import TestUtils
+using Unicycle:
     add_unicycle_dynamics_constraints!,
     add_unicycle_dynamics_jacobians!,
     visualize_unicycle_trajectory
@@ -49,11 +50,12 @@ control_system = (
     n_controls = 2,
 )
 
-x0 = [-1, 1, 0.1, 0]
+x0 = [-1, 1, 0.0, 0]
 T = 100
 
 player_cost_models = (
     (;
+        player_inputs = [1],
         weights = (; state_velocity_p1 = 10, control_Δv_p1 = 100),
         objective = objective_p1,
         objective_gradients = objective_gradients_p1,
@@ -61,9 +63,12 @@ player_cost_models = (
         add_objective! = function (model, args...; kwargs...)
             @objective(model, Min, objective_p1(args...; kwargs...))
         end,
-        player_inputs = [1],
+        add_objective_gradients! = function (model, args...; kwargs...)
+            objective_gradients_p1(args...; kwargs...)
+        end,
     ),
     (;
+        player_inputs = [2],
         weights = (; state_goal_p2 = 0.1, control_Δθ_p2 = 10),
         objective = objective_p2,
         objective_gradients = objective_gradients_p2,
@@ -71,7 +76,9 @@ player_cost_models = (
         add_objective! = function (model, args...; kwargs...)
             @objective(model, Min, objective_p2(args...; kwargs...))
         end,
-        player_inputs = [2],
+        add_objective_gradients! = function (model, args...; kwargs...)
+            objective_gradients_p2(args...; kwargs...)
+        end,
     ),
 )
 
@@ -90,8 +97,7 @@ player_cost_models = (
     end
 end
 
-function sanity_check_unicycle_multipliers(λ, x, u; player_cost_models)
-
+function test_unicycle_multipliers(λ, x, u; player_cost_models)
     df = let
         As = [
             [
@@ -129,14 +135,14 @@ function sanity_check_unicycle_multipliers(λ, x, u; player_cost_models)
                 for t in 1:(T - 1)
             ]
 
-            @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dLdx)
-            @test all(all(isapprox.(x, 0; atol = 1e-8)) for x in dLdu)
+            @test all(all(isapprox.(x, 0; atol = 1e-6)) for x in dLdx)
+            @test all(all(isapprox.(x, 0; atol = 1e-6)) for x in dLdu)
         end
     end
 end
 
 @testset "Forward IBR" begin
-    global ibr_nash, ibr_converged, ibr_models = solve_game(
+    global ibr_converged, ibr_nash, ibr_models = solve_game(
         IBRGameSolver(),
         control_system,
         player_cost_models,
@@ -154,7 +160,7 @@ end
         end
     end
 
-    sanity_check_unicycle_multipliers(λ_ibr, ibr_nash.x, ibr_nash.u; player_cost_models)
+    test_unicycle_multipliers(λ_ibr, ibr_nash.x, ibr_nash.u; player_cost_models)
 end
 
 @testset "Forward KKT Nash" begin
@@ -164,22 +170,39 @@ end
         player_cost_models,
         x0,
         T;
-        init = (; x = ibr_nash.x, u = ibr_nash.u),
         solver = Ipopt.Optimizer,
     )
 
     visualize_unicycle_trajectory(kkt_nash.x)
 
-    sanity_check_unicycle_multipliers(kkt_nash.λ, kkt_nash.x, kkt_nash.u; player_cost_models)
+    test_unicycle_multipliers(kkt_nash.λ, kkt_nash.x, kkt_nash.u; player_cost_models)
 end
 
+observation_model = (; σ = 0, expected_observation = identity)
 # TODO: robustify
 @testset "Inverse KKT Nash" begin
     global inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
-        kkt_nash.x,
-        kkt_nash.u;
-        # λ_init = kkt_nash.λ,
+        InverseKKTSolver(),
+        ibr_nash.x;
+        init = (; ibr_nash.u),
         control_system,
         player_cost_models,
+    )
+
+    for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
+        TestUtils.test_inverse_solution(weights, cost_model.weights)
+    end
+    TestUtils.test_inverse_model(inverse_kkt_model, observation_model, ibr_nash.x, y)
+end
+
+# TODO: does not converge
+false && begin
+    inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights = solve_inverse_game(
+        InverseIBRSolver(),
+        ibr_nash.x;
+        observation_model,
+        control_system,
+        player_cost_models,
+        u_init = ibr_nash.u,
     )
 end
