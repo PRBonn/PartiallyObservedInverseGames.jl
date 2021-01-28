@@ -7,8 +7,9 @@ using SparseArrays: spzeros
 using JuMPOptimalControl.ForwardOptimalControl: solve_optimal_control
 using JuMPOptimalControl.InverseOptimalControl: solve_inverse_optimal_control
 
-include("Unicycle.jl")
-using .Unicycle:
+unique!(push!(LOAD_PATH, @__DIR__))
+import TestUtils
+using Unicycle:
     add_unicycle_dynamics_constraints!,
     add_unicycle_dynamics_jacobians!,
     visualize_unicycle_trajectory
@@ -64,7 +65,7 @@ function add_forward_objective_gradients!(model, x, u; weights)
         dproxdy[t] == -2 * (x[2, t] - obstacle[2]) / model[:regularized_sq_dist][t]
     )
 
-    dg̃dx = (;
+    dJ̃dx = (;
         state_goal = 2 * [
             zeros(2, T_activate_goalcost - 1) x[1:2, T_activate_goalcost:T]
             zeros(n_states - 2, T)
@@ -75,9 +76,9 @@ function add_forward_objective_gradients!(model, x, u; weights)
         control_Δθ = spzeros(n_states, T),
         control = spzeros(n_states, T),
     )
-    dgdx = sum(weights[k] * dg̃dx[symbol(k)] for k in keys(weights))
+    dJdx = sum(weights[k] * dJ̃dx[symbol(k)] for k in keys(weights))
 
-    dg̃du = (;
+    dJ̃du = (;
         state_goal = spzeros(n_controls, T),
         state_velocity = spzeros(n_controls, T),
         state_proximity = spzeros(n_controls, T),
@@ -85,9 +86,9 @@ function add_forward_objective_gradients!(model, x, u; weights)
         control_Δθ = 2 * [spzeros(T) u[2, :]]',
         control = 2 * u,
     )
-    dgdu = sum(weights[k] * dg̃du[symbol(k)] for k in keys(weights))
+    dJdu = sum(weights[k] * dJ̃du[symbol(k)] for k in keys(weights))
 
-    (; dx = dgdx, du = dgdu)
+    (; dx = dJdx, du = dJdu)
 end
 
 control_system = (
@@ -130,8 +131,8 @@ y = let
 end
 
 inverse_solution, inverse_model = solve_inverse_optimal_control(
-    y,
-    forward_solution.u;
+    y;
+    init = (; forward_solution.u),
     control_system,
     cost_model,
     observation_model,
@@ -139,23 +140,7 @@ inverse_solution, inverse_model = solve_inverse_optimal_control(
 
 #============================================== Tests ==============================================#
 
-@testset "Inverse Solution Sanity" begin
-    @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
-    atol = 1e-2
-
-    w_total_inverse = sum(inverse_solution.weights)
-    w_total_forward = sum(cost_model.weights)
-
-    for k in keys(cost_model.weights)
-        @info k
-        @test isapprox(
-            inverse_solution.weights[k] / w_total_inverse,
-            cost_model.weights[k] / w_total_forward;
-            atol = atol,
-        )
-    end
-
-    ŷ = observation_model.expected_observation(forward_solution.x)
-    ê_sq = sum((ŷ .- y) .^ 2)
-    @test JuMP.objective_value(inverse_model) <= ê_sq + 1e-2
+@testset "Inverse Solution" begin
+    TestUtils.test_inverse_solution(inverse_solution.weights, cost_model.weights)
+    TestUtils.test_inverse_model(inverse_model, observation_model, forward_solution.x, y)
 end
