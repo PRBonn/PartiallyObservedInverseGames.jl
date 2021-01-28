@@ -15,9 +15,10 @@ function set_solver_attributes!(model, ; silent, solver_attributes...)
     )
 end
 
-function init_if_hasproperty!(v, init, sym)
-    if hasproperty(init, sym)
-        JuMP.set_start_value.(v, getproperty(init, sym))
+function init_if_hasproperty!(v, init, sym; default = nothing)
+    init_value = hasproperty(init, sym) ? getproperty(init, sym) : default
+    if !isnothing(init_value)
+        JuMP.set_start_value.(v, init_value)
     end
 end
 
