@@ -85,7 +85,6 @@ function solve_game(
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
     # Decision Variables
-    # TODO: fix the variable access here.
     x = @variable(model, [1:n_states, 1:T])
     u = @variable(model, [1:n_controls, 1:T])
     λ = @variable(model, [1:n_states, 1:(T - 1), 1:n_players])

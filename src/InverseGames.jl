@@ -12,6 +12,7 @@ export solve_inverse_game
 
 struct InverseIBRSolver end
 
+# TODO: allow for partial and noisy state observations
 # TODO: This probably does not work so well if the initial strategy for the players does not match
 # the observation well.
 function solve_inverse_game(
@@ -99,7 +100,6 @@ function solve_inverse_game(
     SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
 
     # Decision Variables
-    # TODO: continue here: add and intialize weights (key as union over player cost weight keys)
     player_weights =
         [@variable(model, [keys(cost_model.weights)]) for cost_model in player_cost_models]
     x = @variable(model, [1:n_states, 1:T])
@@ -151,12 +151,8 @@ function solve_inverse_game(
 
         # regularization
         @constraint(model, weights .>= cmin)
-        # # TODO: Think about the correct regularization here
         @constraint(model, sum(w -> w^2, weights) .== 1)
     end
-
-    # TODO: Think about the correct regularization here
-    # @constraint(model, sum(sum(weights) for weights in player_weights) .== 1)
 
     # The inverse objective: match the observed demonstration
     @objective(model, Min, sum((x .- x̂) .^ 2))
