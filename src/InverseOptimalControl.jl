@@ -87,16 +87,16 @@ end
 #=========================================== Non-LQ-Case ===========================================#
 
 function solve_inverse_optimal_control(
-    y,
-    û = nothing;
+    y;
     control_system,
     cost_model,
     observation_model,
+    fixed_inputs = (),
+    init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (),
     silent = false,
     cmin = 1e-5,
-    max_trajectory_error = nothing,
 )
     T = size(y)[2]
     @unpack n_states, n_controls = control_system
@@ -109,37 +109,50 @@ function solve_inverse_optimal_control(
     x = @variable(model, [1:n_states, 1:T])
     u = @variable(model, [1:n_controls, 1:T])
     λ = @variable(model, [1:n_states, 1:(T - 1)]) # multipliers of the forward optimality condition
-    # TODO: Are there smarter initial guesses that we can make for `u` and `λ`?
-    JuMP.set_start_value.(weights, 1 / length(cost_model.weights))
+
+    # initialization
+    if hasproperty(init, :weights) && !isnothing(init.weights)
+        for k in keys(init.weights)
+            JuMP.set_start_value(weights[k], init.weights[k])
+        end
+    else
+        JuMP.set_start_value.(weights, 1 / length(weights))
+    end
+
+    # SolverUtils.init_if_hasproperty!(weights, init, :weights, default = 1 / length(weights))
     # TODO: This is not always correct. Technically we would want to use an inverse observation
     # model here if it exists (mapping from observationi to state components)
     JuMP.set_start_value.(x[CartesianIndices(y)], y)
-    if !isnothing(û)
-        JuMP.set_start_value.(u[CartesianIndices(û)], û)
-    end
+    SolverUtils.init_if_hasproperty!(u, init, :u)
 
     # constraints
-    if !isnothing(max_trajectory_error)
-        @constraint(model, sum(x .- y) .^ 2 <= max_trajectory_error)
-    end
     if iszero(observation_model.σ)
         @constraint(model, observation_model.expected_observation(x[:, 1]) .== y[:, 1])
     end
     control_system.add_dynamics_constraints!(model, x, u)
-    # KKT conditions as constraints for forward optimality
+    # figure out which inputs we control and fix all others
+    controlled_inputs = filter(i -> i ∉ fixed_inputs, 1:n_controls)
+    for i in fixed_inputs
+        @constraint(model, u[fixed_inputs, :] .== init.u[fixed_inputs, :])
+    end
+    # Require forward-optimality for all *controlled* inputs.
     df = control_system.add_dynamics_jacobians!(model, x, u)
-    dg = cost_model.add_objective_gradients!(model, x, u; weights)
+    dJ = cost_model.add_objective_gradients!(model, x, u; weights)
     @constraint(
         model,
-        dLdx[t = 2:(T - 1)],
-        dg.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0
+        [t = 2:(T - 1)],
+        dJ.dx[:, t] + λ[:, t - 1] - (λ[:, t]' * df.dx[:, :, t])' .== 0
     )
-    @constraint(model, dg.dx[:, T] + λ[:, T - 1] .== 0)
-    @constraint(model, [t = 1:(T - 1)], dg.du[:, t] - (λ[:, t]' * df.du[:, :, t])' .== 0)
-    @constraint(model, dg.du[:, T] .== 0)
+    @constraint(model, dJ.dx[:, T] + λ[:, T - 1] .== 0)
+    @constraint(
+        model,
+        [t = 1:(T - 1)],
+        dJ.du[controlled_inputs, t] - (λ[:, t]' * df.du[:, controlled_inputs, t])' .== 0
+    )
+    @constraint(model, dJ.du[controlled_inputs, T] .== 0)
     # regularization
     # TODO: There might be a smarter regularization here. Rather, we want there to be non-zero cost
-    # for all inputs.
+    # for all inputs (i.e. enforce positive definiteness of the input cost.)
     @constraint(model, weights .>= cmin)
     @constraint(model, sum(weights) == 1)
 
