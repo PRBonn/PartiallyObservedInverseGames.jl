@@ -17,14 +17,16 @@ end
 
 "Returns an iterable of state indices for the `subsystem_idx`th subsystem."
 function state_indices(system::ProductSystem, subsystem_idx)
-    idx_offset = sum(i -> system.subsystems[i].n_states, 1:(subsystem_idx - 1))
-    (idx_offset .+ 1):(system.subsystems[subsystem_idx].n_states)
+    # Note: starting from Julia 1.6 this can be done directly with a sum.
+    idx_offset = mapreduce(i -> system.subsystems[i].n_states, +, 1:(subsystem_idx - 1); init = 0)
+    idx_offset .+ (1:(system.subsystems[subsystem_idx].n_states))
 end
 
 "Returns an iterable of input indices for the `subsystem_idx`th subsystem."
 function input_indices(system::ProductSystem, subsystem_idx)
-    idx_offset = sum(i -> system.subsystems[i].n_controls, 1:(subsystem_idx - 1))
-    (idx_offset .+ 1):(system.subsystems[subsystem_idx].n_controls)
+    # Note: starting from Julia 1.6 this can be done directly with a sum.
+    idx_offset = mapreduce(i -> system.subsystems[i].n_controls, +, 1:(subsystem_idx - 1); init = 0)
+    idx_offset .+ (1:(system.subsystems[subsystem_idx].n_controls))
 end
 
 function DynamicsModelInterface.add_dynamics_constraints!(system::ProductSystem, opt_model, x, u)

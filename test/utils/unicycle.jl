@@ -52,7 +52,7 @@ function DynamicsModelInterface.add_dynamics_constraints!(::Unicycle, opt_model,
 
     @constraint(
         opt_model,
-        dynamics[t = 1:(T - 1)],
+        [t = 1:(T - 1)],
         x[:, t + 1] .== [
             x[1, t] + x[3, t] * cosθ[t],
             x[2, t] + x[3, t] * sinθ[t],
