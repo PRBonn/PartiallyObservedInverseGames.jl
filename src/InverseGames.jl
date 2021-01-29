@@ -57,7 +57,7 @@ function solve_inverse_game(
                         # immediately.
                         x = last_player_solution.x,
                         u = last_player_solution.u,
-                        λ = last_player_solution.λ
+                        λ = last_player_solution.λ,
                     ),
                     inner_solver_kwargs...,
                 )
@@ -66,7 +66,6 @@ function solve_inverse_game(
         end
 
         converged =
-            i_ibr > 1 &&
             sum(Δu -> Δu^2, last_player_solution.u .- last_ibr_solution.u) <=
             ibr_convergence_tolerance
         last_ibr_solution = last_player_solution
