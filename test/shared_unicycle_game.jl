@@ -12,32 +12,31 @@ using UnPack: @unpack
 
 import Plots
 
-unique!(push!(LOAD_PATH, @__DIR__))
+unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils
 import TestDynamics
 
 #======================================== Global parameters ========================================#
 
 function objective_p1(x, u; weights)
-    weights[:state_velocity_p1] * sum((x[3, :] .- 0.1) .^ 2) +
-    weights[:control_Δv_p1] * sum(u[1, :] .^ 2)
+    weights[:state_velocity] * sum((x[3, :] .- 0.1) .^ 2) + weights[:control_Δv] * sum(u[1, :] .^ 2)
 end
 
 function objective_gradients_p1(x, u; weights)
     T = size(x, 2)
-    dJdx = 2 * weights[:state_velocity_p1] * [zeros(2, T); x[3:3, :] .- 0.1; zeros(1, T)]
-    dJdu = 2 * weights[:control_Δv_p1] * [u[1:1, :]; zeros(1, T)]
+    dJdx = 2 * weights[:state_velocity] * [zeros(2, T); x[3:3, :] .- 0.1; zeros(1, T)]
+    dJdu = 2 * weights[:control_Δv] * [u[1:1, :]; zeros(1, T)]
     (; dx = dJdx, du = dJdu)
 end
 
 function objective_p2(x, u2; weights)
-    weights[:state_goal_p2] * sum(x[1:2, :] .^ 2) + weights[:control_Δθ_p2] * sum(u2 .^ 2)
+    weights[:state_goal] * sum(x[1:2, :] .^ 2) + weights[:control_Δθ] * sum(u2 .^ 2)
 end
 
 function objective_gradients_p2(x, u; weights)
     T = size(x, 2)
-    dJdx = 2 * weights[:state_goal_p2] * [x[1:2, :]; zeros(2, T)]
-    dJdu = 2 * weights[:control_Δθ_p2] * [zeros(1, T); u[2:2, :]]
+    dJdx = 2 * weights[:state_goal] * [x[1:2, :]; zeros(2, T)]
+    dJdu = 2 * weights[:control_Δθ] * [zeros(1, T); u[2:2, :]]
     (; dx = dJdx, du = dJdu)
 end
 
@@ -45,10 +44,11 @@ control_system = TestDynamics.Unicycle()
 x0 = [-1, 1, 0.0, 0]
 T = 100
 
+# TODO: think about whichinformation is redundant and could be generated.
 player_cost_models = (
     (;
         player_inputs = [1],
-        weights = (; state_velocity_p1 = 10, control_Δv_p1 = 100),
+        weights = (; state_velocity = 10, control_Δv = 100),
         objective = objective_p1,
         objective_gradients = objective_gradients_p1,
         add_objective! = function (opt_model, args...; kwargs...)
@@ -60,7 +60,7 @@ player_cost_models = (
     ),
     (;
         player_inputs = [2],
-        weights = (; state_goal_p2 = 0.1, control_Δθ_p2 = 10),
+        weights = (; state_goal = 0.1, control_Δθ = 10),
         objective = objective_p2,
         objective_gradients = objective_gradients_p2,
         add_objective! = function (opt_model, args...; kwargs...)
