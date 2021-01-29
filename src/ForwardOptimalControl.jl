@@ -1,5 +1,6 @@
 module ForwardOptimalControl
 
+import ..DynamicsModelInterface
 import ..SolverUtils
 import Ipopt
 import JuMP
@@ -79,7 +80,7 @@ function solve_optimal_control(
         @constraint(model, u[fixed_inputs, :] .== init.u[fixed_inputs, :])
     end
 
-    control_system.add_dynamics_constraints!(model, x, u)
+    DynamicsModelInterface.add_dynamics_constraints!(control_system, model, x, u)
     @constraint(model, x[:, 1] .== x0)
     cost_model.add_objective!(model, x, u; cost_model.weights)
     @time JuMP.optimize!(model)

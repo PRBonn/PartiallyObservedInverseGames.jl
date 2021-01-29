@@ -1,4 +1,5 @@
 module JuMPOptimalControl
+include("DynamicsModelInterface.jl")
 include("SolverUtils.jl")
 include("ForwardOptimalControl.jl")
 include("InverseOptimalControl.jl")

@@ -2,6 +2,7 @@ module InverseGames
 
 import JuMP
 import Ipopt
+import ..DynamicsModelInterface
 import ..SolverUtils
 import ..InverseOptimalControl
 
@@ -127,8 +128,8 @@ function solve_inverse_game(
     # end
 
     # constraints
-    control_system.add_dynamics_constraints!(model, x, u)
-    df = control_system.add_dynamics_jacobians!(model, x, u)
+    DynamicsModelInterface.add_dynamics_constraints!(control_system, model, x, u)
+    df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, model, x, u)
 
     @constraint(model, x[:, 1] .== x0)
 

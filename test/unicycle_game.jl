@@ -5,6 +5,7 @@ import Zygote
 using JuMP: @variable, @constraint, @objective
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
 using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTSolver, solve_inverse_game
+using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
 using SparseArrays: spzeros
 using Test: @test, @testset, @test_broken
 using UnPack: @unpack
@@ -13,10 +14,7 @@ import Plots
 
 unique!(push!(LOAD_PATH, @__DIR__))
 import TestUtils
-using Unicycle:
-    add_unicycle_dynamics_constraints!,
-    add_unicycle_dynamics_jacobians!,
-    visualize_unicycle_trajectory
+import TestDynamics
 
 #======================================== Global parameters ========================================#
 
@@ -43,13 +41,7 @@ function objective_gradients_p2(x, u; weights)
     (; dx = dJdx, du = dJdu)
 end
 
-control_system = (
-    add_dynamics_constraints! = add_unicycle_dynamics_constraints!,
-    add_dynamics_jacobians! = add_unicycle_dynamics_jacobians!,
-    n_states = 4,
-    n_controls = 2,
-)
-
+control_system = TestDynamics.Unicycle()
 x0 = [-1, 1, 0.0, 0]
 T = 100
 
@@ -171,7 +163,7 @@ end
         solver = Ipopt.Optimizer,
     )
 
-    visualize_unicycle_trajectory(kkt_nash.x)
+    visualize_trajectory(control_system, kkt_nash.x)
 
     test_unicycle_multipliers(kkt_nash.λ, kkt_nash.x, kkt_nash.u; player_cost_models)
 end
@@ -194,13 +186,14 @@ observation_model = (; σ = 0, expected_observation = identity)
 end
 
 # TODO: does not reliably converge yet
-@test_broken false
-# inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights =
-#     solve_inverse_game(
-#         InverseIBRSolver(),
-#         ibr_nash.x;
-#         observation_model,
-#         control_system,
-#         player_cost_models,
-#         u_init = ibr_nash.u,
-#     )
+@test_broken false && begin
+    inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights =
+        solve_inverse_game(
+            InverseIBRSolver(),
+            ibr_nash.x;
+            observation_model,
+            control_system,
+            player_cost_models,
+            u_init = ibr_nash.u,
+        )
+end

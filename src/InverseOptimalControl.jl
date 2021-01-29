@@ -1,5 +1,6 @@
 module InverseOptimalControl
 
+import ..DynamicsModelInterface
 import ..SolverUtils
 import Ipopt
 import JuMP
@@ -132,14 +133,14 @@ function solve_inverse_optimal_control(
     if iszero(observation_model.σ)
         @constraint(model, observation_model.expected_observation(x[:, 1]) .== y[:, 1])
     end
-    control_system.add_dynamics_constraints!(model, x, u)
+    DynamicsModelInterface.add_dynamics_constraints!(control_system, model, x, u)
     # figure out which inputs we control and fix all others
     controlled_inputs = filter(i -> i ∉ fixed_inputs, 1:n_controls)
     for i in fixed_inputs
         @constraint(model, u[fixed_inputs, :] .== init.u[fixed_inputs, :])
     end
     # Require forward-optimality for all *controlled* inputs.
-    df = control_system.add_dynamics_jacobians!(model, x, u)
+    df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, model, x, u)
     dJ = cost_model.add_objective_gradients!(model, x, u; weights)
     @constraint(
         model,

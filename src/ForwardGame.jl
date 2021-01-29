@@ -2,6 +2,7 @@ module ForwardGame
 
 import JuMP
 import Ipopt
+import ..DynamicsModelInterface
 import ..SolverUtils
 import ..ForwardOptimalControl
 
@@ -96,8 +97,8 @@ function solve_game(
 
     # constraints
     @constraint(model, x[:, 1] .== x0)
-    control_system.add_dynamics_constraints!(model, x, u)
-    df = control_system.add_dynamics_jacobians!(model, x, u)
+    DynamicsModelInterface.add_dynamics_constraints!(control_system, model, x, u)
+    df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, model, x, u)
 
     for (player_idx, cost_model) in enumerate(player_cost_models)
         @unpack player_inputs, weights = cost_model

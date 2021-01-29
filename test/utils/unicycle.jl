@@ -1,12 +1,16 @@
-module Unicycle
+struct Unicycle end
 
-import Plots
-using JuMP: @variable, @constraint, @NLconstraint
+function Base.getproperty(::Unicycle, sym::Symbol)
+    if sym === :n_states
+        4
+    elseif sym === :n_controls
+        2
+    else
+        getfield(x, sym)
+    end
+end
 
-export visualize_unicycle_trajectory,
-    add_unicycle_dynamics_jacobians!, add_unicycle_dynamics_jacobians!
-
-function visualize_unicycle_trajectory(x; cost_model = nothing, kwargs...)
+function DynamicsModelInterface.visualize_trajectory(::Unicycle, x; cost_model = nothing, kwargs...)
     (x_min, x_max) = extrema(x[1, :]) .+ (-0.5, 0.5)
     (y_min, y_max) = extrema(x[2, :]) .+ (-0.5, 0.5)
 
@@ -37,7 +41,7 @@ end
 
 # These constraints encode the dynamics of a unicycle with state layout x_t = [px, py, v, θ] and
 # inputs u_t = [Δv, Δθ].
-function add_unicycle_dynamics_constraints!(model, x, u)
+function DynamicsModelInterface.add_dynamics_constraints!(::Unicycle, model, x, u)
     T = size(x)[2]
 
     # auxiliary variables for nonlinearities
@@ -59,7 +63,7 @@ function add_unicycle_dynamics_constraints!(model, x, u)
     )
 end
 
-function add_unicycle_dynamics_jacobians!(model, x, u)
+function DynamicsModelInterface.add_dynamics_jacobians!(::Unicycle, model, x, u)
     n_states, T = size(x)
     n_controls = size(u, 1)
     # TODO it's a bit ugly that we rely on these constraints to be present. We could check with
@@ -89,6 +93,4 @@ function add_unicycle_dynamics_jacobians!(model, x, u)
     ] .* reshape(ones(T), 1, 1, :)
 
     (; dx = dfdx, du = dfdu)
-end
-
 end

@@ -6,13 +6,11 @@ using JuMP: JuMP, @NLconstraint, @objective, @variable, @NLexpression
 using SparseArrays: spzeros
 using JuMPOptimalControl.ForwardOptimalControl: solve_optimal_control
 using JuMPOptimalControl.InverseOptimalControl: solve_inverse_optimal_control
+using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
 
-unique!(push!(LOAD_PATH, @__DIR__))
+unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils
-using Unicycle:
-    add_unicycle_dynamics_constraints!,
-    add_unicycle_dynamics_jacobians!,
-    visualize_unicycle_trajectory
+import TestDynamics
 
 #========================================== Cost Library ===========================================#
 
@@ -91,12 +89,7 @@ function add_forward_objective_gradients!(model, x, u; weights)
     (; dx = dJdx, du = dJdu)
 end
 
-control_system = (
-    add_dynamics_constraints! = add_unicycle_dynamics_constraints!,
-    add_dynamics_jacobians! = add_unicycle_dynamics_jacobians!,
-    n_states = 4,
-    n_controls = 2,
-)
+control_system = TestDynamics.Unicycle()
 
 # TODO: maybe limit the region of proximity cost
 x0 = [-1, 1, 0, 0]
@@ -119,7 +112,7 @@ cost_model = (
 #====================================== forward optimal control ====================================#
 
 forward_solution, forward_model = solve_optimal_control(control_system, cost_model, x0, T)
-visualize_unicycle_trajectory(forward_solution.x)
+visualize_trajectory(control_system, forward_solution.x)
 
 #===================================== Inverse Optimal Control =====================================#
 
