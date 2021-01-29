@@ -45,10 +45,9 @@ function DynamicsModelInterface.add_dynamics_constraints!(::Unicycle, opt_model,
     T = size(x)[2]
 
     # auxiliary variables for nonlinearities
-    @variable(opt_model, cosθ[1:T])
+    cosθ = @variable(opt_model, [1:T])
     @NLconstraint(opt_model, [t = 1:T], cosθ[t] == cos(x[4, t]))
-
-    @variable(opt_model, sinθ[1:T])
+    sinθ = @variable(opt_model, [1:T])
     @NLconstraint(opt_model, [t = 1:T], sinθ[t] == sin(x[4, t]))
 
     @constraint(
@@ -66,10 +65,12 @@ end
 function DynamicsModelInterface.add_dynamics_jacobians!(::Unicycle, opt_model, x, u)
     n_states, T = size(x)
     n_controls = size(u, 1)
-    # TODO it's a bit ugly that we rely on these constraints to be present. We could check with
-    # `haskey`.
-    cosθ = opt_model[:cosθ]
-    sinθ = opt_model[:sinθ]
+
+    # auxiliary variables for nonlinearities
+    cosθ = @variable(opt_model, [1:T])
+    @NLconstraint(opt_model, [t = 1:T], cosθ[t] == cos(x[4, t]))
+    sinθ = @variable(opt_model, [1:T])
+    @NLconstraint(opt_model, [t = 1:T], sinθ[t] == sin(x[4, t]))
 
     # jacobians of the dynamics in x
     @variable(opt_model, dfdx[1:n_states, 1:n_states, 1:T])
