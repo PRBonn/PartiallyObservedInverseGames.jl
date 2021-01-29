@@ -132,7 +132,7 @@ function test_unicycle_multipliers(λ, x, u; player_cost_models)
 end
 
 @testset "Forward IBR" begin
-    global ibr_converged, ibr_nash, ibr_models = solve_game(
+    global ibr_converged, ibr_solution, ibr_models = solve_game(
         IBRGameSolver(),
         control_system,
         player_cost_models,
@@ -150,11 +150,11 @@ end
         end
     end
 
-    test_unicycle_multipliers(λ_ibr, ibr_nash.x, ibr_nash.u; player_cost_models)
+    test_unicycle_multipliers(λ_ibr, ibr_solution.x, ibr_solution.u; player_cost_models)
 end
 
 @testset "Forward KKT Nash" begin
-    global kkt_nash, kkt_model = solve_game(
+    global kkt_solution, kkt_model = solve_game(
         KKTGameSolver(),
         control_system,
         player_cost_models,
@@ -163,9 +163,9 @@ end
         solver = Ipopt.Optimizer,
     )
 
-    visualize_trajectory(control_system, kkt_nash.x)
+    visualize_trajectory(control_system, kkt_solution.x)
 
-    test_unicycle_multipliers(kkt_nash.λ, kkt_nash.x, kkt_nash.u; player_cost_models)
+    test_unicycle_multipliers(kkt_solution.λ, kkt_solution.x, kkt_solution.u; player_cost_models)
 end
 
 observation_model = (; σ = 0, expected_observation = identity)
@@ -173,8 +173,8 @@ observation_model = (; σ = 0, expected_observation = identity)
 @testset "Inverse KKT Nash" begin
     global inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
         InverseKKTSolver(),
-        ibr_nash.x;
-        init = (; ibr_nash.u),
+        ibr_solution.x;
+        init = (; ibr_solution.u),
         control_system,
         player_cost_models,
     )
@@ -182,7 +182,12 @@ observation_model = (; σ = 0, expected_observation = identity)
     for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
         TestUtils.test_inverse_solution(weights, cost_model.weights)
     end
-    TestUtils.test_inverse_model(inverse_kkt_model, observation_model, ibr_nash.x, ibr_nash.x)
+    TestUtils.test_inverse_model(
+        inverse_kkt_model,
+        observation_model,
+        ibr_solution.x,
+        ibr_solution.x,
+    )
 end
 
 # TODO: does not reliably converge yet
@@ -190,10 +195,10 @@ end
     inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights =
         solve_inverse_game(
             InverseIBRSolver(),
-            ibr_nash.x;
+            ibr_solution.x;
             observation_model,
             control_system,
             player_cost_models,
-            u_init = ibr_nash.u,
+            u_init = ibr_solution.u,
         )
 end
