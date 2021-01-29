@@ -14,6 +14,18 @@ function Base.getproperty(system::ProductSystem, sym::Symbol)
 end
 
 # TODO: Implement DynamicsModelInterface.visualize_trajectory
+function DynamicsModelInterface.visualize_trajectory(
+    system::ProductSystem,
+    x;
+    canvas = Plots.plot(),
+)
+    for (subsystem_idx, subsystem) in enumerate(system.subsystems)
+        @views x_sub = x[state_indices(system, subsystem_idx), :]
+        DynamicsModelInterface.visualize_trajectory(subsystem, x_sub; canvas)
+    end
+
+    canvas
+end
 
 "Returns an iterable of state indices for the `subsystem_idx`th subsystem."
 function state_indices(system::ProductSystem, subsystem_idx)

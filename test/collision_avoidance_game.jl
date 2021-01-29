@@ -1,6 +1,7 @@
 using Test: @test, @testset
 
 using JuMP: @objective
+using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, solve_game
 
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
@@ -84,8 +85,14 @@ player_cost_models = let
     (cost_model_p1, cost_model_p2)
 end
 
-x0 = vcat([-1, 0, 0, 0], [0, -1, 0, pi / 4])
+x0 = vcat([-1, 0, 0, 0], [0, -1, 0, pi / 2])
 T = 100
 
 ibr_converged, ibr_solution, ibr_models =
     solve_game(IBRGameSolver(), control_system, player_cost_models, x0, T)
+
+@testset "Forward Game" begin
+    @test ibr_converged
+end
+
+visualize_trajectory(control_system, ibr_solution.x)

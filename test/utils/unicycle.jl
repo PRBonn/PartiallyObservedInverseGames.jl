@@ -10,26 +10,17 @@ function Base.getproperty(::Unicycle, sym::Symbol)
     end
 end
 
-function DynamicsModelInterface.visualize_trajectory(::Unicycle, x; cost_model = nothing, kwargs...)
+function DynamicsModelInterface.visualize_trajectory(
+    ::Unicycle,
+    x;
+    canvas = Plots.plot(),
+    kwargs...,
+)
     (x_min, x_max) = extrema(x[1, :]) .+ (-0.5, 0.5)
     (y_min, y_max) = extrema(x[2, :]) .+ (-0.5, 0.5)
 
-    # TODO: this is a rather ugly hack for quick visualization of the proximity cost
-    prox_cost = if !isnothing(cost_model) && haskey(cost_model.weights, :state_proximity)
-        Plots.plot(
-            x_min:0.01:x_max,
-            y_min:0.01:y_max,
-            (x, y) ->
-                cost_model.weights.state_proximity *
-                -log(sum(((x, y) .- cost_model.obstacle) .^ 2)),
-            st = :contour,
-        )
-    else
-        Plots.plot()
-    end
-
-    unicycle_viz = Plots.plot!(
-        prox_cost,
+    Plots.plot!(
+        canvas,
         x[1, :],
         x[2, :];
         quiver = (abs.(x[3, :]) .* cos.(x[4, :]), abs.(x[3, :]) .* sin.(x[4, :])),
