@@ -112,10 +112,12 @@ function solve_inverse_optimal_control(
 
     # initialization
     if hasproperty(init, :weights) && !isnothing(init.weights)
+        silent || @info "Using weight guess: $(init.weights)"
         for k in keys(init.weights)
             JuMP.set_start_value(weights[k], init.weights[k])
         end
     else
+        silent || @info "Using weight default"
         JuMP.set_start_value.(weights, 1 / length(weights))
     end
 
