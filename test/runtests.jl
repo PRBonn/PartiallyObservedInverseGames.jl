@@ -1,7 +1,12 @@
 using Test: @testset
 
 @testset "Tests" begin
-    include("lq_control.jl")
-    include("nonlq_control.jl")
-    include("ol_nash_game.jl")
+    @testset "Single Player: Forward and Inverse Optimal Control" begin
+        include("lq_control.jl")
+        include("nonlq_control.jl")
+    end
+
+    @testset "Multi Player: Forward and Inverse Infinite Dynamnic Games" begin
+        include("unicycle_game.jl")
+    end
 end

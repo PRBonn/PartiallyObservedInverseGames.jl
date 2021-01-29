@@ -9,7 +9,7 @@ using SparseArrays: spzeros
 using Test: @test, @testset, @test_broken
 using UnPack: @unpack
 
-import Plots, ElectronDisplay
+import Plots
 
 unique!(push!(LOAD_PATH, @__DIR__))
 import TestUtils
@@ -190,17 +190,17 @@ observation_model = (; σ = 0, expected_observation = identity)
     for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
         TestUtils.test_inverse_solution(weights, cost_model.weights)
     end
-    TestUtils.test_inverse_model(inverse_kkt_model, observation_model, ibr_nash.x, y)
+    TestUtils.test_inverse_model(inverse_kkt_model, observation_model, ibr_nash.x, ibr_nash.x)
 end
 
-# TODO: does not converge
-false && begin
-    inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights = solve_inverse_game(
-        InverseIBRSolver(),
-        ibr_nash.x;
-        observation_model,
-        control_system,
-        player_cost_models,
-        u_init = ibr_nash.u,
-    )
-end
+# TODO: does not reliably converge yet
+@test_broken false
+# inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights =
+#     solve_inverse_game(
+#         InverseIBRSolver(),
+#         ibr_nash.x;
+#         observation_model,
+#         control_system,
+#         player_cost_models,
+#         u_init = ibr_nash.u,
+#     )

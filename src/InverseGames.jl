@@ -30,7 +30,7 @@ function solve_inverse_game(
     @unpack n_controls = control_system
     n_players = length(player_cost_models)
 
-    last_ibr_solution = (; x = x̂, u = u_init)
+    last_ibr_solution = (; x = x̂, u = u_init, λ = nothing)
     last_player_solution = last_ibr_solution
     player_opt_models = resize!(JuMP.Model[], n_players)
     # TODO: dirty hack
@@ -40,8 +40,6 @@ function solve_inverse_game(
     for i_ibr in 1:max_ibr_rounds
         for (player_idx, player_cost_model) in enumerate(player_cost_models)
             cost_model = player_cost_models[player_idx]
-            weights = player_weights[player_idx]
-
             last_player_solution, player_opt_models[player_idx] =
                 InverseOptimalControl.solve_inverse_optimal_control(
                     x̂;
@@ -49,7 +47,17 @@ function solve_inverse_game(
                     cost_model,
                     observation_model,
                     fixed_inputs = filter(i -> i ∉ player_cost_model.player_inputs, 1:n_controls),
-                    init = merge(last_player_solution, (; weights, x = x̂)),
+                    init = (;
+                        weights = player_weights[player_idx],
+                        # TODO: think about whether we should initialize with `x̂` or with
+                        # `last_player_solution.x` here
+                        # TODO: think about whether we should also hand over λ or whether it is
+                        # better to start from λ = 0 to make sure we don't enforce the contraints
+                        # immediately.
+                        x = last_player_solution.x,
+                        u = last_player_solution.u,
+                        λ = last_player_solution.λ
+                    ),
                     inner_solver_kwargs...,
                 )
 
@@ -58,7 +66,7 @@ function solve_inverse_game(
 
         converged =
             i_ibr > 1 &&
-            sum(u -> u^2, last_player_solution.u .- last_ibr_solution.u) <=
+            sum(Δu -> Δu^2, last_player_solution.u .- last_ibr_solution.u) <=
             ibr_convergence_tolerance
         last_ibr_solution = last_player_solution
 
@@ -80,8 +88,7 @@ struct InverseKKTSolver end
 # TODO: allow for partial and noisy state observations
 function solve_inverse_game(
     ::InverseKKTSolver,
-    x̂,
-    û = nothing;
+    x̂;
     control_system,
     player_cost_models,
     init = (),
