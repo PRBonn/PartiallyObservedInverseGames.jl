@@ -82,13 +82,13 @@ function solve_game(
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
 
-    model = JuMP.Model(solver)
-    SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
+    opt_model = JuMP.Model(solver)
+    SolverUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
 
     # Decision Variables
-    x = @variable(model, [1:n_states, 1:T])
-    u = @variable(model, [1:n_controls, 1:T])
-    λ = @variable(model, [1:n_states, 1:(T - 1), 1:n_players])
+    x = @variable(opt_model, [1:n_states, 1:T])
+    u = @variable(opt_model, [1:n_controls, 1:T])
+    λ = @variable(opt_model, [1:n_states, 1:(T - 1), 1:n_players])
 
     # Initialization
     SolverUtils.init_if_hasproperty!(λ, init, :λ)
@@ -96,9 +96,9 @@ function solve_game(
     SolverUtils.init_if_hasproperty!(u, init, :u)
 
     # constraints
-    @constraint(model, x[:, 1] .== x0)
-    DynamicsModelInterface.add_dynamics_constraints!(control_system, model, x, u)
-    df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, model, x, u)
+    @constraint(opt_model, x[:, 1] .== x0)
+    DynamicsModelInterface.add_dynamics_constraints!(control_system, opt_model, x, u)
+    df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, opt_model, x, u)
 
     for (player_idx, cost_model) in enumerate(player_cost_models)
         @unpack player_inputs, weights = cost_model
@@ -106,22 +106,22 @@ function solve_game(
 
         # KKT Nash constraints
         @constraint(
-            model,
+            opt_model,
             [t = 2:(T - 1)],
             dJ.dx[:, t] + λ[:, t - 1, player_idx] - (λ[:, t, player_idx]' * df.dx[:, :, t])' .== 0
         )
-        @constraint(model, dJ.dx[:, T] + λ[:, T - 1, player_idx] .== 0)
+        @constraint(opt_model, dJ.dx[:, T] + λ[:, T - 1, player_idx] .== 0)
 
         @constraint(
-            model,
+            opt_model,
             [t = 1:(T - 1)],
             dJ.du[player_inputs, t] - (λ[:, t, player_idx]' * df.du[:, player_inputs, t])' .== 0
         )
-        @constraint(model, dJ.du[player_inputs, T] .== 0)
+        @constraint(opt_model, dJ.du[player_inputs, T] .== 0)
     end
 
-    @time JuMP.optimize!(model)
-    SolverUtils.get_values(; x, u, λ), model
+    @time JuMP.optimize!(opt_model)
+    SolverUtils.get_values(; x, u, λ), opt_model
 end
 
 end

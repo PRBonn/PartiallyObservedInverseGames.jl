@@ -41,18 +41,18 @@ end
 
 # These constraints encode the dynamics of a unicycle with state layout x_t = [px, py, v, θ] and
 # inputs u_t = [Δv, Δθ].
-function DynamicsModelInterface.add_dynamics_constraints!(::Unicycle, model, x, u)
+function DynamicsModelInterface.add_dynamics_constraints!(::Unicycle, opt_model, x, u)
     T = size(x)[2]
 
     # auxiliary variables for nonlinearities
-    @variable(model, cosθ[1:T])
-    @NLconstraint(model, [t = 1:T], cosθ[t] == cos(x[4, t]))
+    @variable(opt_model, cosθ[1:T])
+    @NLconstraint(opt_model, [t = 1:T], cosθ[t] == cos(x[4, t]))
 
-    @variable(model, sinθ[1:T])
-    @NLconstraint(model, [t = 1:T], sinθ[t] == sin(x[4, t]))
+    @variable(opt_model, sinθ[1:T])
+    @NLconstraint(opt_model, [t = 1:T], sinθ[t] == sin(x[4, t]))
 
     @constraint(
-        model,
+        opt_model,
         dynamics[t = 1:(T - 1)],
         x[:, t + 1] .== [
             x[1, t] + x[3, t] * cosθ[t],
@@ -63,18 +63,18 @@ function DynamicsModelInterface.add_dynamics_constraints!(::Unicycle, model, x, 
     )
 end
 
-function DynamicsModelInterface.add_dynamics_jacobians!(::Unicycle, model, x, u)
+function DynamicsModelInterface.add_dynamics_jacobians!(::Unicycle, opt_model, x, u)
     n_states, T = size(x)
     n_controls = size(u, 1)
     # TODO it's a bit ugly that we rely on these constraints to be present. We could check with
     # `haskey`.
-    cosθ = model[:cosθ]
-    sinθ = model[:sinθ]
+    cosθ = opt_model[:cosθ]
+    sinθ = opt_model[:sinθ]
 
     # jacobians of the dynamics in x
-    @variable(model, dfdx[1:n_states, 1:n_states, 1:T])
+    @variable(opt_model, dfdx[1:n_states, 1:n_states, 1:T])
     @constraint(
-        model,
+        opt_model,
         [t = 1:T],
         dfdx[:, :, t] .== [
             1 0 cosθ[t] -x[3, t]*sinθ[t]

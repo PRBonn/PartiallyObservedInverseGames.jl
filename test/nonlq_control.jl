@@ -17,22 +17,22 @@ import TestDynamics
 symbol(s::Symbol) = s
 symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
 
-function register_shared_forward_cost_expressions!(model, x, u; prox_min = 0.1)
+function register_shared_forward_cost_expressions!(opt_model, x, u; prox_min = 0.1)
     T = size(x, 2)
     @NLexpression(
-        model,
+        opt_model,
         regularized_sq_dist[t = 1:T],
         (x[1, t] - obstacle[1])^2 + (x[2, t] - obstacle[2])^2 + prox_min
     )
 end
 
-function add_forward_objective!(model, x, u; weights)
+function add_forward_objective!(opt_model, x, u; weights)
     T = size(x, 2)
-    register_shared_forward_cost_expressions!(model, x, u)
+    register_shared_forward_cost_expressions!(opt_model, x, u)
 
     # Avoid a point. Assumes x = [px, py, ...]. Functional form is -log(|(x, y) - p|^2).
-    @variable(model, prox_cost[t = 1:T])
-    @NLconstraint(model, [t = 1:T], prox_cost[t] == -log(model[:regularized_sq_dist][t]))
+    @variable(opt_model, prox_cost[t = 1:T])
+    @NLconstraint(opt_model, [t = 1:T], prox_cost[t] == -log(opt_model[:regularized_sq_dist][t]))
 
     g̃ = (;
         state_goal = sum(x[1:2, T_activate_goalcost:T] .^ 2),
@@ -43,24 +43,24 @@ function add_forward_objective!(model, x, u; weights)
         control = sum(u .^ 2),
     )
 
-    @objective(model, Min, sum(weights[k] * g̃[symbol(k)] for k in keys(weights)))
+    @objective(opt_model, Min, sum(weights[k] * g̃[symbol(k)] for k in keys(weights)))
 end
 
-function add_forward_objective_gradients!(model, x, u; weights)
+function add_forward_objective_gradients!(opt_model, x, u; weights)
     n_states, T = size(x)
     n_controls = size(u, 1)
-    register_shared_forward_cost_expressions!(model, x, u)
-    @variable(model, dproxdx[1:T])
+    register_shared_forward_cost_expressions!(opt_model, x, u)
+    @variable(opt_model, dproxdx[1:T])
     @NLconstraint(
-        model,
+        opt_model,
         [t = 1:T],
-        dproxdx[t] == -2 * (x[1, t] - obstacle[1]) / model[:regularized_sq_dist][t]
+        dproxdx[t] == -2 * (x[1, t] - obstacle[1]) / opt_model[:regularized_sq_dist][t]
     )
-    @variable(model, dproxdy[1:T])
+    @variable(opt_model, dproxdy[1:T])
     @NLconstraint(
-        model,
+        opt_model,
         [t = 1:T],
-        dproxdy[t] == -2 * (x[2, t] - obstacle[2]) / model[:regularized_sq_dist][t]
+        dproxdy[t] == -2 * (x[2, t] - obstacle[2]) / opt_model[:regularized_sq_dist][t]
     )
 
     dJ̃dx = (;

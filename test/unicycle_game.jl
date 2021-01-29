@@ -51,10 +51,10 @@ player_cost_models = (
         weights = (; state_velocity_p1 = 10, control_Δv_p1 = 100),
         objective = objective_p1,
         objective_gradients = objective_gradients_p1,
-        add_objective! = function (model, args...; kwargs...)
-            @objective(model, Min, objective_p1(args...; kwargs...))
+        add_objective! = function (opt_model, args...; kwargs...)
+            @objective(opt_model, Min, objective_p1(args...; kwargs...))
         end,
-        add_objective_gradients! = function (model, args...; kwargs...)
+        add_objective_gradients! = function (opt_model, args...; kwargs...)
             objective_gradients_p1(args...; kwargs...)
         end,
     ),
@@ -63,10 +63,10 @@ player_cost_models = (
         weights = (; state_goal_p2 = 0.1, control_Δθ_p2 = 10),
         objective = objective_p2,
         objective_gradients = objective_gradients_p2,
-        add_objective! = function (model, args...; kwargs...)
-            @objective(model, Min, objective_p2(args...; kwargs...))
+        add_objective! = function (opt_model, args...; kwargs...)
+            @objective(opt_model, Min, objective_p2(args...; kwargs...))
         end,
-        add_objective_gradients! = function (model, args...; kwargs...)
+        add_objective_gradients! = function (opt_model, args...; kwargs...)
             objective_gradients_p2(args...; kwargs...)
         end,
     ),
@@ -143,8 +143,8 @@ end
     @test ibr_converged
 
     # extract constraint multipliers
-    global λ_ibr = mapreduce((a, b) -> cat(a, b; dims = 3), ibr_models) do model
-        mapreduce(hcat, model[:dynamics]) do c
+    global λ_ibr = mapreduce((a, b) -> cat(a, b; dims = 3), ibr_models) do opt_model
+        mapreduce(hcat, opt_model[:dynamics]) do c
             # Sign flipped due to internal convention of JuMP
             -JuMP.dual.(c)
         end

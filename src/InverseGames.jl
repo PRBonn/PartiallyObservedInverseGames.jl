@@ -104,18 +104,18 @@ function solve_inverse_game(
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
 
-    model = JuMP.Model(solver)
-    SolverUtils.set_solver_attributes!(model; silent, solver_attributes...)
+    opt_model = JuMP.Model(solver)
+    SolverUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
 
     # Decision Variables
     player_weights =
-        [@variable(model, [keys(cost_model.weights)]) for cost_model in player_cost_models]
-    x = @variable(model, [1:n_states, 1:T])
-    u = @variable(model, [1:n_controls, 1:T])
-    λ = @variable(model, [1:n_states, 1:(T - 1), 1:n_players])
+        [@variable(opt_model, [keys(cost_model.weights)]) for cost_model in player_cost_models]
+    x = @variable(opt_model, [1:n_states, 1:T])
+    u = @variable(opt_model, [1:n_controls, 1:T])
+    λ = @variable(opt_model, [1:n_states, 1:(T - 1), 1:n_players])
 
-    x0 = @variable(model, [1:n_states])
-    λ0 = @variable(model, [1:n_states, 1:n_players])
+    x0 = @variable(opt_model, [1:n_states])
+    λ0 = @variable(opt_model, [1:n_states, 1:n_players])
 
     # Initialization
     JuMP.set_start_value.(x, x̂)
@@ -128,10 +128,10 @@ function solve_inverse_game(
     # end
 
     # constraints
-    DynamicsModelInterface.add_dynamics_constraints!(control_system, model, x, u)
-    df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, model, x, u)
+    DynamicsModelInterface.add_dynamics_constraints!(control_system, opt_model, x, u)
+    df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, opt_model, x, u)
 
-    @constraint(model, x[:, 1] .== x0)
+    @constraint(opt_model, x[:, 1] .== x0)
 
     for (player_idx, cost_model) in enumerate(player_cost_models)
         weights = player_weights[player_idx]
@@ -140,37 +140,37 @@ function solve_inverse_game(
 
         # KKT Nash constraints
         @constraint(
-            model,
+            opt_model,
             dJ.dx[:, 1] - (λ[:, 1, player_idx]' * df.dx[:, :, 1])' + λ0[:, player_idx] .== 0
         )
         @constraint(
-            model,
+            opt_model,
             [t = 2:(T - 1)],
             dJ.dx[:, t] + λ[:, t - 1, player_idx] - (λ[:, t, player_idx]' * df.dx[:, :, t])' .== 0
         )
-        @constraint(model, dJ.dx[:, T] + λ[:, T - 1, player_idx] .== 0)
+        @constraint(opt_model, dJ.dx[:, T] + λ[:, T - 1, player_idx] .== 0)
 
         @constraint(
-            model,
+            opt_model,
             [t = 1:(T - 1)],
             dJ.du[player_inputs, t] - (λ[:, t, player_idx]' * df.du[:, player_inputs, t])' .== 0
         )
-        @constraint(model, dJ.du[player_inputs, T] .== 0)
+        @constraint(opt_model, dJ.du[player_inputs, T] .== 0)
 
         # regularization
-        @constraint(model, weights .>= cmin)
-        @constraint(model, sum(w -> w^2, weights) .== 1)
+        @constraint(opt_model, weights .>= cmin)
+        @constraint(opt_model, sum(w -> w^2, weights) .== 1)
     end
 
     # The inverse objective: match the observed demonstration
-    @objective(model, Min, sum((x .- x̂) .^ 2))
+    @objective(opt_model, Min, sum((x .- x̂) .^ 2))
 
-    @time JuMP.optimize!(model)
+    @time JuMP.optimize!(opt_model)
     merge(
         SolverUtils.get_values(; x, u, λ),
         (; player_weights = map(w -> JuMP.value.(w), player_weights)),
     ),
-    model
+    opt_model
 end
 
 end
