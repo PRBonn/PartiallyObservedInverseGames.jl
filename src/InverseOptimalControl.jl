@@ -97,6 +97,7 @@ function solve_inverse_optimal_control(
     solver_attributes = (),
     silent = false,
     cmin = 1e-5,
+    max_observation_error_sq = nothing
 )
     T = size(y)[2]
     @unpack n_states, n_controls = control_system
@@ -157,6 +158,11 @@ function solve_inverse_optimal_control(
     # for all inputs (i.e. enforce positive definiteness of the input cost.)
     @constraint(model, weights .>= cmin)
     @constraint(model, sum(weights) == 1)
+    # TODO: dirty hack
+    # Only search in a reasonable neighborhood of hte demonstration.
+    if !isnothing(max_observation_error_sq)
+        @constraint(model, (x - y).^2 .<= max_observation_error_sq)
+    end
 
     # The inverse objective: match the observed demonstration
     @objective(model, Min, sum((observation_model.expected_observation(x) .- y) .^ 2))
