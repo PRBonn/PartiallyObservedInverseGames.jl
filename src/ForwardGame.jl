@@ -48,7 +48,7 @@ function solve_game(
         end
 
         converged =
-            sum(x -> x^2, last_player_solution.x - last_ibr_solution.x) <= ibr_convergence_tolerance
+            sum(Δu -> Δu^2, last_player_solution.u - last_ibr_solution.u) <= ibr_convergence_tolerance
         last_ibr_solution = last_player_solution
 
         if converged
