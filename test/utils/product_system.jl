@@ -49,10 +49,30 @@ function DynamicsModelInterface.add_dynamics_constraints!(system::ProductSystem,
     end
 end
 
+# TODO: dirty hack. Minor type piracy to patch https://github.com/JuliaLang/julia/pull/36222 in
+# Julia 1.5.3. This won't be necessary starting from Julia 1.6.
+if VERSION < v"1.6"
+    @inline function Base._cat_t(dims, T::Type{<:JuMP.GenericAffExpr}, X...)
+        catdims = Base.dims2cat(dims)
+        shape = Base.cat_shape(catdims, (), map(Base.cat_size, X)...)
+        A = Base.cat_similar(X[1], T, shape)
+        if count(!iszero, catdims) > 1
+            fill!(A, zero(T))
+        end
+        return Base.__cat(A, shape, catdims, X...)
+    end
+end
+
 function DynamicsModelInterface.add_dynamics_jacobians!(system::ProductSystem, opt_model, x, u)
-    for (subsystem_idx, subsystem) in enumerate(system.subsystems)
+    mapreduce(
+        # diagonal pairwise concatenationo the elements in df and df_sub to comopse joint Jacobian
+        # TODO dirty hack: scaling with 1 will make sure that d1 is an expression for which
+        # Base.zero is defined.
+        (df, df_sub) -> map((d1, d2) -> cat(1d1, d2; dims = (1, 2)), df, df_sub),
+        enumerate(system.subsystems),
+    ) do (subsystem_idx, subsystem)
         @views x_sub = x[state_indices(system, subsystem_idx), :]
         @views u_sub = u[input_indices(system, subsystem_idx), :]
-        DynamicsModelInterface.add_dynamics_constraints!(subsystem, opt_model, x_sub, u_sub)
+        DynamicsModelInterface.add_dynamics_jacobians!(subsystem, opt_model, x_sub, u_sub)
     end
 end
