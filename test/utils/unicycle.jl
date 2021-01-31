@@ -64,7 +64,7 @@ function DynamicsModelInterface.add_dynamics_jacobians!(::Unicycle, opt_model, x
     @NLconstraint(opt_model, [t = 1:T], sinθ[t] == sin(x[4, t]))
 
     # jacobians of the dynamics in x
-    @variable(opt_model, dfdx[1:n_states, 1:n_states, 1:T])
+    dfdx = @variable(opt_model, [1:n_states, 1:n_states, 1:T])
     @constraint(
         opt_model,
         [t = 1:T],
