@@ -21,7 +21,6 @@ control_system = TestDynamics.ProductSystem([TestDynamics.Unicycle(), TestDynami
     @test all(i in TestDynamics.input_indices(control_system, 2) for i in 3:4)
 end
 
-# TODO: avoid name collisions of weight keys in the inverse game setting.
 function generate_player_cost_model(;
     state_indices,
     input_indices,
@@ -86,11 +85,13 @@ player_cost_models = let
         state_indices = 1:4,
         input_indices = 1:2,
         goal_position = [1, 0],
+        weights = (; state_goal = 0.1, state_velocity = 10, control_Δv = 100, control_Δθ = 10),
     )
     cost_model_p2 = generate_player_cost_model(;
         state_indices = 5:8,
         input_indices = 3:4,
         goal_position = [0, 1],
+        weights = (; state_goal = 0.1, state_velocity = 100, control_Δv = 100, control_Δθ = 10),
     )
 
     (cost_model_p1, cost_model_p2)
@@ -127,7 +128,6 @@ end
             ibr_solution.x;
             control_system,
             player_cost_models,
-            init = kkt_solution,
         )
 
         for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
