@@ -41,6 +41,7 @@ function objective_gradients_p2(x, u; weights)
 end
 
 control_system = TestDynamics.Unicycle()
+observation_model = (; σ = 0, expected_observation = identity)
 x0 = [-1, 1, 0.0, 0]
 T = 100
 
@@ -168,7 +169,6 @@ end
     test_unicycle_multipliers(kkt_solution.λ, kkt_solution.x, kkt_solution.u; player_cost_models)
 end
 
-observation_model = (; σ = 0, expected_observation = identity)
 # TODO: robustify
 @testset "Inverse KKT Nash" begin
     global inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
