@@ -103,7 +103,7 @@ function solve_game(
 
     for (player_idx, cost_model) in enumerate(player_cost_models)
         @unpack player_inputs, weights = cost_model
-        dJ = cost_model.objective_gradients(x, u; weights)
+        dJ = cost_model.add_objective_gradients!(opt_model, x, u; weights)
 
         # KKT Nash constraints
         @constraint(

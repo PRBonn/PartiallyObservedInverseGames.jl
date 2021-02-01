@@ -17,12 +17,12 @@ import TestDynamics
 symbol(s::Symbol) = s
 symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
 
-function register_shared_forward_cost_expressions!(opt_model, x, u; prox_min = 0.1)
+function register_shared_forward_cost_expressions!(opt_model, x, u; prox_min_regularization = 0.1)
     T = size(x, 2)
     @NLexpression(
         opt_model,
         regularized_sq_dist[t = 1:T],
-        (x[1, t] - obstacle[1])^2 + (x[2, t] - obstacle[2])^2 + prox_min
+        (x[1, t] - obstacle[1])^2 + (x[2, t] - obstacle[2])^2 + prox_min_regularization
     )
 end
 

@@ -135,7 +135,7 @@ function solve_inverse_game(
     for (player_idx, cost_model) in enumerate(player_cost_models)
         weights = player_weights[player_idx]
         @unpack player_inputs = cost_model
-        dJ = cost_model.objective_gradients(x, u; weights)
+        dJ = cost_model.add_objective_gradients!(opt_model, x, u; weights)
 
         # KKT Nash constraints
         @constraint(
