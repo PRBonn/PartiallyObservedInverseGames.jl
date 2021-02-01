@@ -2,10 +2,11 @@ module SolverUtils
 
 import JuMP
 
-export get_values, get_model_values, set_solver_attributes!, init_if_hasproperty!
+export get_values, get_model_values, set_solver_attributes!, init_if_hasproperty!, drop_zeros!
 
 get_values(; jump_vars...) = (; map(((k, v),) -> k => JuMP.value.(v), collect(jump_vars))...)
-get_model_values(opt_model, symbols...) = get_values(; map(sym -> sym => opt_model[sym], symbols)...)
+get_model_values(opt_model, symbols...) =
+    get_values(; map(sym -> sym => opt_model[sym], symbols)...)
 
 function set_solver_attributes!(opt_model, ; silent, solver_attributes...)
     silent ? JuMP.set_silent(opt_model) : JuMP.unset_silent(opt_model)
@@ -20,6 +21,25 @@ function init_if_hasproperty!(v, init, sym; default = nothing)
     if !isnothing(init_value)
         JuMP.set_start_value.(v, init_value)
     end
+end
+
+function drop_zeros!(expr::JuMP.GenericAffExpr)
+    for (key, coef) in expr.terms
+        if iszero(coef)
+            delete!(expr.terms, key)
+        end
+    end
+    expr
+end
+
+function drop_zeros!(expr::JuMP.GenericQuadExpr)
+    drop_zeros!(expr.aff)
+    for (key, coef) in expr.terms
+        if iszero(coef)
+            delete!(expr.terms, key)
+        end
+    end
+    expr
 end
 
 end

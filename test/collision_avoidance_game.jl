@@ -4,6 +4,7 @@ using JuMP: @objective, @variable, @NLconstraint, @NLexpression
 using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
 using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTSolver, solve_inverse_game
+using JuMPOptimalControl.SolverUtils: drop_zeros!
 
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils
@@ -29,8 +30,8 @@ function generate_player_cost_model(;
     input_indices,
     goal_position,
     weights = (;
-        state_goal = 1,
-        # state_proximity = 0.0,
+        state_goal = 100,
+        state_proximity = 0.01,
         state_velocity = 10,
         control_Δv = 100,
         control_Δθ = 10,
@@ -73,7 +74,7 @@ function generate_player_cost_model(;
             control_Δv = sum(el -> el^2, u_sub_ego[1, :]),
             control_Δθ = sum(el -> el^2, u_sub_ego[2, :]),
         )
-        @objective(opt_model, Min, sum(weights[k] * J̃[k] for k in keys(weights)))
+        @objective(opt_model, Min, sum(weights[k] * J̃[symbol(k)] for k in keys(weights)))
     end
 
     function add_objective_gradients!(opt_model, x, u; weights)
@@ -106,11 +107,11 @@ function generate_player_cost_model(;
         dJdx = let
             dJ̃dx_sub = (;
                 state_goal = [
-                    zeros(2, T_activate_goalcost - 1) (x_sub_ego[1:2, T_activate_goalcost:T].-goal_position)
+                    zeros(2, T_activate_goalcost - 1) 2*(x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position)
                     zeros(2, T)
                 ],
                 state_proximity = [dprox_dxy; zeros(2, T)],
-                state_velocity = [zeros(2, T); x_sub_ego[3, :]'; zeros(1, T)],
+                state_velocity = [zeros(2, T); 2 * x_sub_ego[3, :]'; zeros(1, T)],
                 control_Δv = zeros(size(x_sub_ego)),
                 control_Δθ = zeros(size(x_sub_ego)),
             )
@@ -153,7 +154,7 @@ player_cost_models = let
 end
 
 observation_model = (; σ = 0, expected_observation = identity)
-x0 = vcat([-1, 0, 0, 0 + deg2rad(30)], [0, -1, 0, pi / 2 + deg2rad(30)])
+x0 = vcat([-1, 0, 0.1, 0 + deg2rad(30)], [0, -1, 0.1, pi / 2 + deg2rad(30)])
 T = 100
 
 @testset "Forward Game" begin
@@ -192,8 +193,8 @@ end
         TestUtils.test_inverse_model(
             inverse_kkt_model,
             observation_model,
-            ibr_solution.x,
-            ibr_solution.x,
+            kkt_solution.x,
+            kkt_solution.x;
         )
     end
 end
