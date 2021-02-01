@@ -11,11 +11,9 @@ using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils
 import TestDynamics
+using CostUtils: symbol
 
 #========================================== Cost Library ===========================================#
-
-symbol(s::Symbol) = s
-symbol(s::JuMP.Containers.DenseAxisArrayKey) = only(s.I)
 
 function register_shared_forward_cost_expressions!(opt_model, x, u; prox_min_regularization = 0.1)
     T = size(x, 2)
@@ -91,7 +89,6 @@ end
 
 control_system = TestDynamics.Unicycle()
 
-# TODO: maybe limit the region of proximity cost
 x0 = [-1, 1, 0, 0]
 T = 100
 obstacle = (-0.5, 0.25) # Point to avoid.
@@ -99,11 +96,10 @@ T_activate_goalcost = T
 cost_model = (
     weights = (;
         state_goal = 100,
-        state_velocity = 1_000, # TODO: have a higher cost for driving backwards
+        state_velocity = 1_000,
         state_proximity = 1,
         control_Δv = 100,
-        control_Δθ = 10, # TODO: Delay orientation input once more
-        # control = 100,
+        control_Δθ = 10,
     ),
     add_objective! = add_forward_objective!,
     add_objective_gradients! = add_forward_objective_gradients!,
