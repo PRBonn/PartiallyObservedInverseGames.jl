@@ -96,7 +96,7 @@ function solve_inverse_game(
     solver_attributes = (),
     silent = false,
     cmin = 1e-5,
-    max_trajectory_error = nothing,
+    max_observation_error_sq = nothing,
 )
 
     T = size(x̂)[2]
@@ -121,7 +121,7 @@ function solve_inverse_game(
     SolverUtils.init_if_hasproperty!(u, init, :u)
     SolverUtils.init_if_hasproperty!(λ, init, :λ)
 
-    # TODO: think about initialization for player weights
+    # # TODO: think about initialization for player weights
     # for weights in player_weights
     #     JuMP.set_start_value.(weights, 1 / length(weights))
     # end
@@ -158,11 +158,17 @@ function solve_inverse_game(
 
         # regularization
         @constraint(opt_model, weights .>= cmin)
-        @constraint(opt_model, sum(w -> w^2, weights) .== 1)
+        @constraint(opt_model, sum(weights) .== 1)
+    end
+
+    # TODO: dirty hack
+    # Only search in a reasonable neighborhood of hte demonstration.
+    if !isnothing(max_observation_error_sq)
+        @constraint(opt_model, (x - x̂) .^ 2 .<= max_observation_error_sq)
     end
 
     # The inverse objective: match the observed demonstration
-    @objective(opt_model, Min, sum((x .- x̂) .^ 2))
+    @objective(opt_model, Min, sum(el -> el^2, x .- x̂))
 
     @time JuMP.optimize!(opt_model)
     merge(

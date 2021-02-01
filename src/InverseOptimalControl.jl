@@ -159,14 +159,16 @@ function solve_inverse_optimal_control(
     # for all inputs (i.e. enforce positive definiteness of the input cost.)
     @constraint(opt_model, weights .>= cmin)
     @constraint(opt_model, sum(weights) == 1)
+
+    y_expected = observation_model.expected_observation(x)
     # TODO: dirty hack
     # Only search in a reasonable neighborhood of hte demonstration.
     if !isnothing(max_observation_error_sq)
-        @constraint(opt_model, (x - y) .^ 2 .<= max_observation_error_sq)
+        @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error_sq)
     end
 
     # The inverse objective: match the observed demonstration
-    @objective(opt_model, Min, sum((observation_model.expected_observation(x) .- y) .^ 2))
+    @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
 
     @time JuMP.optimize!(opt_model)
     SolverUtils.get_values(; weights, x, u, λ), opt_model
