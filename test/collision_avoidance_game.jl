@@ -8,6 +8,7 @@ using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTSolver, solve
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils
 import TestDynamics
+using CostUtils: symbol
 
 control_system = TestDynamics.ProductSystem([TestDynamics.Unicycle(), TestDynamics.Unicycle()])
 
@@ -21,46 +22,56 @@ control_system = TestDynamics.ProductSystem([TestDynamics.Unicycle(), TestDynami
     @test all(i in TestDynamics.input_indices(control_system, 2) for i in 3:4)
 end
 
+# TODO We should probably pass the `ProductSystem` and the player index here to compute the
+# `state_indices`, `input_indices`, and `opponent_indices`.
 function generate_player_cost_model(;
     state_indices,
     input_indices,
     goal_position,
-    weights = (; state_goal = 1, state_proximity = 0.01, state_velocity = 10, control_Δv = 100, control_Δθ = 10),
+    weights = (;
+        state_goal = 1,
+        # state_proximity = 0.0,
+        state_velocity = 10,
+        control_Δv = 100,
+        control_Δθ = 10,
+    ),
     prox_min_regularization = 0.1,
     T_activate_goalcost = 100,
+    # TODO: dirty hack
+    opponent_indices = 1 in state_indices ? (5:8) : (1:4),
 )
+    function add_regularized_squared_distance!(opt_model, x_sub_ego, x_sub_opp)
+        @NLexpression(
+            opt_model,
+            [t = 1:T],
+            (x_sub_ego[1, t] - x_sub_opp[1, t])^2 +
+            (x_sub_ego[2, t] - x_sub_opp[2, t])^2 +
+            prox_min_regularization
+        )
+    end
 
     function add_objective!(opt_model, x, u; weights)
         T = size(x, 2)
         # TODO: Currently, this implementation is *not* agnostic to the order of players or
         # input and state dimensions of other players subsystems. Get these values from
         # somewhere else to make it agnostic:
-        @views x_sub = x[state_indices, :]
-        @views u_sub = u[input_indices, :]
+        @views x_sub_ego = x[state_indices, :]
+        @views u_sub_ego = u[input_indices, :]
+        @views x_sub_opp = x[opponent_indices, :]
 
         prox_cost = let
-            regularized_sq_dist = let
-                opponent_position_indices = 1 in state_indices ? (5:6) : (1:2)
-                @NLexpression(
-                    opt_model,
-                    [t = 1:T],
-                    (x_sub[1, t] - x[opponent_position_indices[1], t])^2 +
-                    (x_sub[2, t] - x[opponent_position_indices[2], t])^2 +
-                    prox_min_regularization
-                )
-            end
-
+            d_sq = add_regularized_squared_distance!(opt_model, x_sub_ego, x_sub_opp)
             prox_cost = @variable(opt_model, prox_cost[t = 1:T])
-            @NLconstraint(opt_model, [t = 1:T], prox_cost[t] == -log(regularized_sq_dist[t]))
+            @NLconstraint(opt_model, [t = 1:T], prox_cost[t] == -log(d_sq[t]))
             prox_cost
         end
 
         J̃ = (;
-            state_goal = sum(el -> el^2, x_sub[1:2, T_activate_goalcost:T] .- goal_position),
+            state_goal = sum(el -> el^2, x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position),
             state_proximity = sum(prox_cost),
-            state_velocity = sum(el -> el^2, x_sub[3, :]),
-            control_Δv = sum(el -> el^2, u_sub[1, :]),
-            control_Δθ = sum(el -> el^2, u_sub[2, :]),
+            state_velocity = sum(el -> el^2, x_sub_ego[3, :]),
+            control_Δv = sum(el -> el^2, u_sub_ego[1, :]),
+            control_Δθ = sum(el -> el^2, u_sub_ego[2, :]),
         )
         @objective(opt_model, Min, sum(weights[k] * J̃[k] for k in keys(weights)))
     end
@@ -68,26 +79,57 @@ function generate_player_cost_model(;
     function add_objective_gradients!(opt_model, x, u; weights)
         n_states, T = size(x)
         n_controls = size(u, 1)
-        @views x_sub = x[state_indices, :]
-        @views u_sub = u[input_indices, :]
+        @views x_sub_ego = x[state_indices, :]
+        @views u_sub_ego = u[input_indices, :]
+        @views x_sub_opp = x[opponent_indices, :]
 
-        dJdx_sub = [
-            2 * weights[:state_goal] * (x_sub[1:2, :] .- goal_position)
-            2 * weights[:state_velocity] * x_sub[3, :]'
-            zeros(1, T)
-        ]
-        dJdu_sub = 2 .* [weights[:control_Δv], weights[:control_Δθ]] .* u_sub
+        dprox_dxy = let
+            d_sq = add_regularized_squared_distance!(opt_model, x_sub_ego, x_sub_opp)
+            dproxdx = @variable(opt_model, [t = 1:T])
+            @NLconstraint(
+                opt_model,
+                [t = 1:T],
+                dproxdx[t] == -2 * (x_sub_ego[1, t] - x_sub_opp[1, t]) / d_sq[t]
+            )
+            dproxdy = @variable(opt_model, [t = 1:T])
+            @NLconstraint(
+                opt_model,
+                [t = 1:T],
+                dproxdy[t] == -2 * (x_sub_ego[2, t] - x_sub_opp[2, t]) / d_sq[t]
+            )
+            [dproxdx'; dproxdy']
+        end
 
-        dJdx = [
-            zeros(first(state_indices) - 1, T)
-            dJdx_sub
-            zeros(n_states - last(state_indices), T)
-        ]
-        dJdu = [
-            zeros(first(input_indices) - 1, T)
-            dJdu_sub
-            zeros(n_controls - last(input_indices), T)
-        ]
+        # TODO: Technically this is missing the negative gradient on the opponents state but we
+        # can't control that anyway (certainly not in OL Nash). Must be fixed for non-decoupled
+        # systems and potentially FB Nash.
+        dJdx = let
+            dJ̃dx_sub = (;
+                state_goal = [
+                    zeros(2, T_activate_goalcost - 1) (x_sub_ego[1:2, T_activate_goalcost:T].-goal_position)
+                    zeros(2, T)
+                ],
+                state_proximity = [dprox_dxy; zeros(2, T)],
+                state_velocity = [zeros(2, T); x_sub_ego[3, :]'; zeros(1, T)],
+                control_Δv = zeros(size(x_sub_ego)),
+                control_Δθ = zeros(size(x_sub_ego)),
+            )
+            dJdx_sub = sum(weights[k] * dJ̃dx_sub[symbol(k)] for k in keys(weights))
+            [
+                zeros(first(state_indices) - 1, T)
+                dJdx_sub
+                zeros(n_states - last(state_indices), T)
+            ]
+        end
+
+        dJdu = let
+            dJdu_sub = 2 * [weights[:control_Δv], weights[:control_Δθ]] .* u_sub_ego
+            [
+                zeros(first(input_indices) - 1, T)
+                dJdu_sub
+                zeros(n_controls - last(input_indices), T)
+            ]
+        end
 
         (; dx = dJdx, du = dJdu)
     end
@@ -134,13 +176,13 @@ T = 100
     end
 end
 
-false && @testset "Inverse Game" begin
+@testset "Inverse Game" begin
     @testset "KKT" begin
         global inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
             InverseKKTSolver(),
-            ibr_solution.x;
+            kkt_solution.x;
             control_system,
-            player_cost_models,
+            player_cost_models
         )
 
         for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
