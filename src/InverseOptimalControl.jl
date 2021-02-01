@@ -137,7 +137,7 @@ function solve_inverse_optimal_control(
     # figure out which inputs we control and fix all others
     controlled_inputs = filter(i -> i ∉ fixed_inputs, 1:n_controls)
     for i in fixed_inputs
-        @constraint(opt_model, u[fixed_inputs, :] .== init.u[fixed_inputs, :])
+        JuMP.fix.(u[i, :], init.u[i, :])
     end
     # Require forward-optimality for all *controlled* inputs.
     df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, opt_model, x, u)

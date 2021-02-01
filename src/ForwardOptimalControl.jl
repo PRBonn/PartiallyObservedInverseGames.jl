@@ -77,7 +77,7 @@ function solve_optimal_control(
 
     # fix certain inputs
     for i in fixed_inputs
-        @constraint(opt_model, u[fixed_inputs, :] .== init.u[fixed_inputs, :])
+        JuMP.fix.(u[i, :], init.u[i, :])
     end
 
     DynamicsModelInterface.add_dynamics_constraints!(control_system, opt_model, x, u)
