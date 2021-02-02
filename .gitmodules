@@ -1,0 +1,3 @@
+[submodule "external/PardisoLib.jl"]
+	path = external/PardisoLib.jl
+	url = git@github.com:lassepe/PardisoLib.jl
