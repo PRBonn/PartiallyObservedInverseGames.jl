@@ -164,6 +164,9 @@ T = 100
         @test ibr_converged
     end
 
+    import Libdl
+    Libdl.dlopen("/usr/lib/libomp.so", Libdl.RTLD_GLOBAL)
+    Libdl.dlopen("/usr/lib/liblapack.so", Libdl.RTLD_GLOBAL)
     @testset "KKT" begin
         global kkt_solution, kkt_model = solve_game(
             KKTGameSolver(),
@@ -172,6 +175,7 @@ T = 100
             x0,
             T;
             init = ibr_solution,
+            solver_attributes = (; linear_solver = "pardiso")
         )
     end
 end
