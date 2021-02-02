@@ -4,7 +4,6 @@ using JuMP: @objective, @variable, @NLconstraint, @NLexpression
 using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
 using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTSolver, solve_inverse_game
-using JuMPOptimalControl.SolverUtils: drop_zeros!
 
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils

@@ -1,7 +1,7 @@
 module ForwardOptimalControl
 
 import ..DynamicsModelInterface
-import ..SolverUtils
+import ..JuMPUtils
 import Ipopt
 import JuMP
 
@@ -36,7 +36,7 @@ function solve_lqr(
 )
     n_states, n_controls = size(only(unique(B)))
     opt_model = JuMP.Model(solver)
-    SolverUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
 
     x = @variable(opt_model, [1:n_states, 1:T])
     u = @variable(opt_model, [1:n_controls, 1:T])
@@ -44,7 +44,7 @@ function solve_lqr(
     @constraint(opt_model, x[:, 1] .== x0)
     @objective(opt_model, Min, forward_quadratic_objective(x, u; Q, R))
     @time JuMP.optimize!(opt_model)
-    SolverUtils.get_values(; x, u), opt_model
+    JuMPUtils.get_values(; x, u), opt_model
 end
 
 #=========================================== Non-LQ-Case ===========================================#
@@ -65,15 +65,15 @@ function solve_optimal_control(
     @unpack n_states, n_controls = control_system
 
     opt_model = JuMP.Model(solver)
-    SolverUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
 
     # decision variables
     x = @variable(opt_model, [1:n_states, 1:T])
     u = @variable(opt_model, [1:n_controls, 1:T])
 
     # initial guess
-    SolverUtils.init_if_hasproperty!(x, init, :x)
-    SolverUtils.init_if_hasproperty!(u, init, :u)
+    JuMPUtils.init_if_hasproperty!(x, init, :x)
+    JuMPUtils.init_if_hasproperty!(u, init, :u)
 
     # fix certain inputs
     for i in fixed_inputs
@@ -84,7 +84,7 @@ function solve_optimal_control(
     @constraint(opt_model, x[:, 1] .== x0)
     cost_model.add_objective!(opt_model, x, u; cost_model.weights)
     @time JuMP.optimize!(opt_model)
-    SolverUtils.get_values(; x, u), opt_model
+    JuMPUtils.get_values(; x, u), opt_model
 end
 
 end

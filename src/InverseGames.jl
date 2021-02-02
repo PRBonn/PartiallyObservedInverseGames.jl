@@ -3,7 +3,7 @@ module InverseGames
 import JuMP
 import Ipopt
 import ..DynamicsModelInterface
-import ..SolverUtils
+import ..JuMPUtils
 import ..InverseOptimalControl
 
 using JuMP: @variable, @constraint, @objective
@@ -104,7 +104,7 @@ function solve_inverse_game(
     @unpack n_states, n_controls = control_system
 
     opt_model = JuMP.Model(solver)
-    SolverUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
 
     # Decision Variables
     player_weights =
@@ -118,8 +118,8 @@ function solve_inverse_game(
 
     # Initialization
     JuMP.set_start_value.(x, x̂)
-    SolverUtils.init_if_hasproperty!(u, init, :u)
-    SolverUtils.init_if_hasproperty!(λ, init, :λ)
+    JuMPUtils.init_if_hasproperty!(u, init, :u)
+    JuMPUtils.init_if_hasproperty!(λ, init, :λ)
 
     # # TODO: think about initialization for player weights
     # for weights in player_weights
@@ -172,7 +172,7 @@ function solve_inverse_game(
 
     @time JuMP.optimize!(opt_model)
     merge(
-        SolverUtils.get_values(; x, u, λ),
+        JuMPUtils.get_values(; x, u, λ),
         (; player_weights = map(w -> JuMP.value.(w), player_weights)),
     ),
     opt_model

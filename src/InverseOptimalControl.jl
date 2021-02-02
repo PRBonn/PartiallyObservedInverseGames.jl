@@ -1,7 +1,7 @@
 module InverseOptimalControl
 
 import ..DynamicsModelInterface
-import ..SolverUtils
+import ..JuMPUtils
 import Ipopt
 import JuMP
 
@@ -58,7 +58,7 @@ function solve_inverse_lqr(
     T = size(x̂)[2]
     n_states, n_controls = size(only(unique(B)))
     opt_model = JuMP.Model(solver)
-    SolverUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
 
     # decision variable
     q = @variable(opt_model, [1:length(Q̃)], lower_bound = 0)
@@ -82,7 +82,7 @@ function solve_inverse_lqr(
 
     @objective(opt_model, Min, sum((x .- x̂) .^ 2))
     @time JuMP.optimize!(opt_model)
-    SolverUtils.get_values(; q, r, x, u, λ, ∇ₓL, ∇ᵤL), opt_model, JuMP.value.(Q), JuMP.value.(R)
+    JuMPUtils.get_values(; q, r, x, u, λ, ∇ₓL, ∇ᵤL), opt_model, JuMP.value.(Q), JuMP.value.(R)
 end
 
 #=========================================== Non-LQ-Case ===========================================#
@@ -104,7 +104,7 @@ function solve_inverse_optimal_control(
     @unpack n_states, n_controls = control_system
 
     opt_model = JuMP.Model(solver)
-    SolverUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
 
     # decision variable
     weights = @variable(opt_model, [keys(cost_model.weights)],)
@@ -123,11 +123,11 @@ function solve_inverse_optimal_control(
         JuMP.set_start_value.(weights, 1 / length(weights))
     end
 
-    # SolverUtils.init_if_hasproperty!(weights, init, :weights, default = 1 / length(weights))
+    # JuMPUtils.init_if_hasproperty!(weights, init, :weights, default = 1 / length(weights))
     # TODO: This is not always correct. Technically we would want to use an inverse observation
     # opt_model here if it exists (mapping from observationi to state components)
     JuMP.set_start_value.(x[CartesianIndices(y)], y)
-    SolverUtils.init_if_hasproperty!(u, init, :u)
+    JuMPUtils.init_if_hasproperty!(u, init, :u)
 
     # constraints
     if iszero(observation_model.σ)
@@ -171,7 +171,7 @@ function solve_inverse_optimal_control(
     @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
 
     @time JuMP.optimize!(opt_model)
-    SolverUtils.get_values(; weights, x, u, λ), opt_model
+    JuMPUtils.get_values(; weights, x, u, λ), opt_model
 end
 
 end

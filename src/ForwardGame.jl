@@ -3,7 +3,7 @@ module ForwardGame
 import JuMP
 import Ipopt
 import ..DynamicsModelInterface
-import ..SolverUtils
+import ..JuMPUtils
 import ..ForwardOptimalControl
 
 using JuMP: @variable, @constraint, @objective
@@ -84,7 +84,7 @@ function solve_game(
     @unpack n_states, n_controls = control_system
 
     opt_model = JuMP.Model(solver)
-    SolverUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
 
     # Decision Variables
     x = @variable(opt_model, [1:n_states, 1:T])
@@ -92,9 +92,9 @@ function solve_game(
     λ = @variable(opt_model, [1:n_states, 1:(T - 1), 1:n_players])
 
     # Initialization
-    SolverUtils.init_if_hasproperty!(λ, init, :λ)
-    SolverUtils.init_if_hasproperty!(x, init, :x)
-    SolverUtils.init_if_hasproperty!(u, init, :u)
+    JuMPUtils.init_if_hasproperty!(λ, init, :λ)
+    JuMPUtils.init_if_hasproperty!(x, init, :x)
+    JuMPUtils.init_if_hasproperty!(u, init, :u)
 
     # constraints
     @constraint(opt_model, x[:, 1] .== x0)
@@ -122,7 +122,7 @@ function solve_game(
     end
 
     @time JuMP.optimize!(opt_model)
-    SolverUtils.get_values(; x, u, λ), opt_model
+    JuMPUtils.get_values(; x, u, λ), opt_model
 end
 
 end
