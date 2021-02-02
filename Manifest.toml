@@ -118,9 +118,9 @@ uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.5.7"
 
 [[DataAPI]]
-git-tree-sha1 = "25ccd31003243d2ce83e474cf11663dddf48035f"
+git-tree-sha1 = "6d64b28d291cb94a0d84e6e41081fb081e7f717f"
 uuid = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
-version = "1.4.1"
+version = "1.5.0"
 
 [[DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -207,9 +207,9 @@ version = "0.4.2"
 
 [[ForwardDiff]]
 deps = ["CommonSubexpressions", "DiffResults", "DiffRules", "NaNMath", "Random", "SpecialFunctions", "StaticArrays"]
-git-tree-sha1 = "c26b56e9b9f0687f7ca887f6b6ded03d269e0e35"
+git-tree-sha1 = "d48a40c0f54f29a5c8748cfb3225719accc72b77"
 uuid = "f6369f11-7733-5829-9624-2563aa707210"
-version = "0.10.15"
+version = "0.10.16"
 
 [[FreeType2_jll]]
 deps = ["Artifacts", "Bzip2_jll", "JLLWrappers", "Libdl", "Pkg", "Zlib_jll"]
@@ -617,6 +617,14 @@ version = "1.1.2"
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
 
+[[SNOPT7]]
+deps = ["JuMP", "MathOptInterface", "SparseArrays"]
+git-tree-sha1 = "e1566c8fdc76249a4b8d97d22aafb64b967a9a4f"
+repo-rev = "master"
+repo-url = "https://github.com/snopt/SNOPT7.jl"
+uuid = "32a37bd7-71e6-4205-9197-7b5bd839f8dd"
+version = "0.1.0"
+
 [[Scratch]]
 deps = ["Dates"]
 git-tree-sha1 = "ad4b278adb62d185bbcb6864dc24959ab0627bf6"
@@ -881,9 +889,9 @@ version = "1.4.8+0"
 
 [[Zygote]]
 deps = ["AbstractFFTs", "ChainRules", "DiffRules", "Distributed", "FillArrays", "ForwardDiff", "IRTools", "InteractiveUtils", "LinearAlgebra", "MacroTools", "NaNMath", "Random", "Requires", "SpecialFunctions", "Statistics", "ZygoteRules"]
-git-tree-sha1 = "746c9de7fb87a341c809437007cbd172c4d494b4"
+git-tree-sha1 = "52835a83f7c899cfcb95f796d584201812887ea8"
 uuid = "e88e6eb3-aa80-5325-afca-941959d7151f"
-version = "0.6.2"
+version = "0.6.3"
 
 [[ZygoteRules]]
 deps = ["MacroTools"]
