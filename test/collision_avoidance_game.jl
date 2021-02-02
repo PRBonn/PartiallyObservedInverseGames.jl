@@ -183,7 +183,7 @@ end
             InverseKKTSolver(),
             kkt_solution.x;
             control_system,
-            player_cost_models
+            player_cost_models,
         )
 
         for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
@@ -194,7 +194,7 @@ end
             inverse_kkt_model,
             observation_model,
             kkt_solution.x,
-            kkt_solution.x;
+            kkt_solution.x,
         )
     end
 end
