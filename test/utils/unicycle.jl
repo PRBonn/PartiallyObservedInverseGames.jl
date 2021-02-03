@@ -1,21 +1,24 @@
-struct Unicycle end
+struct Unicycle{T<:Real}
+    ΔT::T
+end
 
-function Base.getproperty(::Unicycle, sym::Symbol)
+function Base.getproperty(system::Unicycle, sym::Symbol)
     if sym === :n_states
         4
     elseif sym === :n_controls
         2
     else
-        getfield(x, sym)
+        getfield(system, sym)
     end
 end
 
 function DynamicsModelInterface.visualize_trajectory(
-    ::Unicycle,
+    system::Unicycle,
     x;
     canvas = Plots.plot(),
     kwargs...,
 )
+    ΔT = system.ΔT
     (x_min, x_max) = extrema(x[1, :]) .+ (-0.5, 0.5)
     (y_min, y_max) = extrema(x[2, :]) .+ (-0.5, 0.5)
 
@@ -23,16 +26,17 @@ function DynamicsModelInterface.visualize_trajectory(
         canvas,
         x[1, :],
         x[2, :];
-        quiver = (abs.(x[3, :]) .* cos.(x[4, :]), abs.(x[3, :]) .* sin.(x[4, :])),
+        quiver = (abs.(ΔT * x[3, :]) .* cos.(x[4, :]), abs.(ΔT * x[3, :]) .* sin.(x[4, :])),
         # line_z = axes(x)[2],
         st = :quiver,
         kwargs...,
     )
 end
 
-# These constraints encode the dynamics of a unicycle with state layout x_t = [px, py, v, θ] and
+# These constraints encode the dynamics of a unicycle with state layout x_t = [px, pyL, v, θ] and
 # inputs u_t = [Δv, Δθ].
-function DynamicsModelInterface.add_dynamics_constraints!(::Unicycle, opt_model, x, u)
+function DynamicsModelInterface.add_dynamics_constraints!(system::Unicycle, opt_model, x, u)
+    ΔT = system.ΔT
     T = size(x)[2]
 
     # auxiliary variables for nonlinearities
@@ -45,15 +49,16 @@ function DynamicsModelInterface.add_dynamics_constraints!(::Unicycle, opt_model,
         opt_model,
         [t = 1:(T - 1)],
         x[:, t + 1] .== [
-            x[1, t] + x[3, t] * cosθ[t],
-            x[2, t] + x[3, t] * sinθ[t],
+            x[1, t] + ΔT * x[3, t] * cosθ[t],
+            x[2, t] + ΔT * x[3, t] * sinθ[t],
             x[3, t] + u[1, t],
             x[4, t] + u[2, t],
         ]
     )
 end
 
-function DynamicsModelInterface.add_dynamics_jacobians!(::Unicycle, opt_model, x, u)
+function DynamicsModelInterface.add_dynamics_jacobians!(system::Unicycle, opt_model, x, u)
+    ΔT = system.ΔT
     n_states, T = size(x)
     n_controls = size(u, 1)
 
@@ -69,8 +74,8 @@ function DynamicsModelInterface.add_dynamics_jacobians!(::Unicycle, opt_model, x
         opt_model,
         [t = 1:T],
         dfdx[:, :, t] .== [
-            1 0 cosθ[t] -x[3, t]*sinθ[t]
-            0 1 sinθ[t] +x[3, t]*cosθ[t]
+            1 0 ΔT*cosθ[t] -ΔT*x[3, t]*sinθ[t]
+            0 1 ΔT*sinθ[t] +ΔT*x[3, t]*cosθ[t]
             0 0 1 0
             0 0 0 1
         ]

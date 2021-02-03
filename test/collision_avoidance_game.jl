@@ -10,7 +10,8 @@ import TestUtils
 import TestDynamics
 using CostUtils: symbol
 
-control_system = TestDynamics.ProductSystem([TestDynamics.Unicycle(), TestDynamics.Unicycle()])
+control_system =
+    TestDynamics.ProductSystem([TestDynamics.Unicycle(0.25), TestDynamics.Unicycle(0.25)])
 
 @testset "Product Dynamics" begin
     @test control_system.n_states == 8
@@ -25,18 +26,19 @@ end
 # TODO We should probably pass the `ProductSystem` and the player index here to compute the
 # `state_indices`, `input_indices`, and `opponent_indices`.
 function generate_player_cost_model(;
+    T,
     state_indices,
     input_indices,
     goal_position,
     weights = (;
         state_goal = 100,
-        state_proximity = 0.01,
-        state_velocity = 10,
-        control_Δv = 100,
-        control_Δθ = 10,
+        state_proximity = 0.1,
+        state_velocity = 1,
+        control_Δv = 10,
+        control_Δθ = 1,
     ),
     prox_min_regularization = 0.1,
-    T_activate_goalcost = 100,
+    T_activate_goalcost = T,
     # TODO: dirty hack
     opponent_indices = 1 in state_indices ? (5:8) : (1:4),
 )
@@ -137,13 +139,18 @@ function generate_player_cost_model(;
     (; player_inputs = input_indices, weights, add_objective!, add_objective_gradients!)
 end
 
+observation_model = (; σ = 0, expected_observation = identity)
+x0 = vcat([-1, 0, 0.1, 0 + deg2rad(10)], [0, -1, 0.1, pi / 2 + deg2rad(10)])
+T = 25
 player_cost_models = let
     cost_model_p1 = generate_player_cost_model(;
+        T,
         state_indices = 1:4,
         input_indices = 1:2,
         goal_position = [1, 0],
     )
     cost_model_p2 = generate_player_cost_model(;
+        T,
         state_indices = 5:8,
         input_indices = 3:4,
         goal_position = [0, 1],
@@ -151,10 +158,6 @@ player_cost_models = let
 
     (cost_model_p1, cost_model_p2)
 end
-
-observation_model = (; σ = 0, expected_observation = identity)
-x0 = vcat([-1, 0, 0.1, 0 + deg2rad(30)], [0, -1, 0.1, pi / 2 + deg2rad(30)])
-T = 100
 
 @testset "Forward Game" begin
     @testset "IBR" begin

@@ -19,12 +19,12 @@ import TestDynamics
 #======================================== Global parameters ========================================#
 
 function objective_p1(x, u; weights)
-    weights[:state_velocity] * sum((x[3, :] .- 0.1) .^ 2) + weights[:control_Δv] * sum(u[1, :] .^ 2)
+    weights[:state_velocity] * sum((x[3, :] .- 1.0) .^ 2) + weights[:control_Δv] * sum(u[1, :] .^ 2)
 end
 
 function objective_gradients_p1(x, u; weights)
     T = size(x, 2)
-    dJdx = 2 * weights[:state_velocity] * [zeros(2, T); x[3:3, :] .- 0.1; zeros(1, T)]
+    dJdx = 2 * weights[:state_velocity] * [zeros(2, T); x[3:3, :] .- 1.0; zeros(1, T)]
     dJdu = 2 * weights[:control_Δv] * [u[1:1, :]; zeros(1, T)]
     (; dx = dJdx, du = dJdu)
 end
@@ -40,7 +40,7 @@ function objective_gradients_p2(x, u; weights)
     (; dx = dJdx, du = dJdu)
 end
 
-control_system = TestDynamics.Unicycle()
+control_system = TestDynamics.Unicycle(0.1)
 observation_model = (; σ = 0, expected_observation = identity)
 x0 = [-1, 1, 0.0, 0]
 T = 100
@@ -49,7 +49,7 @@ T = 100
 player_cost_models = (
     (;
         player_inputs = [1],
-        weights = (; state_velocity = 10, control_Δv = 100),
+        weights = (; state_velocity = 1, control_Δv = 10),
         objective = objective_p1,
         objective_gradients = objective_gradients_p1,
         add_objective! = function (opt_model, args...; kwargs...)
@@ -88,12 +88,13 @@ player_cost_models = (
     end
 end
 
-function test_unicycle_multipliers(λ, x, u; player_cost_models)
+function test_unicycle_multipliers(system, λ, x, u; player_cost_models)
+    # annoying code duplication due to JuMP.expression ...
     df = let
         As = [
             [
-                1 0 cos(x[4, t]) -x[3, t]*sin(x[4, t])
-                0 1 sin(x[4, t]) +x[3, t]*cos(x[4, t])
+                1 0 system.ΔT*cos(x[4, t]) -system.ΔT*x[3, t]*sin(x[4, t])
+                0 1 system.ΔT*sin(x[4, t]) +system.ΔT*x[3, t]*cos(x[4, t])
                 0 0 1 0
                 0 0 0 1
             ] for t in 1:T
@@ -150,7 +151,13 @@ end
 
     visualize_trajectory(control_system, kkt_solution.x)
 
-    test_unicycle_multipliers(kkt_solution.λ, kkt_solution.x, kkt_solution.u; player_cost_models)
+    test_unicycle_multipliers(
+        control_system,
+        kkt_solution.λ,
+        kkt_solution.x,
+        kkt_solution.u;
+        player_cost_models,
+    )
 end
 
 # TODO: robustify

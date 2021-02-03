@@ -87,19 +87,19 @@ function add_forward_objective_gradients!(opt_model, x, u; weights)
     (; dx = dJdx, du = dJdu)
 end
 
-control_system = TestDynamics.Unicycle()
+control_system = TestDynamics.Unicycle(0.1)
 
-x0 = [-1, 1, 0, 0]
+x0 = [-1, 1, 1, 0]
 T = 100
 obstacle = (-0.5, 0.25) # Point to avoid.
 T_activate_goalcost = T
 cost_model = (
     weights = (;
         state_goal = 100,
-        state_velocity = 1_000,
+        state_velocity = 1,
         state_proximity = 1,
-        control_Δv = 100,
-        control_Δθ = 10,
+        control_Δv = 10,
+        control_Δθ = 1,
     ),
     add_objective! = add_forward_objective!,
     add_objective_gradients! = add_forward_objective_gradients!,
