@@ -95,7 +95,7 @@ function solve_inverse_game(
     solver = Ipopt.Optimizer,
     solver_attributes = (),
     cmin = 1e-5,
-    max_observation_error_sq = nothing,
+    max_observation_error = nothing,
 )
 
     T = size(y)[2]
@@ -169,8 +169,8 @@ function solve_inverse_game(
     # TODO: dirty hack
     # Only search in a local neighborhood of the demonstration if we have an error-bound on the
     # noise.
-    if !isnothing(max_observation_error_sq)
-        @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error_sq)
+    if !isnothing(max_observation_error)
+        @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error^2)
     end
 
     # The inverse objective: match the observed demonstration

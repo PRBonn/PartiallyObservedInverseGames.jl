@@ -96,7 +96,7 @@ function solve_inverse_optimal_control(
     solver = Ipopt.Optimizer,
     solver_attributes = (),
     cmin = 1e-5,
-    max_observation_error_sq = nothing,
+    max_observation_error = nothing,
     verbose = true,
 )
     T = size(y)[2]
@@ -161,8 +161,8 @@ function solve_inverse_optimal_control(
     # TODO: dirty hack
     # Only search in a local neighborhood of the demonstration if we have an error-bound on the
     # noise.
-    if !isnothing(max_observation_error_sq)
-        @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error_sq)
+    if !isnothing(max_observation_error)
+        @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error^2)
     end
 
     # The inverse objective: match the observed demonstration

@@ -169,7 +169,7 @@ end
         control_system,
         observation_model,
         player_cost_models,
-        max_observation_error_sq = 0.1,
+        max_observation_error = 0.1,
     )
 
     for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
