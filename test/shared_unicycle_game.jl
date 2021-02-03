@@ -133,25 +133,9 @@ function test_unicycle_multipliers(λ, x, u; player_cost_models)
 end
 
 @testset "Forward IBR" begin
-    global ibr_converged, ibr_solution, ibr_models = solve_game(
-        IBRGameSolver(),
-        control_system,
-        player_cost_models,
-        x0,
-        T;
-        inner_solver_kwargs = (; silent = true),
-    )
+    global ibr_converged, ibr_solution, ibr_models =
+        solve_game(IBRGameSolver(), control_system, player_cost_models, x0, T)
     @test ibr_converged
-
-    # extract constraint multipliers
-    global λ_ibr = mapreduce((a, b) -> cat(a, b; dims = 3), ibr_models) do opt_model
-        mapreduce(hcat, opt_model[:dynamics]) do c
-            # Sign flipped due to internal convention of JuMP
-            -JuMP.dual.(c)
-        end
-    end
-
-    test_unicycle_multipliers(λ_ibr, ibr_solution.x, ibr_solution.u; player_cost_models)
 end
 
 @testset "Forward KKT Nash" begin
@@ -177,6 +161,7 @@ end
         init = (; ibr_solution.u),
         control_system,
         player_cost_models,
+        max_observation_error_sq = 0.1,
     )
 
     for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)

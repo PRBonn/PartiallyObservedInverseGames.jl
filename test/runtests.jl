@@ -8,5 +8,6 @@ using Test: @testset
 
     @testset "Multi Player: Forward and Inverse Infinite Dynamnic Games" begin
         include("shared_unicycle_game.jl")
+        include("collision_avoidance_game.jl")
     end
 end
