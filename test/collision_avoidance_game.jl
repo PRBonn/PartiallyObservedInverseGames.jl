@@ -139,7 +139,6 @@ function generate_player_cost_model(;
     (; player_inputs = input_indices, weights, add_objective!, add_objective_gradients!)
 end
 
-observation_model = (; σ = 0, expected_observation = identity)
 x0 = vcat([-1, 0, 0.1, 0 + deg2rad(10)], [0, -1, 0.1, pi / 2 + deg2rad(10)])
 T = 25
 player_cost_models = let
@@ -180,8 +179,9 @@ end
 end
 
 @testset "Inverse Game" begin
-    @testset "KKT" begin
-        global inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+    @testset "Perfect Observation" begin
+        observation_model = (; σ = 0, expected_observation = identity)
+        inverse_kkt_perfectobs_solution, inverse_kkt_perfectobs_model = solve_inverse_game(
             InverseKKTSolver(),
             kkt_solution.x;
             control_system,
@@ -189,15 +189,36 @@ end
             player_cost_models,
         )
 
-        for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
+        for (cost_model, weights) in
+            zip(player_cost_models, inverse_kkt_perfectobs_solution.player_weights)
             TestUtils.test_inverse_solution(weights, cost_model.weights)
         end
 
         TestUtils.test_inverse_model(
-            inverse_kkt_model,
+            inverse_kkt_perfectobs_model,
             observation_model,
             kkt_solution.x,
             kkt_solution.x,
+        )
+    end
+
+    @testset "Noisy Full Observation" begin
+        observation_model = (; σ = 0.01, expected_observation = identity)
+        y_noisy = TestUtils.noisy_observation(observation_model, kkt_solution.x)
+
+        inverse_kkt_noisyobs_solution, inverse_kkt_noisyobs_model = solve_inverse_game(
+            InverseKKTSolver(),
+            y_noisy;
+            control_system,
+            observation_model,
+            player_cost_models,
+        )
+
+        TestUtils.test_inverse_model(
+            inverse_kkt_noisyobs_model,
+            observation_model,
+            kkt_solution.x,
+            y_noisy,
         )
     end
 end
