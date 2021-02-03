@@ -122,7 +122,7 @@ function solve_inverse_optimal_control(
         JuMP.set_start_value.(weights, 1 / length(weights))
     end
 
-    # JuMPUtils.init_if_hasproperty!(weights, init, :weights, default = 1 / length(weights))
+    # Initialization
     # TODO: This is not always correct. Technically we would want to use an inverse observation
     # opt_model here if it exists (mapping from observationi to state components)
     JuMP.set_start_value.(x[CartesianIndices(y)], y)
@@ -154,14 +154,13 @@ function solve_inverse_optimal_control(
     )
     @constraint(opt_model, dJ.du[controlled_inputs, T] .== 0)
     # regularization
-    # TODO: There might be a smarter regularization here. Rather, we want there to be non-zero cost
-    # for all inputs (i.e. enforce positive definiteness of the input cost.)
     @constraint(opt_model, weights .>= cmin)
     @constraint(opt_model, sum(weights) == 1)
 
     y_expected = observation_model.expected_observation(x)
     # TODO: dirty hack
-    # Only search in a reasonable neighborhood of hte demonstration.
+    # Only search in a local neighborhood of the demonstration if we have an error-bound on the
+    # noise.
     if !isnothing(max_observation_error_sq)
         @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error_sq)
     end

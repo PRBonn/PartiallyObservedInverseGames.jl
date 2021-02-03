@@ -185,6 +185,7 @@ end
             InverseKKTSolver(),
             kkt_solution.x;
             control_system,
+            observation_model,
             player_cost_models,
         )
 

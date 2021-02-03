@@ -85,11 +85,11 @@ end
 
 struct InverseKKTSolver end
 
-# TODO: allow for partial and noisy state observations
 function solve_inverse_game(
     ::InverseKKTSolver,
-    x̂;
+    y;
     control_system,
+    observation_model,
     player_cost_models,
     init = (),
     solver = Ipopt.Optimizer,
@@ -98,7 +98,7 @@ function solve_inverse_game(
     max_observation_error_sq = nothing,
 )
 
-    T = size(x̂)[2]
+    T = size(y)[2]
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
 
@@ -111,12 +111,14 @@ function solve_inverse_game(
     x = @variable(opt_model, [1:n_states, 1:T])
     u = @variable(opt_model, [1:n_controls, 1:T])
     λ = @variable(opt_model, [1:n_states, 1:(T - 1), 1:n_players])
-
+    # slack variables for unknown initial condition
     x0 = @variable(opt_model, [1:n_states])
     λ0 = @variable(opt_model, [1:n_states, 1:n_players])
 
     # Initialization
-    JuMP.set_start_value.(x, x̂)
+    # TODO: This is not always correct. Technically we would want to use an inverse observation
+    # opt_model here if it exists (mapping from observationi to state components)
+    JuMP.set_start_value.(x[CartesianIndices(y)], y)
     JuMPUtils.init_if_hasproperty!(u, init, :u)
     JuMPUtils.init_if_hasproperty!(λ, init, :λ)
 
@@ -129,6 +131,9 @@ function solve_inverse_game(
     DynamicsModelInterface.add_dynamics_constraints!(control_system, opt_model, x, u)
     df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, opt_model, x, u)
 
+    if iszero(observation_model.σ)
+        @constraint(opt_model, observation_model.expected_observation(x0) .== y[:, 1])
+    end
     @constraint(opt_model, x[:, 1] .== x0)
 
     for (player_idx, cost_model) in enumerate(player_cost_models)
@@ -160,14 +165,16 @@ function solve_inverse_game(
         @constraint(opt_model, sum(weights) .== 1)
     end
 
+    y_expected = observation_model.expected_observation(x)
     # TODO: dirty hack
-    # Only search in a reasonable neighborhood of hte demonstration.
+    # Only search in a local neighborhood of the demonstration if we have an error-bound on the
+    # noise.
     if !isnothing(max_observation_error_sq)
-        @constraint(opt_model, (x - x̂) .^ 2 .<= max_observation_error_sq)
+        @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error_sq)
     end
 
     # The inverse objective: match the observed demonstration
-    @objective(opt_model, Min, sum(el -> el^2, x .- x̂))
+    @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
 
     @time JuMP.optimize!(opt_model)
     merge(

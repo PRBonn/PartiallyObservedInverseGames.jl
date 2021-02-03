@@ -167,6 +167,7 @@ end
         ibr_solution.x;
         init = (; ibr_solution.u),
         control_system,
+        observation_model,
         player_cost_models,
         max_observation_error_sq = 0.1,
     )
