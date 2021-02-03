@@ -23,20 +23,10 @@ function linear_dynamics_constraints(x, u; A, B)
 end
 
 "Solves a forward LQR problem using JuMP."
-function solve_lqr(
-    A,
-    B,
-    Q,
-    R,
-    x0,
-    T;
-    solver = Ipopt.Optimizer,
-    silent = true,
-    solver_attributes = (;)
-)
+function solve_lqr(A, B, Q, R, x0, T; solver = Ipopt.Optimizer, solver_attributes = ())
     n_states, n_controls = size(only(unique(B)))
     opt_model = JuMP.Model(solver)
-    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; solver_attributes...)
 
     x = @variable(opt_model, [1:n_states, 1:T])
     u = @variable(opt_model, [1:n_controls, 1:T])
@@ -60,12 +50,11 @@ function solve_optimal_control(
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (),
-    silent = false,
 )
     @unpack n_states, n_controls = control_system
 
     opt_model = JuMP.Model(solver)
-    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; solver_attributes...)
 
     # decision variables
     x = @variable(opt_model, [1:n_states, 1:T])

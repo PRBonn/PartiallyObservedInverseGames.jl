@@ -76,7 +76,6 @@ function solve_game(
     T;
     solver = Ipopt.Optimizer,
     solver_attributes = (),
-    silent = false,
     init = (),
 )
 
@@ -84,7 +83,7 @@ function solve_game(
     @unpack n_states, n_controls = control_system
 
     opt_model = JuMP.Model(solver)
-    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; solver_attributes...)
 
     # Decision Variables
     x = @variable(opt_model, [1:n_states, 1:T])

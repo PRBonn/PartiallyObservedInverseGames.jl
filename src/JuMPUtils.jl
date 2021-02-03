@@ -8,8 +8,7 @@ get_values(; jump_vars...) = (; map(((k, v),) -> k => JuMP.value.(v), collect(ju
 get_model_values(opt_model, symbols...) =
     get_values(; map(sym -> sym => opt_model[sym], symbols)...)
 
-function set_solver_attributes!(opt_model, ; silent, solver_attributes...)
-    silent ? JuMP.set_silent(opt_model) : JuMP.unset_silent(opt_model)
+function set_solver_attributes!(opt_model; solver_attributes...)
     foreach(
         ((k, v),) -> JuMP.set_optimizer_attribute(opt_model, string(k), v),
         pairs(solver_attributes),

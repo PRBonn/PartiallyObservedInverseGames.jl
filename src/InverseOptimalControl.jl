@@ -53,12 +53,11 @@ function solve_inverse_lqr(
     r_sqr_min = 1e-5,
     solver = Ipopt.Optimizer,
     solver_attributes = (),
-    silent = false,
 )
     T = size(x̂)[2]
     n_states, n_controls = size(only(unique(B)))
     opt_model = JuMP.Model(solver)
-    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; solver_attributes...)
 
     # decision variable
     q = @variable(opt_model, [1:length(Q̃)], lower_bound = 0)
@@ -96,15 +95,15 @@ function solve_inverse_optimal_control(
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (),
-    silent = false,
     cmin = 1e-5,
     max_observation_error_sq = nothing,
+    verbose = true,
 )
     T = size(y)[2]
     @unpack n_states, n_controls = control_system
 
     opt_model = JuMP.Model(solver)
-    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; solver_attributes...)
 
     # decision variable
     weights = @variable(opt_model, [keys(cost_model.weights)],)
@@ -114,12 +113,12 @@ function solve_inverse_optimal_control(
 
     # initialization
     if hasproperty(init, :weights) && !isnothing(init.weights)
-        silent || @info "Using weight guess: $(init.weights)"
+        verbose && @info "Using weight guess: $(init.weights)"
         for k in keys(init.weights)
             JuMP.set_start_value(weights[k], init.weights[k])
         end
     else
-        silent || @info "Using weight default"
+        verbose && @info "Using weight default"
         JuMP.set_start_value.(weights, 1 / length(weights))
     end
 

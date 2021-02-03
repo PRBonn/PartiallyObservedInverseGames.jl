@@ -94,7 +94,6 @@ function solve_inverse_game(
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (),
-    silent = false,
     cmin = 1e-5,
     max_observation_error_sq = nothing,
 )
@@ -104,7 +103,7 @@ function solve_inverse_game(
     @unpack n_states, n_controls = control_system
 
     opt_model = JuMP.Model(solver)
-    JuMPUtils.set_solver_attributes!(opt_model; silent, solver_attributes...)
+    JuMPUtils.set_solver_attributes!(opt_model; solver_attributes...)
 
     # Decision Variables
     player_weights =
