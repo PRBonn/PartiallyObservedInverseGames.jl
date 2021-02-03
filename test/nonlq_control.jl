@@ -114,10 +114,7 @@ visualize_trajectory(control_system, forward_solution.x)
 
 observation_model = (; σ = 0.0, expected_observation = identity)
 
-y = let
-    ŷ = observation_model.expected_observation(forward_solution.x)
-    ŷ + randn(Random.MersenneTwister(1), size(ŷ)) .* observation_model.σ
-end
+y = TestUtils.noisy_observation(observation_model, forward_solution.x)
 
 inverse_solution, inverse_model = solve_inverse_optimal_control(
     y;
