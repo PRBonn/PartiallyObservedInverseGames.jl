@@ -98,6 +98,7 @@ function solve_inverse_optimal_control(
     cmin = 1e-5,
     max_observation_error = nothing,
     verbose = true,
+    init_with_observation = true,
 )
     T = size(y)[2]
     @unpack n_states, n_controls = control_system
@@ -123,9 +124,12 @@ function solve_inverse_optimal_control(
     end
 
     # Initialization
-    # TODO: This is not always correct. Technically we would want to use an inverse observation
-    # opt_model here if it exists (mapping from observationi to state components)
-    JuMP.set_start_value.(x[CartesianIndices(y)], y)
+    if init_with_observation
+        # TODO: This is not always correct. It will only work if
+        # `observation_model.expected_observation` effectively creates an array view into x
+        # (extracting components of the variable).
+        JuMP.set_start_value.(observation_model.expected_observation(x), y)
+    end
     JuMPUtils.init_if_hasproperty!(u, init, :u)
 
     # constraints

@@ -96,6 +96,7 @@ function solve_inverse_game(
     solver_attributes = (),
     cmin = 1e-5,
     max_observation_error = nothing,
+    init_with_observation = true,
 )
 
     T = size(y)[2]
@@ -116,13 +117,16 @@ function solve_inverse_game(
     λ0 = @variable(opt_model, [1:n_states, 1:n_players])
 
     # Initialization
-    # TODO: This is not always correct. Technically we would want to use an inverse observation
-    # opt_model here if it exists (mapping from observationi to state components)
-    JuMP.set_start_value.(x[CartesianIndices(y)], y)
+    if init_with_observation
+        # TODO: This is not always correct. It will only work if
+        # `observation_model.expected_observation` effectively creates an array view into x
+        # (extracting components of the variable).
+        JuMP.set_start_value.(observation_model.expected_observation(x), y)
+    end
     JuMPUtils.init_if_hasproperty!(u, init, :u)
     JuMPUtils.init_if_hasproperty!(λ, init, :λ)
 
-    # # TODO: think about initialization for player weights
+    # # TODO: think about initialization for player weights. Make this a kwarg
     # for weights in player_weights
     #     JuMP.set_start_value.(weights, 1 / length(weights))
     # end

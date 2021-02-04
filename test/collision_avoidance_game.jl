@@ -181,7 +181,7 @@ end
 @testset "Inverse Game" begin
     @testset "Perfect Observation" begin
         observation_model = (; σ = 0, expected_observation = identity)
-        inverse_kkt_perfectobs_solution, inverse_kkt_perfectobs_model = solve_inverse_game(
+        inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
             InverseKKTSolver(),
             kkt_solution.x;
             control_system,
@@ -189,13 +189,12 @@ end
             player_cost_models,
         )
 
-        for (cost_model, weights) in
-            zip(player_cost_models, inverse_kkt_perfectobs_solution.player_weights)
+        for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
             TestUtils.test_inverse_solution(weights, cost_model.weights)
         end
 
         TestUtils.test_inverse_model(
-            inverse_kkt_perfectobs_model,
+            inverse_kkt_model,
             observation_model,
             kkt_solution.x,
             kkt_solution.x,
@@ -204,21 +203,52 @@ end
 
     @testset "Noisy Full Observation" begin
         observation_model = (; σ = 0.01, expected_observation = identity)
-        y_noisy = TestUtils.noisy_observation(observation_model, kkt_solution.x)
+        y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
 
-        inverse_kkt_noisyobs_solution, inverse_kkt_noisyobs_model = solve_inverse_game(
+        inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
             InverseKKTSolver(),
-            y_noisy;
+            y_obs;
             control_system,
             observation_model,
             player_cost_models,
         )
 
-        TestUtils.test_inverse_model(
-            inverse_kkt_noisyobs_model,
+        TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
+    end
+
+    @testset "Noise-Free Partial Observation" begin
+        observation_model = (; σ = 0.0, expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :])
+        y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
+
+        inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+            InverseKKTSolver(),
+            y_obs;
+            control_system,
             observation_model,
-            kkt_solution.x,
-            y_noisy,
+            player_cost_models,
+            # TODO: think about initialization in the partial observation case
+            init_with_observation = true,
+            max_observation_error = 0.1,
         )
+
+        TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
+    end
+
+    @testset "Noisy Partial Observation" begin
+        observation_model = (; σ = 0.01, expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :])
+        y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
+
+        inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+            InverseKKTSolver(),
+            y_obs;
+            control_system,
+            observation_model,
+            player_cost_models,
+            # TODO: think about initialization in the partial observation case
+            init_with_observation = true,
+            max_observation_error = 0.1,
+        )
+
+        TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
     end
 end
