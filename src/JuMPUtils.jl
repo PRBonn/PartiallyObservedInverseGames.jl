@@ -2,11 +2,9 @@ module JuMPUtils
 
 import JuMP
 
-export get_values, get_model_values, set_solver_attributes!, init_if_hasproperty!
+export get_values, set_solver_attributes!, init_if_hasproperty!
 
 get_values(; jump_vars...) = (; map(((k, v),) -> k => JuMP.value.(v), collect(jump_vars))...)
-get_model_values(opt_model, symbols...) =
-    get_values(; map(sym -> sym => opt_model[sym], symbols)...)
 
 function set_solver_attributes!(opt_model; solver_attributes...)
     foreach(
