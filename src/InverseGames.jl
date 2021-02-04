@@ -11,6 +11,8 @@ using UnPack: @unpack
 
 export solve_inverse_game
 
+#=========================================== Inverse IBR ===========================================#
+
 struct InverseIBRSolver end
 
 # TODO: allow for partial and noisy state observations
@@ -83,10 +85,10 @@ end
 
 #================================ Inverse Games via KKT constraints ================================#
 
-struct InverseKKTSolver end
+struct InverseKKTConstraintSolver end
 
 function solve_inverse_game(
-    ::InverseKKTSolver,
+    ::InverseKKTConstraintSolver,
     y;
     control_system,
     observation_model,
@@ -163,8 +165,10 @@ function solve_inverse_game(
             dJ.du[player_inputs, t] - (λ[:, t, player_idx]' * df.du[:, player_inputs, t])' .== 0
         )
         @constraint(opt_model, dJ.du[player_inputs, T] .== 0)
+    end
 
-        # regularization
+    # regularization
+    for weights in player_weights
         @constraint(opt_model, weights .>= cmin)
         @constraint(opt_model, sum(weights) .== 1)
     end
@@ -183,6 +187,107 @@ function solve_inverse_game(
     @time JuMP.optimize!(opt_model)
     merge(
         JuMPUtils.get_values(; x, u, λ),
+        (; player_weights = map(w -> JuMP.value.(w), player_weights)),
+    ),
+    opt_model
+end
+
+#========================================== KKT Residual ===========================================#
+
+struct InverseKKTResidualSolver end
+
+# TODO: remove unneeded function parameters once implementation has converged a bit more.
+function solve_inverse_game(
+    ::InverseKKTResidualSolver,
+    x,
+    u;
+    control_system,
+    # observation_model # not applicable
+    player_cost_models,
+    init = (),          # not really needed. Everything is assumed to be observed
+    solver = Ipopt.Optimizer,
+    solver_attributes = (),
+    cmin = 1e-5,
+    # max_observation_error = nothing, # Not applicable, can't deviate from the observation anyway
+    # init_with_observation = true, # Well always stay at obs
+)
+
+    T = size(x)[2]
+    n_players = length(player_cost_models)
+    @unpack n_states, n_controls = control_system
+
+    opt_model = JuMP.Model(solver)
+    JuMPUtils.set_solver_attributes!(opt_model; solver_attributes...)
+
+    # Decision Variables
+    player_weights =
+        [@variable(opt_model, [keys(cost_model.weights)]) for cost_model in player_cost_models]
+    λ = @variable(opt_model, [1:n_states, 1:(T - 1), 1:n_players])
+
+    # Initialization
+    JuMPUtils.init_if_hasproperty!(λ, init, :λ)
+    # # TODO: think about initialization for player weights. Make this a kwarg
+    # for weights in player_weights
+    #     JuMP.set_start_value.(weights, 1 / length(weights))
+    # end
+
+    # Compute intermediate results needed for the KKT residual
+    # NOTE: In the KKT residual formulation, it is an *unconstrained* optimizatino problem. The only
+    # constraints that we add here are the reiguarization constraints ont he palyer weights.
+    df = DynamicsModelInterface.add_dynamics_jacobians!(control_system, opt_model, x, u)
+
+    player_residuals = map(enumerate(player_cost_models)) do (player_idx, cost_model)
+        weights = player_weights[player_idx]
+        @unpack player_inputs = cost_model
+        dJ = cost_model.add_objective_gradients!(opt_model, x, u; weights)
+
+        dLdx = let
+            # TODO: The first of these is never used but 1-based indexing is needed to allow
+            # broadcasting.
+            dLdx = @variable(opt_model, [1:n_states, 1:T])
+
+            @constraint(
+                opt_model,
+                [t = 2:(T - 1)],
+                dLdx[:, t] .==
+                dJ.dx[:, t] + λ[:, t - 1, player_idx] - (λ[:, t, player_idx]' * df.dx[:, :, t])'
+            )
+            @constraint(opt_model, dLdx[:, T] .== dJ.dx[:, T] + λ[:, T - 1, player_idx])
+
+            dLdx
+        end
+
+        dLdu = let
+            dLdu = @variable(opt_model, [1:length(player_inputs), 1:T])
+            @constraint(
+                opt_model,
+                [t = 1:(T - 1)],
+                dLdu[:, t] .==
+                dJ.du[player_inputs, t] - (λ[:, t, player_idx]' * df.du[:, player_inputs, t])'
+            )
+            @constraint(opt_model, dLdu[:, T] .== dJ.du[player_inputs, T])
+
+            dLdu
+        end
+
+        (; dLdx, dLdu)
+    end
+
+    # regularization
+    for weights in player_weights
+        @constraint(opt_model, weights .>= cmin)
+        @constraint(opt_model, sum(weights) .== 1)
+    end
+
+    @objective(
+        opt_model,
+        Min,
+        sum(sum(el -> el^2, res.dLdx) + sum(el -> el^2, res.dLdu) for res in player_residuals)
+    )
+
+    @time JuMP.optimize!(opt_model)
+    merge(
+        JuMPUtils.get_values(; λ),
         (; player_weights = map(w -> JuMP.value.(w), player_weights)),
     ),
     opt_model
