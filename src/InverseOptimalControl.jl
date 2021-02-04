@@ -52,7 +52,7 @@ function solve_inverse_lqr(
     B,
     r_sqr_min = 1e-5,
     solver = Ipopt.Optimizer,
-    solver_attributes = (),
+    solver_attributes = (; print_level = 3),
 )
     T = size(x̂)[2]
     n_states, n_controls = size(only(unique(B)))
@@ -94,7 +94,7 @@ function solve_inverse_optimal_control(
     fixed_inputs = (),
     init = (),
     solver = Ipopt.Optimizer,
-    solver_attributes = (),
+    solver_attributes = (; print_level = 3),
     cmin = 1e-5,
     max_observation_error = nothing,
     verbose = true,

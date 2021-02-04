@@ -95,7 +95,7 @@ function solve_inverse_game(
     player_cost_models,
     init = (),
     solver = Ipopt.Optimizer,
-    solver_attributes = (),
+    solver_attributes = (; print_level = 3),
     cmin = 1e-5,
     max_observation_error = nothing,
     init_with_observation = true,
@@ -206,7 +206,7 @@ function solve_inverse_game(
     player_cost_models,
     init = (),          # not really needed. Everything is assumed to be observed
     solver = Ipopt.Optimizer,
-    solver_attributes = (),
+    solver_attributes = (; print_level = 3),
     cmin = 1e-5,
     # max_observation_error = nothing, # Not applicable, can't deviate from the observation anyway
     # init_with_observation = true, # Well always stay at obs
@@ -286,10 +286,7 @@ function solve_inverse_game(
     )
 
     @time JuMP.optimize!(opt_model)
-    merge(
-        JuMPUtils.get_values(; λ),
-        (; player_weights = map(w -> JuMP.value.(w), player_weights)),
-    ),
+    merge(JuMPUtils.get_values(; λ), (; player_weights = map(w -> JuMP.value.(w), player_weights))),
     opt_model
 end
 
