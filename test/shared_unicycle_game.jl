@@ -4,7 +4,7 @@ import Zygote
 
 using JuMP: @variable, @constraint, @objective
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
-using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTSolver, solve_inverse_game
+using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTConstraintSolver, solve_inverse_game
 using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
 using SparseArrays: spzeros
 using Test: @test, @testset, @test_broken
@@ -163,7 +163,7 @@ end
 # TODO: robustify
 @testset "Inverse KKT Nash" begin
     global inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
-        InverseKKTSolver(),
+        InverseKKTConstraintSolver(),
         ibr_solution.x;
         init = (; ibr_solution.u),
         control_system,

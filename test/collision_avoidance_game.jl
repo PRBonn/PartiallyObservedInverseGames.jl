@@ -3,7 +3,8 @@ using Test: @test, @testset
 using JuMP: @objective, @variable, @NLconstraint, @NLexpression
 using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
-using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTSolver, solve_inverse_game
+using JuMPOptimalControl.InverseGames:
+    InverseIBRSolver, InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils
@@ -178,27 +179,55 @@ end
     end
 end
 
+# TODO: transpose test sets: Group tests by solver, not by scenarios.
+# TODO: reduce code duplication in tests: Loop over different configurations
 @testset "Inverse Game" begin
     @testset "Perfect Observation" begin
         observation_model = (; σ = 0, expected_observation = identity)
-        inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
-            InverseKKTSolver(),
-            kkt_solution.x;
-            control_system,
-            observation_model,
-            player_cost_models,
-        )
 
-        for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
-            TestUtils.test_inverse_solution(weights, cost_model.weights)
+        @testset "Inverse KKT Constraints" begin
+            inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+                InverseKKTConstraintSolver(),
+                kkt_solution.x;
+                control_system,
+                observation_model,
+                player_cost_models,
+            )
+
+            for (cost_model, weights) in
+                zip(player_cost_models, inverse_kkt_solution.player_weights)
+                TestUtils.test_inverse_solution(weights, cost_model.weights)
+            end
+
+            TestUtils.test_inverse_model(
+                inverse_kkt_model,
+                observation_model,
+                kkt_solution.x,
+                kkt_solution.x,
+            )
         end
 
-        TestUtils.test_inverse_model(
-            inverse_kkt_model,
-            observation_model,
-            kkt_solution.x,
-            kkt_solution.x,
-        )
+        @testset "Invsere KKT Residuals" begin
+            inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+                InverseKKTResidualSolver(),
+                kkt_solution.x,
+                kkt_solution.u;
+                control_system,
+                player_cost_models,
+            )
+
+            for (cost_model, weights) in
+                zip(player_cost_models, inverse_kkt_solution.player_weights)
+                TestUtils.test_inverse_solution(weights, cost_model.weights)
+            end
+
+            TestUtils.test_inverse_model(
+                inverse_kkt_model,
+                observation_model,
+                kkt_solution.x,
+                kkt_solution.x,
+            )
+        end
     end
 
     @testset "Noisy Full Observation" begin
@@ -206,7 +235,7 @@ end
         y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
 
         inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
-            InverseKKTSolver(),
+            InverseKKTConstraintSolver(),
             y_obs;
             control_system,
             observation_model,
@@ -221,12 +250,11 @@ end
         y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
 
         inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
-            InverseKKTSolver(),
+            InverseKKTConstraintSolver(),
             y_obs;
             control_system,
             observation_model,
             player_cost_models,
-            # TODO: think about initialization in the partial observation case
             init_with_observation = true,
             max_observation_error = 0.1,
         )
@@ -239,12 +267,11 @@ end
         y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
 
         inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
-            InverseKKTSolver(),
+            InverseKKTConstraintSolver(),
             y_obs;
             control_system,
             observation_model,
             player_cost_models,
-            # TODO: think about initialization in the partial observation case
             init_with_observation = true,
             max_observation_error = 0.1,
         )
