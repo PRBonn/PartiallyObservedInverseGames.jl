@@ -75,7 +75,7 @@ function solve_game(
     x0,
     T;
     solver = Ipopt.Optimizer,
-    solver_attributes = (),
+    solver_attributes = (; print_level = 3),
     init = (),
 )
 
