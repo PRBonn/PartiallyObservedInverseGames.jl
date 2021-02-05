@@ -30,6 +30,7 @@ function solve_inverse_game(
     inner_solver_kwargs = (),
     max_ibr_rounds = 5,
     ibr_convergence_tolerance = 0.01,
+    verbose = false,
 )
     @unpack n_controls = control_system
     n_players = length(player_cost_models)
@@ -74,7 +75,7 @@ function solve_inverse_game(
         last_ibr_solution = last_player_solution
 
         if converged
-            @info "Converged at ibr iterate: $i_ibr"
+            verbose && @info "Converged at ibr iterate: $i_ibr"
             break
         end
     end
@@ -100,6 +101,7 @@ function solve_inverse_game(
     cmin = 1e-5,
     max_observation_error = nothing,
     init_with_observation = true,
+    verbose = false,
 )
 
     T = size(y)[2]
@@ -185,7 +187,9 @@ function solve_inverse_game(
     # The inverse objective: match the observed demonstration
     @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
 
-    @time JuMP.optimize!(opt_model)
+    time = @elapsed JuMP.optimize!(opt_model)
+    verbose && @info time
+
     merge(
         JuMPUtils.get_values(; x, u, λ),
         (; player_weights = map(w -> JuMP.value.(w), player_weights)),
@@ -209,6 +213,7 @@ function solve_inverse_game(
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
     cmin = 1e-5,
+    verbose = false,
     # max_observation_error = nothing, # Not applicable, can't deviate from the observation anyway
     # init_with_observation = true, # Well always stay at obs
 )
@@ -286,7 +291,8 @@ function solve_inverse_game(
         sum(sum(el -> el^2, res.dLdx) + sum(el -> el^2, res.dLdu) for res in player_residuals)
     )
 
-    @time JuMP.optimize!(opt_model)
+    time = @elapsed JuMP.optimize!(opt_model)
+    verbose && @info time
 
     merge(
         JuMPUtils.get_values(; λ),
