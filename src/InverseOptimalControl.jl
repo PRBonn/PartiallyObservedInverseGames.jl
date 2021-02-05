@@ -2,6 +2,7 @@ module InverseOptimalControl
 
 import ..DynamicsModelInterface
 import ..JuMPUtils
+import ..CostUtils
 import Ipopt
 import JuMP
 
@@ -172,8 +173,13 @@ function solve_inverse_optimal_control(
     # The inverse objective: match the observed demonstration
     @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
 
-    @time JuMP.optimize!(opt_model)
-    JuMPUtils.get_values(; weights, x, u, λ), opt_model
+
+    solution = merge(
+        CostUtils.namedtuple(JuMPUtils.get_values(; weights)),
+        JuMPUtils.get_values(; x, u, λ),
+    )
+
+    solution, opt_model
 end
 
 end

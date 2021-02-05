@@ -1,9 +1,7 @@
 module CollisionAvoidanceGame
 
 using JuMP: @NLconstraint, @NLexpression, @objective, @variable
-
-unique!(push!(LOAD_PATH, joinpath(@__DIR__)))
-using CostUtils: symbol
+using JuMPOptimalControl.CostUtils: symbol
 
 export generate_player_cost_model
 
