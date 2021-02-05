@@ -98,7 +98,7 @@ function solve_inverse_optimal_control(
     solver_attributes = (; print_level = 3),
     cmin = 1e-5,
     max_observation_error = nothing,
-    verbose = true,
+    verbose = false,
     init_with_observation = true,
 )
     T = size(y)[2]
@@ -173,6 +173,8 @@ function solve_inverse_optimal_control(
     # The inverse objective: match the observed demonstration
     @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
 
+    time = @elapsed JuMP.optimize!(opt_model)
+    verbose && @info time
 
     solution = merge(
         CostUtils.namedtuple(JuMPUtils.get_values(; weights)),
