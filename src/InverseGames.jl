@@ -4,6 +4,7 @@ import JuMP
 import Ipopt
 import ..DynamicsModelInterface
 import ..JuMPUtils
+import ..CostUtils
 import ..InverseOptimalControl
 
 using JuMP: @variable, @constraint, @objective
@@ -286,7 +287,11 @@ function solve_inverse_game(
     )
 
     @time JuMP.optimize!(opt_model)
-    merge(JuMPUtils.get_values(; λ), (; player_weights = map(w -> JuMP.value.(w), player_weights))),
+
+    merge(
+        JuMPUtils.get_values(; λ),
+        (; player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights)),
+    ),
     opt_model
 end
 

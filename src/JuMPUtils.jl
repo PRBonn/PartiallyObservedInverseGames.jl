@@ -1,7 +1,6 @@
 module JuMPUtils
 
 import JuMP
-
 export get_values, set_solver_attributes!, init_if_hasproperty!
 
 get_values(; jump_vars...) = (; map(((k, v),) -> k => JuMP.value.(v), collect(jump_vars))...)
