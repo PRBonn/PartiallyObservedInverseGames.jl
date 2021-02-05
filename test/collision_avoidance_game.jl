@@ -13,16 +13,6 @@ import CollisionAvoidanceGame
 control_system =
     TestDynamics.ProductSystem([TestDynamics.Unicycle(0.25), TestDynamics.Unicycle(0.25)])
 
-@testset "Product Dynamics" begin
-    @test control_system.n_states == 8
-    @test control_system.n_controls == 4
-
-    @test all(i in TestDynamics.state_indices(control_system, 1) for i in 1:4)
-    @test all(i in TestDynamics.state_indices(control_system, 2) for i in 5:8)
-    @test all(i in TestDynamics.input_indices(control_system, 1) for i in 1:2)
-    @test all(i in TestDynamics.input_indices(control_system, 2) for i in 3:4)
-end
-
 x0 = vcat([-1, 0, 0.1, 0 + deg2rad(10)], [0, -1, 0.1, pi / 2 + deg2rad(10)])
 T = 25
 player_cost_models = let
@@ -41,6 +31,17 @@ player_cost_models = let
 
     (cost_model_p1, cost_model_p2)
 end
+
+@testset "Product Dynamics" begin
+    @test control_system.n_states == 8
+    @test control_system.n_controls == 4
+
+    @test all(i in TestDynamics.state_indices(control_system, 1) for i in 1:4)
+    @test all(i in TestDynamics.state_indices(control_system, 2) for i in 5:8)
+    @test all(i in TestDynamics.input_indices(control_system, 1) for i in 1:2)
+    @test all(i in TestDynamics.input_indices(control_system, 2) for i in 3:4)
+end
+
 
 @testset "Forward Game" begin
     @testset "IBR" begin
