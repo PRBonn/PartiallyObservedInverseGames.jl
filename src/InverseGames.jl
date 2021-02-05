@@ -190,6 +190,7 @@ function solve_inverse_game(
     time = @elapsed JuMP.optimize!(opt_model)
     verbose && @info time
 
+    # TODO fix to return a namedtuple of weights
     merge(
         JuMPUtils.get_values(; x, u, λ),
         (; player_weights = map(w -> JuMP.value.(w), player_weights)),
