@@ -45,14 +45,15 @@ end
 
 @testset "Forward Game" begin
     @testset "IBR" begin
-        global ibr_converged, ibr_solution, ibr_models =
+        ibr_converged, ibr_solution, ibr_models =
             solve_game(IBRGameSolver(), control_system, player_cost_models, x0, T)
+        global ibr_solution
 
         @test ibr_converged
     end
 
     @testset "KKT" begin
-        global kkt_converged, kkt_solution, kkt_model = solve_game(
+        kkt_converged, kkt_solution, kkt_model = solve_game(
             KKTGameSolver(),
             control_system,
             player_cost_models,
@@ -60,6 +61,7 @@ end
             T;
             init = ibr_solution,
         )
+        global kkt_solution
 
         @test kkt_converged
     end
