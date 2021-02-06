@@ -13,6 +13,13 @@ function generate_player_cost_model(;
     input_indices,
     goal_position,
     weights = (;
+        state_goal = 1,
+        state_proximity = 1,
+        state_velocity = 1,
+        control_Δv = 1,
+        control_Δθ = 1,
+    ),
+    cost_prescaling = (;
         state_goal = 100,
         state_proximity = 0.1,
         state_velocity = 1,
@@ -57,7 +64,11 @@ function generate_player_cost_model(;
             control_Δv = sum(el -> el^2, u_sub_ego[1, :]),
             control_Δθ = sum(el -> el^2, u_sub_ego[2, :]),
         )
-        @objective(opt_model, Min, sum(weights[k] * J̃[symbol(k)] for k in keys(weights)))
+        @objective(
+            opt_model,
+            Min,
+            sum(weights[k] * cost_prescaling[k] * J̃[k] for k in keys(weights))
+        )
     end
 
     function add_objective_gradients!(opt_model, x, u; weights)
@@ -98,7 +109,10 @@ function generate_player_cost_model(;
                 control_Δv = zeros(size(x_sub_ego)),
                 control_Δθ = zeros(size(x_sub_ego)),
             )
-            dJdx_sub = sum(weights[k] * dJ̃dx_sub[symbol(k)] for k in keys(weights))
+            dJdx_sub = sum(
+                weights[k] * cost_prescaling[symbol(k)] * dJ̃dx_sub[symbol(k)]
+                for k in keys(weights)
+            )
             [
                 zeros(first(state_indices) - 1, T)
                 dJdx_sub
@@ -107,7 +121,9 @@ function generate_player_cost_model(;
         end
 
         dJdu = let
-            dJdu_sub = 2 * [weights[:control_Δv], weights[:control_Δθ]] .* u_sub_ego
+            dJdu_sub =
+                2 * [weights[:control_Δv], weights[:control_Δθ]] .*
+                [cost_prescaling[:control_Δv], cost_prescaling[:control_Δθ]] .* u_sub_ego
             [
                 zeros(first(input_indices) - 1, T)
                 dJdu_sub
