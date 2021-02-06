@@ -10,7 +10,7 @@ import ..InverseOptimalControl
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
 
-export solve_inverse_game
+export InverseIBRSolver, InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 #=========================================== Inverse IBR ===========================================#
 
@@ -190,12 +190,12 @@ function solve_inverse_game(
     time = @elapsed JuMP.optimize!(opt_model)
     verbose && @info time
 
-    # TODO fix to return a namedtuple of weights
-    merge(
+    solution = merge(
         JuMPUtils.get_values(; x, u, λ),
-        (; player_weights = map(w -> JuMP.value.(w), player_weights)),
-    ),
-    opt_model
+        (; player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights)),
+    )
+
+    JuMPUtils.isconverged(opt_model), solution, opt_model
 end
 
 #========================================== KKT Residual ===========================================#
@@ -291,11 +291,12 @@ function solve_inverse_game(
     time = @elapsed JuMP.optimize!(opt_model)
     verbose && @info time
 
-    merge(
+    solution = merge(
         JuMPUtils.get_values(; λ),
         (; player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights)),
-    ),
-    opt_model
+    )
+
+    JuMPUtils.isconverged(opt_model), solution, opt_model
 end
 
 end
