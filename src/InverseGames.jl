@@ -202,21 +202,17 @@ end
 
 struct InverseKKTResidualSolver end
 
-# TODO: remove unneeded function parameters once implementation has converged a bit more.
 function solve_inverse_game(
     ::InverseKKTResidualSolver,
     x,
     u;
     control_system,
-    # observation_model # not applicable
     player_cost_models,
-    init = (),          # not really needed. Everything is assumed to be observed
+    init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
     cmin = 1e-5,
     verbose = false,
-    # max_observation_error = nothing, # Not applicable, can't deviate from the observation anyway
-    # init_with_observation = true, # Well always stay at obs
 )
 
     T = size(x)[2]
@@ -249,7 +245,7 @@ function solve_inverse_game(
         dJ = cost_model.add_objective_gradients!(opt_model, x, u; weights)
 
         dLdx = let
-            # TODO: The first of these is never used but 1-based indexing is needed to allow
+            # Note: The first of these is never used but 1-based indexing is needed to allow
             # broadcasting.
             dLdx = @variable(opt_model, [1:n_states, 1:T])
 
