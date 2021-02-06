@@ -140,7 +140,7 @@ end
 end
 
 @testset "Forward KKT Nash" begin
-    global kkt_solution, kkt_model = solve_game(
+    global kkt_converged, kkt_solution, kkt_model = solve_game(
         KKTGameSolver(),
         control_system,
         player_cost_models,
@@ -148,6 +148,8 @@ end
         T;
         solver = Ipopt.Optimizer,
     )
+
+    @test kkt_converged
 
     visualize_trajectory(control_system, kkt_solution.x)
 
@@ -162,7 +164,7 @@ end
 
 # TODO: robustify
 @testset "Inverse KKT Nash" begin
-    global inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+    global converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
         InverseKKTConstraintSolver(),
         ibr_solution.x;
         init = (; ibr_solution.u),
@@ -171,7 +173,7 @@ end
         player_cost_models,
         max_observation_error = 0.1,
     )
-
+    @test converged
     for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
         TestUtils.test_inverse_solution(weights, cost_model.weights)
     end
@@ -185,7 +187,7 @@ end
 
 # TODO: does not reliably converge yet
 @test_broken false && begin
-    inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights =
+    converged, inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights =
         solve_inverse_game(
             InverseIBRSolver(),
             ibr_solution.x;
@@ -194,4 +196,5 @@ end
             player_cost_models,
             u_init = ibr_solution.u,
         )
+    @test converged
 end

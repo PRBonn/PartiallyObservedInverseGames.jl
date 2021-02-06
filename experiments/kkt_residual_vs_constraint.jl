@@ -77,9 +77,9 @@ end
 # In this case we need to think about how to visualize the data in a meaningful way.
 
 if recreate_dataset || !isdefined(Main, :dataset)
-    forward_solution_gt, forward_opt_model_gt =
+    converged, forward_solution_gt, forward_opt_model_gt =
         solve_game(KKTGameSolver(), control_system, player_cost_models_gt, x0, T;)
-    # TODO check that the forward thing converged.
+    @assert converged
     dataset = generate_observations(forward_solution_gt.x, forward_solution_gt.u)
 end
 
@@ -87,7 +87,7 @@ if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, 
     estimates_conKKT = @showprogress map(dataset) do d
         observation_model = (; d.σ, expected_observation = identity)
 
-        estimate, opt_model = solve_inverse_game(
+        converged, estimate, opt_model = solve_inverse_game(
             InverseKKTConstraintSolver(),
             d.x;
             control_system,
@@ -96,14 +96,13 @@ if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, 
             solver_attributes = (; print_level = 1),
             # NOTE: right now this does not use the u information for initialization.
         )
+        @assert converged
 
         estimate
     end
 
     estimates_resKKT = @showprogress map(dataset) do d
-        observation_model = (; d.σ, expected_observation = identity)
-
-        estimate, opt_model = solve_inverse_game(
+        converged, estimate, opt_model = solve_inverse_game(
             InverseKKTResidualSolver(),
             d.x,
             d.u;
@@ -111,6 +110,7 @@ if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, 
             player_cost_models_gt,
             solver_attributes = (; print_level = 1),
         )
+        @assert converged
 
         estimate
     end
@@ -126,7 +126,7 @@ if recreate_forward_solutions || !isdefined(Main, :augmented_estimtes_resKKT)
                 merge(cost_model_gt, (; weights))
             end
         # solve the forward game at this point
-        forward_solution, forward_opt_model = solve_game(
+        converged, forward_solution, forward_opt_model = solve_game(
             KKTGameSolver(),
             control_system,
             player_cost_models_est,
@@ -136,7 +136,7 @@ if recreate_forward_solutions || !isdefined(Main, :augmented_estimtes_resKKT)
             # equilequilibrium
             init = (; forward_solution_gt.x, forward_solution_gt.u),
         )
-        # TODO check this this converges
+        @assert converged
         merge(estimate, (; forward_solution.x, forward_solution.u))
     end
 end
@@ -167,7 +167,7 @@ function error_statistics(estimate, observation; demo_gt, estimator_name)
             @assert sum(weights_est) ≈ 1
             map(
                 CostUtils.normalize(cost_model_gt.weights),
-                CostUtils.namedtuple(weights_est),
+                weights_est,
             ) do weight_gt, weight_est
                 abs(weight_gt - weight_est) / weight_gt
             end |> Statistics.mean

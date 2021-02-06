@@ -52,7 +52,7 @@ end
     end
 
     @testset "KKT" begin
-        global kkt_solution, kkt_model = solve_game(
+        global kkt_converged, kkt_solution, kkt_model = solve_game(
             KKTGameSolver(),
             control_system,
             player_cost_models,
@@ -60,6 +60,8 @@ end
             T;
             init = ibr_solution,
         )
+
+        @test kkt_converged
     end
 end
 
@@ -68,13 +70,15 @@ end
         observation_model = (; σ = 0, expected_observation = identity)
 
         @testset "Inverse KKT Constraints" begin
-            inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+            converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
                 InverseKKTConstraintSolver(),
                 kkt_solution.x;
                 control_system,
                 observation_model,
                 player_cost_models,
             )
+
+            @test converged
 
             for (cost_model, weights) in
                 zip(player_cost_models, inverse_kkt_solution.player_weights)
@@ -90,13 +94,15 @@ end
         end
 
         @testset "Invsere KKT Residuals" begin
-            inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+            converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
                 InverseKKTResidualSolver(),
                 kkt_solution.x,
                 kkt_solution.u;
                 control_system,
                 player_cost_models,
             )
+
+            @test converged
 
             for (cost_model, weights) in
                 zip(player_cost_models, inverse_kkt_solution.player_weights)
@@ -116,13 +122,15 @@ end
         observation_model = (; σ = 0.01, expected_observation = identity)
         y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
 
-        inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+        converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
             InverseKKTConstraintSolver(),
             y_obs;
             control_system,
             observation_model,
             player_cost_models,
         )
+
+        @test converged
 
         TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
     end
@@ -131,7 +139,7 @@ end
         observation_model = (; σ = 0.0, expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :])
         y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
 
-        inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+        converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
             InverseKKTConstraintSolver(),
             y_obs;
             control_system,
@@ -140,6 +148,8 @@ end
             init_with_observation = true,
             max_observation_error = 0.1,
         )
+
+        @test converged
 
         TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
     end
@@ -148,7 +158,7 @@ end
         observation_model = (; σ = 0.01, expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :])
         y_obs = TestUtils.noisy_observation(observation_model, kkt_solution.x)
 
-        inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+        converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
             InverseKKTConstraintSolver(),
             y_obs;
             control_system,
@@ -157,6 +167,8 @@ end
             init_with_observation = true,
             max_observation_error = 0.1,
         )
+
+        @test converged
 
         TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
     end

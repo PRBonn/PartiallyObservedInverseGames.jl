@@ -121,7 +121,7 @@ function solve_game(
     end
 
     @time JuMP.optimize!(opt_model)
-    JuMPUtils.get_values(; x, u, λ), opt_model
+    JuMPUtils.isconverged(opt_model), JuMPUtils.get_values(; x, u, λ), opt_model
 end
 
 end
