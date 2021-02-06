@@ -84,7 +84,7 @@ if recreate_dataset || !isdefined(Main, :dataset)
 end
 
 if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, :estimates_resKKT)
-    estimates_conKKT = @showprogress map(dataset) do d
+    estimates_conKKT = @showprogress map(enumerate(dataset)) do (ii, d)
         observation_model = (; d.σ, expected_observation = identity)
 
         converged, estimate, opt_model = solve_inverse_game(
@@ -92,34 +92,34 @@ if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, 
             d.x;
             control_system,
             observation_model,
-            player_cost_models_gt,
+            player_cost_models = player_cost_models_gt,
             solver_attributes = (; print_level = 1),
             # NOTE: right now this does not use the u information for initialization.
         )
-        @assert converged
+        converged || @warn "conKKT did not converge on observation $ii."
 
-        estimate
+        merge(estimate, (; converged))
     end
 
-    estimates_resKKT = @showprogress map(dataset) do d
+    estimates_resKKT = @showprogress map(enumerate(dataset)) do (ii, d)
         converged, estimate, opt_model = solve_inverse_game(
             InverseKKTResidualSolver(),
             d.x,
             d.u;
             control_system,
-            player_cost_models_gt,
+            player_cost_models = player_cost_models_gt,
             solver_attributes = (; print_level = 1),
         )
-        @assert converged
+        converged || @warn "resKKT did not converge on observation $ii."
 
-        estimate
+        merge(estimate, (; converged))
     end
 end
 
 #======== Augment KKT Residual Solution with State and Input Estimate via Forward Solution =========#
 
 if recreate_forward_solutions || !isdefined(Main, :augmented_estimtes_resKKT)
-    augmented_estimtes_resKKT = map(estimates_resKKT) do estimate
+    augmented_estimtes_resKKT = @showprogress map(enumerate(estimates_resKKT)) do (ii, estimate)
         # overwrite the weights of the ground truth model with the weights of the estimate.
         player_cost_models_est =
             map(player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights
@@ -134,10 +134,12 @@ if recreate_forward_solutions || !isdefined(Main, :augmented_estimtes_resKKT)
             T;
             # Init with forward_solution_gt trajectory to make sure we are recoving the correct
             # equilequilibrium
-            init = (; forward_solution_gt.x, forward_solution_gt.u),
+            init = (; forward_solution_gt.x),
+            solver_attributes = (; print_level = 1),
         )
-        @assert converged
-        merge(estimate, (; forward_solution.x, forward_solution.u))
+        converged || @warn "Forward KKT did not converge on observation $ii."
+
+        merge(estimate, (; forward_solution.x, forward_solution.u, converged))
     end
 end
 
@@ -147,11 +149,11 @@ end
 # messes with the units. But I'm not sure what would be a good projection then (we can't show all
 # combinations of dimensions. There are too many).
 
-function error_statistics(estimates::AbstractVector, observations::AbstractVector; kwargs...)
-    map((args...) -> error_statistics(args...; kwargs...), estimates, observations)
+function estimator_statistics(estimates::AbstractVector, observations::AbstractVector; kwargs...)
+    map((args...) -> estimator_statistics(args...; kwargs...), estimates, observations)
 end
 
-function error_statistics(estimate, observation; demo_gt, estimator_name)
+function estimator_statistics(estimate, observation; demo_gt, estimator_name)
     mean_abs_err_x_obs = Statistics.mean(abs.(demo_gt.x - observation.x))
     mean_abs_err_u_obs = Statistics.mean(abs.(demo_gt.u - observation.u))
     mean_abs_err_pos_obs =
@@ -165,16 +167,14 @@ function error_statistics(estimate, observation; demo_gt, estimator_name)
     mean_rel_weight_err =
         map(demo_gt.player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
             @assert sum(weights_est) ≈ 1
-            map(
-                CostUtils.normalize(cost_model_gt.weights),
-                weights_est,
-            ) do weight_gt, weight_est
+            map(CostUtils.normalize(cost_model_gt.weights), weights_est) do weight_gt, weight_est
                 abs(weight_gt - weight_est) / weight_gt
             end |> Statistics.mean
         end |> Statistics.mean
 
     (;
         estimator_name,
+        estimate.converged,
         mean_abs_err_x_obs,
         mean_abs_err_u_obs,
         mean_abs_err_pos_obs,
@@ -187,9 +187,13 @@ end
 
 demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
 errstats_conKKT =
-    error_statistics(estimates_conKKT, dataset; demo_gt, estimator_name = "KKT Constraints")
-errstats_resKKT =
-    error_statistics(augmented_estimtes_resKKT, dataset; demo_gt, estimator_name = "KKT Residuals")
+    estimator_statistics(estimates_conKKT, dataset; demo_gt, estimator_name = "KKT Constraints")
+errstats_resKKT = estimator_statistics(
+    augmented_estimtes_resKKT,
+    dataset;
+    demo_gt,
+    estimator_name = "KKT Residuals",
+)
 
 #========================================== Visualization ==========================================#
 
@@ -200,17 +204,29 @@ parameter_error_visualizer = @vlplot(
     x = {:mean_abs_err_x_obs, title = "Mean Absolute State Observation Noise"},
     y = {:mean_rel_weight_err, title = "Mean Relative Parameter Error"},
     color = {:estimator_name, title = "Estimator"},
-    shape = {:estimator_name},
+    shape = {:estimator_name, title = "Estimator"},
+    fill = {
+        :converged,
+        title = "Forward Solution Converged",
+        type = "nominal",
+        scale = {scheme = "set1"},
+    },
     width = 700,
     height = 400,
 )
 
 position_error_visualizer = @vlplot(
-    mark = :point,
+    mark = {:point, size = 75},
     x = {:mean_abs_err_pos_obs, title = "Mean Absolute Postion Observation Error [m]"},
     y = {:mean_abs_err_pos_est, title = "Mean Absolute Position Prediction Error [m]"},
     color = {:estimator_name, title = "Estimator"},
-    shape = {:estimator_name},
+    shape = {:estimator_name, title = "Estimator"},
+    fill = {
+        :converged,
+        title = "Forward Solution Converged",
+        type = "nominal",
+        scale = {scheme = "set1"},
+    },
     width = 700,
     height = 400,
 )
