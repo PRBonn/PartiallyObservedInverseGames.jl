@@ -120,6 +120,7 @@ end
 
 #===================================== Statistical Evaluation ======================================#
 
+# TODO: Move all the error statistics computation into this function
 function error_statistics(ground_truth, observation, estimate)
     x_observation_error = (ground_truth.x - observation.x)
     u_observation_error = (ground_truth.u - observation.u)
@@ -208,27 +209,27 @@ errstats = vcat(
 #             solver_attributes = (; print_level = 3),
 #         )
 #         # TODO: check that the solver converged
-# 
+#
 #         forward_solution
 #     end
 # end
-# 
+#
 # forward_solutions_conKKT = estimates_conKKT
-# 
+#
 # function trajectory_error_stats(solutions, dataset, estimator_name)
 #     map(solutions, dataset) do solution, demo
-# 
+#
 #         function trajectory_error_stats(x_gt, x_sol)
 #             Statistics.mean(abs.(x_gt[1:2, :] - x_sol[1:2, :]))
 #         end
-# 
+#
 #         mean_abs_err_x_sol = trajectory_error_stats(forward_solution_gt.x, solution.x)
 #         mean_abs_err_x_obs = trajectory_error_stats(forward_solution_gt.x, demo.x)
-# 
+#
 #         (; mean_abs_err_x_sol, mean_abs_err_x_obs, estimator_name = estimator_name)
 #     end
 # end
-# 
+#
 # vcat(
 #     trajectory_error_stats(forward_solutions_conKKT, dataset, "KKT Constraints"),
 #     trajectory_error_stats(forward_solutions_resKKT, dataset, "KKT Residuals"),
@@ -241,4 +242,4 @@ errstats = vcat(
 #     width = 700,
 #     height = 400
 # )
-# 
+#
