@@ -27,8 +27,9 @@ control_system =
     TestDynamics.ProductSystem([TestDynamics.Unicycle(0.25), TestDynamics.Unicycle(0.25)])
 
 x0 = vcat([-1, 0, 0.1, 0 + deg2rad(10)], [0, -1, 0.1, pi / 2 + deg2rad(10)])
+position_indices = [1, 2, 5, 6] # TODO: for now just hard-coded
 T = 25
-player_cost_models = let
+player_cost_models_gt = let
     cost_model_p1 = CollisionAvoidanceGame.generate_player_cost_model(;
         T,
         state_indices = 1:4,
@@ -74,13 +75,10 @@ end
 # - initial conditions
 # - initialization of forward solver (i.e. different equilibria)
 # In this case we need to think about how to visualize the data in a meaningful way.
-#
-# TODO it would be nice if both solver had the same interface (i.e. the `InverseKKTConstraintSolver`
-# should allow to take an `u` as second argument. Maybe add a distpatch for that.)
 
 if recreate_dataset || !isdefined(Main, :dataset)
     forward_solution_gt, forward_opt_model_gt =
-        solve_game(KKTGameSolver(), control_system, player_cost_models, x0, T;)
+        solve_game(KKTGameSolver(), control_system, player_cost_models_gt, x0, T;)
     # TODO check that the forward thing converged.
     dataset = generate_observations(forward_solution_gt.x, forward_solution_gt.u)
 end
@@ -94,7 +92,7 @@ if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, 
             d.x;
             control_system,
             observation_model,
-            player_cost_models,
+            player_cost_models_gt,
             solver_attributes = (; print_level = 1),
             # NOTE: right now this does not use the u information for initialization.
         )
@@ -110,7 +108,7 @@ if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, 
             d.x,
             d.u;
             control_system,
-            player_cost_models,
+            player_cost_models_gt,
             solver_attributes = (; print_level = 1),
         )
 
@@ -118,128 +116,104 @@ if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, 
     end
 end
 
+#======== Augment KKT Residual Solution with State and Input Estimate via Forward Solution =========#
+
+if recreate_forward_solutions || !isdefined(Main, :augmented_estimtes_resKKT)
+    augmented_estimtes_resKKT = map(estimates_resKKT) do estimate
+        # overwrite the weights of the ground truth model with the weights of the estimate.
+        player_cost_models_est =
+            map(player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights
+                merge(cost_model_gt, (; weights))
+            end
+        # solve the forward game at this point
+        forward_solution, forward_opt_model = solve_game(
+            KKTGameSolver(),
+            control_system,
+            player_cost_models_est,
+            x0,
+            T;
+            # Init with forward_solution_gt trajectory to make sure we are recoving the correct
+            # equilequilibrium
+            init = (; forward_solution_gt.x, forward_solution_gt.u),
+        )
+        # TODO check this this converges
+        merge(estimate, (; forward_solution.x, forward_solution.u))
+    end
+end
+
 #===================================== Statistical Evaluation ======================================#
 
-# TODO: Move all the error statistics computation into this function
-function error_statistics(ground_truth, observation, estimate)
-    x_observation_error = (ground_truth.x - observation.x)
-    u_observation_error = (ground_truth.u - observation.u)
+# TODO: We may not want to average over different state, input, and parameter dimension because that
+# messes with the units. But I'm not sure what would be a good projection then (we can't show all
+# combinations of dimensions. There are too many).
 
-    player_weight_relerrors =
-        map(ground_truth.player_cost_models, estimate.player_weights) do cost_model_gt, weights_est
+function error_statistics(estimates::AbstractVector, observations::AbstractVector; kwargs...)
+    map((args...) -> error_statistics(args...; kwargs...), estimates, observations)
+end
+
+function error_statistics(estimate, observation; demo_gt, estimator_name)
+    mean_abs_err_x_obs = Statistics.mean(abs.(demo_gt.x - observation.x))
+    mean_abs_err_u_obs = Statistics.mean(abs.(demo_gt.u - observation.u))
+    mean_abs_err_pos_obs =
+        Statistics.mean(abs.(demo_gt.x[position_indices, :] - observation.x[position_indices, :]))
+
+    mean_abs_err_x_est = Statistics.mean(abs.(demo_gt.x - estimate.x))
+    mean_abs_err_u_est = Statistics.mean(abs.(demo_gt.u - estimate.u))
+    mean_abs_err_pos_est =
+        Statistics.mean(abs.(demo_gt.x[position_indices, :] - estimate.x[position_indices, :]))
+
+    mean_rel_weight_err =
+        map(demo_gt.player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
             @assert sum(weights_est) ≈ 1
             map(
-                (weight_gt, weight_est) -> abs(weight_gt - weight_est) / weight_gt,
                 CostUtils.normalize(cost_model_gt.weights),
                 CostUtils.namedtuple(weights_est),
-            )
-        end
-
-    # TODO: is this the right metric?
-    x_estimate_error =
-        hasproperty(estimate, :x) ? (ground_truth.x - estimate.x) : x_observation_error
-    u_estimate_error =
-        hasproperty(estimate, :u) ? (ground_truth.u - estimate.u) : u_observation_error
+            ) do weight_gt, weight_est
+                abs(weight_gt - weight_est) / weight_gt
+            end |> Statistics.mean
+        end |> Statistics.mean
 
     (;
-        x_observation_error,
-        u_observation_error,
-        player_weight_relerrors,
-        x_estimate_error,
-        u_estimate_error,
+        estimator_name,
+        mean_abs_err_x_obs,
+        mean_abs_err_u_obs,
+        mean_abs_err_pos_obs,
+        mean_abs_err_x_est,
+        mean_abs_err_u_est,
+        mean_abs_err_pos_est,
+        mean_rel_weight_err,
     )
 end
 
-# TODO: continue here
-ground_truth = merge((; player_cost_models), forward_solution_gt)
-errstats_conKKT = map(estimates_conKKT, dataset) do estimate, observation
-    error_statistics(ground_truth, observation, estimate)
-end
-errstats_resKKT = map(estimates_resKKT, dataset) do estimate, observation
-    error_statistics(ground_truth, observation, estimate)
-end
+demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
+errstats_conKKT =
+    error_statistics(estimates_conKKT, dataset; demo_gt, estimator_name = "KKT Constraints")
+errstats_resKKT =
+    error_statistics(augmented_estimtes_resKKT, dataset; demo_gt, estimator_name = "KKT Residuals")
 
 #========================================== Visualization ==========================================#
 
-using Query: @map
 import ElectronDisplay
-
-# TODO: may do not average over different state, input, and parameter dimension because that messes
-# with the units. But I'm not sure what would be a good projection then (we can't show all
-# combinations of dimensions. There are too many).
-summarize_stats = @map({
-    mean_abs_err_x_obs = Statistics.mean(abs.(_.x_observation_error)),
-    mean_abs_err_u_obs = Statistics.mean(abs.(_.u_observation_error)),
-    mean_abs_err_x_est = Statistics.mean(abs.(_.x_estimate_error)),
-    mean_abs_err_u_est = Statistics.mean(abs.(_.u_estimate_error)),
-    mean_rel_weight_err = Statistics.mean(Statistics.mean.(_.player_weight_relerrors)),
-})
 
 parameter_error_visualizer = @vlplot(
     mark = :point,
     x = {:mean_abs_err_x_obs, title = "Mean Absolute State Observation Noise"},
     y = {:mean_rel_weight_err, title = "Mean Relative Parameter Error"},
-    color = :Estimator,
-    shape = :Estimator,
+    color = {:estimator_name, title = "Estimator"},
+    shape = {:estimator_name},
     width = 700,
-    height = 400
+    height = 400,
 )
 
-errstats = vcat(
-    errstats_conKKT |> summarize_stats |> @map({_..., Estimator = "KKT Constraints"}) |> collect,
-    errstats_resKKT |> summarize_stats |> @map({_..., Estimator = "KKT Residuals"}) |> collect,
-) |> parameter_error_visualizer
+position_error_visualizer = @vlplot(
+    mark = :point,
+    x = {:mean_abs_err_pos_obs, title = "Mean Absolute Postion Observation Error [m]"},
+    y = {:mean_abs_err_pos_est, title = "Mean Absolute Position Prediction Error [m]"},
+    color = {:estimator_name, title = "Estimator"},
+    shape = {:estimator_name},
+    width = 700,
+    height = 400,
+)
 
-# TODO: Augment the KKT residual estimates with solutions (essentially their x estimate) and
-# visualize the error.
-
-# if !isdefined(Main, :forward_solutions_resKKT) || recreate_forward_solutions
-#     forward_solutions_resKKT = @showprogress map(estimates_resKKT) do estimate
-#         forward_solution, forward_opt_model = solve_game(
-#             KKTGameSolver(),
-#             control_system,
-#             map(
-#                 (cost_model_gt, weights) -> merge(cost_model_gt, (; weights)),
-#                 player_cost_models,
-#                 estimate.player_weights,
-#             ),
-#             x0,
-#             T;
-#             init = forward_solution_gt,
-#             solver_attributes = (; print_level = 3),
-#         )
-#         # TODO: check that the solver converged
-#
-#         forward_solution
-#     end
-# end
-#
-# forward_solutions_conKKT = estimates_conKKT
-#
-# function trajectory_error_stats(solutions, dataset, estimator_name)
-#     map(solutions, dataset) do solution, demo
-#
-#         function trajectory_error_stats(x_gt, x_sol)
-#             Statistics.mean(abs.(x_gt[1:2, :] - x_sol[1:2, :]))
-#         end
-#
-#         mean_abs_err_x_sol = trajectory_error_stats(forward_solution_gt.x, solution.x)
-#         mean_abs_err_x_obs = trajectory_error_stats(forward_solution_gt.x, demo.x)
-#
-#         (; mean_abs_err_x_sol, mean_abs_err_x_obs, estimator_name = estimator_name)
-#     end
-# end
-#
-# vcat(
-#     trajectory_error_stats(forward_solutions_conKKT, dataset, "KKT Constraints"),
-#     trajectory_error_stats(forward_solutions_resKKT, dataset, "KKT Residuals"),
-# ) |> @vlplot(
-#     mark = :point,
-#     x = :mean_abs_err_x_obs,
-#     y = :mean_abs_err_x_sol,
-#     color = :estimator_name,
-#     shape = :estimator_name,
-#     width = 700,
-#     height = 400
-# )
-#
+errstats = [errstats_conKKT; errstats_resKKT]
+errstats |> position_error_visualizer
