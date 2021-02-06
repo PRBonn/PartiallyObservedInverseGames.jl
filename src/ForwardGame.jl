@@ -25,6 +25,7 @@ function solve_game(
     inner_solver_kwargs = (),
     max_ibr_rounds = 10,
     ibr_convergence_tolerance = 0.01,
+    verbose = false,
 )
     @unpack n_states, n_controls = control_system
     n_players = length(player_cost_models)
@@ -54,7 +55,7 @@ function solve_game(
         last_ibr_solution = last_player_solution
 
         if converged
-            @info "Converged at ibr iterate: $i_ibr"
+            verbose && @info "Converged at ibr iterate: $i_ibr"
             break
         end
     end
@@ -77,6 +78,7 @@ function solve_game(
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
     init = (),
+    verbose = false,
 )
 
     n_players = length(player_cost_models)
@@ -120,7 +122,9 @@ function solve_game(
         @constraint(opt_model, dJ.du[player_inputs, T] .== 0)
     end
 
-    @time JuMP.optimize!(opt_model)
+    time = @elapsed JuMP.optimize!(opt_model)
+    verbose && @info time
+
     JuMPUtils.isconverged(opt_model), JuMPUtils.get_values(; x, u, λ), opt_model
 end
 
