@@ -134,13 +134,14 @@ function test_unicycle_multipliers(system, λ, x, u; player_cost_models)
 end
 
 @testset "Forward IBR" begin
-    global ibr_converged, ibr_solution, ibr_models =
+    ibr_converged, ibr_solution, ibr_models =
         solve_game(IBRGameSolver(), control_system, player_cost_models, x0, T)
+    global ibr_solution
     @test ibr_converged
 end
 
 @testset "Forward KKT Nash" begin
-    global kkt_converged, kkt_solution, kkt_model = solve_game(
+    kkt_converged, kkt_solution, kkt_model = solve_game(
         KKTGameSolver(),
         control_system,
         player_cost_models,
@@ -148,6 +149,7 @@ end
         T;
         solver = Ipopt.Optimizer,
     )
+    global kkt_solution
 
     @test kkt_converged
 
@@ -164,7 +166,7 @@ end
 
 # TODO: robustify
 @testset "Inverse KKT Nash" begin
-    global converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
+    converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
         InverseKKTConstraintSolver(),
         ibr_solution.x;
         init = (; ibr_solution.u),
@@ -173,6 +175,8 @@ end
         player_cost_models,
         max_observation_error = 0.1,
     )
+    global inverse_kkt_solution
+
     @test converged
     for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
         TestUtils.test_inverse_solution(weights, cost_model.weights)
