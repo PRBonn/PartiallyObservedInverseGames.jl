@@ -138,7 +138,7 @@ function error_statistics(ground_truth, observation, estimate)
     x_estimate_error =
         hasproperty(estimate, :x) ? (ground_truth.x - estimate.x) : x_observation_error
     u_estimate_error =
-        hasproperty(estimate, :u) ? (ground_truth.x - estimate.x) : u_observation_error
+        hasproperty(estimate, :u) ? (ground_truth.u - estimate.u) : u_observation_error
 
     (;
         x_observation_error,
