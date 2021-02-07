@@ -22,15 +22,16 @@ function solve_game(
     player_cost_models,
     x0,
     T;
-    inner_solver_kwargs = (),
+    init = (; x = zeros(control_system.n_states, T), u = zeros(control_system.n_controls, T)),
     max_ibr_rounds = 10,
     ibr_convergence_tolerance = 0.01,
     verbose = false,
+    inner_solver_kwargs...,
 )
     @unpack n_states, n_controls = control_system
     n_players = length(player_cost_models)
 
-    last_ibr_solution = (; x = zeros(n_states, T), u = zeros(n_controls, T))
+    last_ibr_solution = init
     last_player_solution = last_ibr_solution
     player_opt_models = resize!(JuMP.Model[], n_players)
     converged = false
@@ -46,6 +47,7 @@ function solve_game(
                     fixed_inputs = filter(i -> i ∉ player_cost_model.player_inputs, 1:n_controls),
                     init = last_player_solution,
                     inner_solver_kwargs...,
+                    verbose,
                 )
         end
 

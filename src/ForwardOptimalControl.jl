@@ -59,6 +59,7 @@ function solve_optimal_control(
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
+    verbose = false,
 )
     @unpack n_states, n_controls = control_system
 
@@ -81,7 +82,9 @@ function solve_optimal_control(
     DynamicsModelInterface.add_dynamics_constraints!(control_system, opt_model, x, u)
     @constraint(opt_model, x[:, 1] .== x0)
     cost_model.add_objective!(opt_model, x, u; cost_model.weights)
-    @time JuMP.optimize!(opt_model)
+    time = @elapsed JuMP.optimize!(opt_model)
+    verbose && @info time
+
     JuMPUtils.get_values(; x, u), opt_model
 end
 

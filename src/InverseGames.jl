@@ -27,10 +27,10 @@ function solve_inverse_game(
     player_cost_models,
     # TODO: dirty hack
     u_init = nothing,
-    inner_solver_kwargs = (),
     max_ibr_rounds = 5,
     ibr_convergence_tolerance = 0.01,
     verbose = false,
+    inner_solver_kwargs...
 )
     @unpack n_controls = control_system
     n_players = length(player_cost_models)
@@ -64,6 +64,7 @@ function solve_inverse_game(
                         λ = last_player_solution.λ,
                     ),
                     inner_solver_kwargs...,
+                    verbose,
                 )
 
             player_weights[player_idx] = last_player_solution.weights
