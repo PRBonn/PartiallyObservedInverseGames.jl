@@ -7,7 +7,7 @@ import CollisionAvoidanceGame
 import TestDynamics
 import JuMPOptimalControl.CostUtils
 using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
-using JuMPOptimalControl.ForwardGame: KKTGameSolver, solve_game
+using JuMPOptimalControl.ForwardGame: IBRGameSolver, solve_game
 using JuMPOptimalControl.InverseGames:
     InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
@@ -77,12 +77,12 @@ end
 
 if recreate_dataset || !isdefined(Main, :dataset)
     converged, forward_solution_gt, forward_opt_model_gt =
-        solve_game(KKTGameSolver(), control_system, player_cost_models_gt, x0, T;)
+        solve_game(IBRGameSolver(), control_system, player_cost_models_gt, x0, T;)
     @assert converged
     dataset = generate_observations(forward_solution_gt.x, forward_solution_gt.u)
 end
 
-if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, :estimates_resKKT)
+if rerun_conKKT_estimation || !isdefined(Main, :estimates_conKKT)
     estimates_conKKT = @showprogress map(enumerate(dataset)) do (ii, d)
         observation_model = (; d.σ, expected_observation = identity)
 
@@ -99,7 +99,9 @@ if rerun_experiments || !isdefined(Main, :estimates_conKKT) || !isdefined(Main, 
 
         merge(estimate, (; converged))
     end
+end
 
+if rerun_resKKT_estimation || !isdefined(Main, :estimates_resKKT)
     estimates_resKKT = @showprogress map(enumerate(dataset)) do (ii, d)
         converged, estimate, opt_model = solve_inverse_game(
             InverseKKTResidualSolver(),
@@ -126,16 +128,17 @@ if recreate_forward_solutions || !isdefined(Main, :augmented_estimtes_resKKT)
             end
         # solve the forward game at this point
         converged, forward_solution, forward_opt_model = solve_game(
-            KKTGameSolver(),
+            IBRGameSolver(),
             control_system,
             player_cost_models_est,
             x0,
             T;
             # Init with forward_solution_gt trajectory to make sure we are recoving the correct
             # equilequilibrium
-            init = (; forward_solution_gt.x),
+            init = (; forward_solution_gt.x, forward_solution_gt.u),
             solver_attributes = (; print_level = 1),
         )
+
         converged || @warn "Forward KKT did not converge on observation $ii."
 
         merge(estimate, (; forward_solution.x, forward_solution.u, converged))
