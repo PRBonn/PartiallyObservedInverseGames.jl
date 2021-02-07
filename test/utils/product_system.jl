@@ -13,7 +13,6 @@ function Base.getproperty(system::ProductSystem, sym::Symbol)
     end
 end
 
-# TODO: Implement DynamicsModelInterface.visualize_trajectory
 function DynamicsModelInterface.visualize_trajectory(
     system::ProductSystem,
     x;
@@ -49,9 +48,9 @@ function DynamicsModelInterface.add_dynamics_constraints!(system::ProductSystem,
     end
 end
 
-# TODO: dirty hack. Minor type piracy to patch https://github.com/JuliaLang/julia/pull/36222 in
-# Julia 1.5.3. This won't be necessary starting from Julia 1.6.
-if VERSION < v"1.6"
+# Minor type piracy to patch https://github.com/JuliaLang/julia/pull/36222 in Julia 1.5.3. This
+# won't be necessary starting from Julia 1.6.0-beta1.
+if VERSION < v"1.6.0-"
     @inline function Base._cat_t(dims, T::Type{<:JuMP.GenericAffExpr}, X...)
         catdims = Base.dims2cat(dims)
         shape = Base.cat_shape(catdims, (), map(Base.cat_size, X)...)
