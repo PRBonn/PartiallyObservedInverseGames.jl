@@ -52,7 +52,23 @@ end
 function generate_observations(
     x,
     u;
-    noise_levels = [0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1],
+    noise_levels = [
+        0,
+        0.001,
+        0.0025,
+        0.005,
+        0.0075,
+        0.01,
+        0.02,
+        0.03,
+        0.04,
+        0.05,
+        0.06,
+        0.07,
+        0.08,
+        0.09,
+        0.1,
+    ],
     n_trajectory_samples_per_noise_level = 10,
     rng = Random.MersenneTwister(1),
 )
