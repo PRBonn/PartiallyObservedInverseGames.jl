@@ -2,7 +2,6 @@ unique!(push!(LOAD_PATH, realpath(joinpath(@__DIR__, "../test/utils"))))
 
 import Random
 import Statistics
-import Query
 
 import CollisionAvoidanceGame
 import TestDynamics
