@@ -2,6 +2,9 @@ unique!(push!(LOAD_PATH, realpath(joinpath(@__DIR__, "../test/utils"))))
 
 import Random
 import Statistics
+import BSON
+import Glob
+import Dates
 
 import CollisionAvoidanceGame
 import TestDynamics
@@ -15,16 +18,42 @@ using ProgressMeter: @showprogress
 using VegaLite: @vlplot
 
 #=================================== Simple caching / memoization ==================================#
+# TODO: Maybe move this to a module.
 
-# NOTE: clear cache via `empty!(results_cache)`
-if !isdefined(Main, :results_cache)
-    results_cache = Dict()
+function clear_cache!()
+    empty!(results_cache)
 end
 
-function cached_get(f, cache_dict, key)
-    result = get(f, cache_dict, key)
-    cache_dict[key] = result
+function save_cache!()
+    save_path = joinpath(@__DIR__, "../data/results_cache-$(Dates.now(Dates.UTC)).bson")
+    @assert !isfile(save_path)
+    BSON.bson(save_path, results_cache)
+end
+
+function load_cache!()
+    result_cache_file_list = Glob.glob("results_cache-*.bson", joinpath(@__DIR__, "../data/"))
+    if isempty(result_cache_file_list)
+        false
+    else
+        global results_cache = BSON.load(last(result_cache_file_list))
+        true
+    end
+end
+
+function run_cached!(f, key)
+    result = get(f, results_cache, key)
+    results_cache[key] = result
     result
+end
+
+if !isdefined(Main, :results_cache)
+    cache_file_found = load_cache!()
+    if cache_file_found
+        @info "Loaded cached results from file!"
+    else
+        @info "No persisted results cache file found. Resuming with an emtpy cache."
+        global results_cache = Dict()
+    end
 end
 
 #==================================== Forward Game Formulation =====================================#
@@ -59,7 +88,7 @@ end
 function generate_dataset(
     solve_args = (IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     solve_kwargs = (; solver_attributes = (; print_level = 1)),
-    noise_levels = [0:0.002:0.01; 0.02:0.01:0.1 ;],
+    noise_levels = [0:0.002:0.01; 0.02:0.01:0.1],
     n_trajectory_samples_per_noise_level = 10,
     rng = Random.MersenneTwister(1),
 )
@@ -82,7 +111,7 @@ function generate_dataset(
     forward_solution_gt, dataset
 end
 
-forward_solution_gt, dataset = cached_get(results_cache, :forward_solution_gt_dataset) do
+forward_solution_gt, dataset = run_cached!(:forward_solution_gt_dataset) do
     generate_dataset()
 end
 
@@ -144,11 +173,11 @@ estimator_setup = (;
     solver_attributes = (; print_level = 1),
 )
 
-estimates_conKKT = cached_get(results_cache, :estimates_conKKT) do
+estimates_conKKT = run_cached!(:estimates_conKKT) do
     estimate(InverseKKTConstraintSolver(); estimator_setup...)
 end
 
-estimates_resKKT = cached_get(results_cache, :estimates_resKKT) do
+estimates_resKKT = run_cached!(:estimates_resKKT) do
     estimate(InverseKKTResidualSolver(); estimator_setup...)
 end
 
@@ -180,7 +209,7 @@ function augment_with_forward_solution(
     end
 end
 
-augmented_estimtes_resKKT = cached_get(results_cache, :augmented_estimtes_resKKT) do
+augmented_estimtes_resKKT = run_cached!(:augmented_estimtes_resKKT) do
     augment_with_forward_solution(
         estimates_resKKT;
         solver = IBRGameSolver(),
