@@ -234,4 +234,5 @@ position_error_visualizer = @vlplot(
 )
 
 errstats = [errstats_conKKT; errstats_resKKT]
-errstats |> position_error_visualizer
+
+errstats |> @vlplot() + [position_error_visualizer; parameter_error_visualizer]
