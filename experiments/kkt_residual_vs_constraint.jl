@@ -14,11 +14,18 @@ using JuMPOptimalControl.InverseGames:
 using ProgressMeter: @showprogress
 using VegaLite: @vlplot
 
-#========================================== Configuration ==========================================#
+#=================================== Simple caching / memoization ==================================#
 
-recreate_dataset = false
-rerun_experiments = false
-recreate_forward_solutions = false
+# NOTE: clear cache via `empty!(results_cache)`
+if !isdefined(Main, :results_cache)
+    results_cache = Dict()
+end
+
+function cached_get(f, cache_dict, key)
+    result = get(f, cache_dict, key)
+    cache_dict[key] = result
+    result
+end
 
 #==================================== Forward Game Formulation =====================================#
 
@@ -49,66 +56,57 @@ end
 
 # TODO: maybe allow for different noise levels per dimension (i.e. allow to pass covariance matrix
 # here.)
-function generate_observations(
-    x,
-    u;
-    noise_levels = [
-        0,
-        0.001,
-        0.0025,
-        0.005,
-        0.0075,
-        0.01,
-        0.02,
-        0.03,
-        0.04,
-        0.05,
-        0.06,
-        0.07,
-        0.08,
-        0.09,
-        0.1,
-    ],
+function generate_dataset(
+    solve_args = (IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
+    solve_kwargs = (; solver_attributes = (; print_level = 1)),
+    noise_levels = [0:0.002:0.01; 0.02:0.01:0.1 ;],
     n_trajectory_samples_per_noise_level = 10,
     rng = Random.MersenneTwister(1),
 )
+    converged_gt, forward_solution_gt, forward_opt_model_gt =
+        solve_game(solve_args...; solve_kwargs...)
+    @assert converged_gt
 
     # Note: reducing over inner loop to flatten the dataset
-    mapreduce(vcat, noise_levels) do σ
+    dataset = mapreduce(vcat, noise_levels) do σ
         n_samples = iszero(σ) ? 1 : n_trajectory_samples_per_noise_level
         observations = map(1:n_samples) do _
-            (; σ, x = x + σ * randn(rng, size(x)), u = u + σ * randn(rng, size(u)))
+            (;
+                σ,
+                x = forward_solution_gt.x + σ * randn(rng, size(forward_solution_gt.x)),
+                u = forward_solution_gt.u + σ * randn(rng, size(forward_solution_gt.u)),
+            )
         end
     end
+
+    forward_solution_gt, dataset
 end
 
-# TODO: Save the results data using something like JLD or BSON.
-# TODO: Run experiments in parallel and/or distributed fashion (Not sure whether we can have more
-# than one process talking to IPOPT on the same machine.)
-# TODO: For now consider only one true forward game. Later also consider varying:
-# - cost parameters of the observed system
-# - initial conditions
-# - initialization of forward solver (i.e. different equilibria)
-# In this case we need to think about how to visualize the data in a meaningful way.
-
-if recreate_dataset || !isdefined(Main, :dataset)
-    converged, forward_solution_gt, forward_opt_model_gt =
-        solve_game(IBRGameSolver(), control_system, player_cost_models_gt, x0, T;)
-    @assert converged
-    dataset = generate_observations(forward_solution_gt.x, forward_solution_gt.u)
+forward_solution_gt, dataset = cached_get(results_cache, :forward_solution_gt_dataset) do
+    generate_dataset()
 end
 
-if rerun_conKKT_estimation || !isdefined(Main, :estimates_conKKT)
-    estimates_conKKT = @showprogress map(enumerate(dataset)) do (ii, d)
+#========================================= Run estimators ==========================================#
+
+# TODO: code duplication could be reduced if both solvers supported the same interface
+function estimate(
+    solver::InverseKKTConstraintSolver;
+    dataset,
+    control_system,
+    player_cost_models,
+    solver_attributes,
+)
+
+    @showprogress map(enumerate(dataset)) do (ii, d)
         observation_model = (; d.σ, expected_observation = identity)
 
         converged, estimate, opt_model = solve_inverse_game(
-            InverseKKTConstraintSolver(),
+            solver,
             d.x;
             control_system,
             observation_model,
-            player_cost_models = player_cost_models_gt,
-            solver_attributes = (; print_level = 1),
+            player_cost_models,
+            solver_attributes,
             # NOTE: right now this does not use the u information for initialization.
         )
         converged || @warn "conKKT did not converge on observation $ii."
@@ -117,15 +115,21 @@ if rerun_conKKT_estimation || !isdefined(Main, :estimates_conKKT)
     end
 end
 
-if rerun_resKKT_estimation || !isdefined(Main, :estimates_resKKT)
-    estimates_resKKT = @showprogress map(enumerate(dataset)) do (ii, d)
+function estimate(
+    solver::InverseKKTResidualSolver;
+    dataset = dataset,
+    control_system = control_system,
+    player_cost_models = player_cost_models_gt,
+    solver_attributes = (; print_level = 1),
+)
+    @showprogress map(enumerate(dataset)) do (ii, d)
         converged, estimate, opt_model = solve_inverse_game(
-            InverseKKTResidualSolver(),
+            solver,
             d.x,
             d.u;
             control_system,
-            player_cost_models = player_cost_models_gt,
-            solver_attributes = (; print_level = 1),
+            player_cost_models,
+            solver_attributes,
         )
         converged || @warn "resKKT did not converge on observation $ii."
 
@@ -133,27 +137,42 @@ if rerun_resKKT_estimation || !isdefined(Main, :estimates_resKKT)
     end
 end
 
+estimator_setup = (;
+    dataset,
+    control_system,
+    player_cost_models = player_cost_models_gt,
+    solver_attributes = (; print_level = 1),
+)
+
+estimates_conKKT = cached_get(results_cache, :estimates_conKKT) do
+    estimate(InverseKKTConstraintSolver(); estimator_setup...)
+end
+
+estimates_resKKT = cached_get(results_cache, :estimates_resKKT) do
+    estimate(InverseKKTResidualSolver(); estimator_setup...)
+end
+
 #======== Augment KKT Residual Solution with State and Input Estimate via Forward Solution =========#
 
-if recreate_forward_solutions || !isdefined(Main, :augmented_estimtes_resKKT)
-    augmented_estimtes_resKKT = @showprogress map(enumerate(estimates_resKKT)) do (ii, estimate)
+function augment_with_forward_solution(
+    estimates;
+    solver,
+    control_system,
+    player_cost_models_gt,
+    x0,
+    T,
+    kwargs...,
+)
+    @showprogress map(enumerate(estimates)) do (ii, estimate)
         # overwrite the weights of the ground truth model with the weights of the estimate.
         player_cost_models_est =
             map(player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights
                 merge(cost_model_gt, (; weights))
             end
+
         # solve the forward game at this point
-        converged, forward_solution, forward_opt_model = solve_game(
-            IBRGameSolver(),
-            control_system,
-            player_cost_models_est,
-            x0,
-            T;
-            # Init with forward_solution_gt trajectory to make sure we are recoving the correct
-            # equilequilibrium
-            init = (; forward_solution_gt.x, forward_solution_gt.u),
-            solver_attributes = (; print_level = 1),
-        )
+        converged, forward_solution, forward_opt_model =
+            solve_game(solver, control_system, player_cost_models_est, x0, T; kwargs...)
 
         converged || @warn "Forward KKT did not converge on observation $ii."
 
@@ -161,11 +180,21 @@ if recreate_forward_solutions || !isdefined(Main, :augmented_estimtes_resKKT)
     end
 end
 
-#===================================== Statistical Evaluation ======================================#
+augmented_estimtes_resKKT = cached_get(results_cache, :augmented_estimtes_resKKT) do
+    augment_with_forward_solution(
+        estimates_resKKT;
+        solver = IBRGameSolver(),
+        control_system,
+        player_cost_models_gt,
+        x0,
+        T,
+        # Init with forward_solution_gt trajectory to make sure we are recoving the correct equilibrium
+        init = (; forward_solution_gt.x, forward_solution_gt.u),
+        solver_attributes = (; print_level = 1),
+    )
+end
 
-# TODO: We may not want to average over different state, input, and parameter dimension because that
-# messes with the units. But I'm not sure what would be a good projection then (we can't show all
-# combinations of dimensions. There are too many).
+#===================================== Statistical Evaluation ======================================#
 
 function estimator_statistics(estimates::AbstractVector, observations::AbstractVector; kwargs...)
     map((args...) -> estimator_statistics(args...; kwargs...), estimates, observations)
