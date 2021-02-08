@@ -5,6 +5,7 @@ import Statistics
 import BSON
 import Glob
 import Dates
+import LinearAlgebra
 
 import CollisionAvoidanceGame
 import TestDynamics
@@ -40,8 +41,8 @@ function load_cache!()
     end
 end
 
-function run_cached!(f, key)
-    result = get(f, results_cache, key)
+function run_cached!(f, key; force_run = false)
+    result = force_run ? f() : get(f, results_cache, key)
     results_cache[key] = result
     result
 end
