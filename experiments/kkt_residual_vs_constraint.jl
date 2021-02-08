@@ -275,6 +275,7 @@ function estimator_statistics(estimate, observation; demo_gt, estimator_name)
 
     (;
         estimator_name,
+        estimate.observation_idx,
         estimate.converged,
         mean_abs_err_x_obs,
         mean_abs_err_u_obs,
@@ -302,8 +303,9 @@ errstats_random =
 
 import ElectronDisplay
 
+# TODO: share more of the spec to avoid duplication.
 position_error_visualizer = @vlplot(
-    mark = {:point, size = 75},
+    mark = {:point, size = 75, tooltip = {content = "data"}},
     x = {:mean_abs_err_pos_obs, title = "Mean Absolute Postion Observation Error [m]"},
     y = {
         :mean_abs_err_pos_est,
@@ -312,32 +314,32 @@ position_error_visualizer = @vlplot(
     },
     color = {:estimator_name, title = "Estimator"},
     shape = {:estimator_name, title = "Estimator"},
-#    fill = {
-#        :converged,
-#        title = "Forward Solution Converged",
-#        type = "nominal",
-#        scale = {scheme = "set1"},
-#    },
+    fill = {
+        :converged,
+        title = "Trajectory Reconstructable",
+        type = "nominal",
+        scale = {range = ["bisque", "red"]},
+    },
     width = 700,
     height = 400,
 )
 
 parameter_error_visualizer = @vlplot(
-    mark = :point,
+    mark = {:point, size = 75, tooltip = {content = "data"}},
     x = {:mean_abs_err_x_obs, title = "Mean Absolute State Observation Noise"},
     y = {:mean_rel_weight_err, title = "Mean Relative Parameter Error"},
     color = {:estimator_name, title = "Estimator"},
     shape = {:estimator_name, title = "Estimator"},
-#    fill = {
-#        :converged,
-#        title = "Forward Solution Converged",
-#        type = "nominal",
-#        scale = {scheme = "set1"},
-#    },
+    fill = {
+        :converged,
+        title = "Trajectory Reconstructable",
+        type = "nominal",
+        scale = {domain = ["true", "false"], range = ["green", "red"]},
+    },
     width = 700,
     height = 400,
 )
 
-errstats = [errstats_conKKT; errstats_resKKT; errstats_random]
+errstats = [errstats_conKKT; errstats_resKKT]
 
 errstats |> @vlplot() + [position_error_visualizer; parameter_error_visualizer]
