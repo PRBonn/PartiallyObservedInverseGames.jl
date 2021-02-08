@@ -80,6 +80,7 @@ function solve_game(
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
     init = (),
+    match_equilibrium = nothing,
     verbose = false,
 )
 
@@ -122,6 +123,14 @@ function solve_game(
             dJ.du[player_inputs, t] - (λ[:, t, player_idx]' * df.du[:, player_inputs, t])' .== 0
         )
         @constraint(opt_model, dJ.du[player_inputs, T] .== 0)
+    end
+
+    if !isnothing(match_equilibrium)
+        @objective(
+            opt_model,
+            Min,
+            sum(el -> el^2, x - match_equilibrium.x)
+        )
     end
 
     time = @elapsed JuMP.optimize!(opt_model)
