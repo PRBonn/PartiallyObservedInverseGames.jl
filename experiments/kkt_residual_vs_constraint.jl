@@ -167,6 +167,21 @@ function estimate(
     end
 end
 
+struct RandomEstimator end
+
+function estimate(::RandomEstimator; dataset, player_cost_models, kwargs...)
+    rng = Random.MersenneTwister(1)
+
+    map(dataset) do _
+        player_weights_random = map(player_cost_models) do cost_model
+            normalized_random_weights =
+                LinearAlgebra.normalize(rand(rng, length(cost_model.weights)), 1)
+            NamedTuple{keys(cost_model.weights)}(normalized_random_weights)
+        end
+        (; player_weights = player_weights_random, converged = true)
+    end
+end
+
 estimator_setup = (;
     dataset,
     control_system,
@@ -181,6 +196,8 @@ end
 estimates_resKKT = run_cached!(:estimates_resKKT) do
     estimate(InverseKKTResidualSolver(); estimator_setup...)
 end
+
+estimates_random = estimate(RandomEstimator(); estimator_setup...)
 
 #======== Augment KKT Residual Solution with State and Input Estimate via Forward Solution =========#
 
@@ -210,18 +227,24 @@ function augment_with_forward_solution(
     end
 end
 
+augmentor_kwargs = (;
+    solver = IBRGameSolver(),
+    control_system,
+    player_cost_models_gt,
+    x0,
+    T,
+    # TODO: Could use KKT forward solver with least-squares objective instead.
+    # Init with forward_solution_gt trajectory to make sure we are recoving the correct equilibrium
+    init = (; forward_solution_gt.x, forward_solution_gt.u),
+    solver_attributes = (; print_level = 1),
+)
+
 augmented_estimtes_resKKT = run_cached!(:augmented_estimtes_resKKT) do
-    augment_with_forward_solution(
-        estimates_resKKT;
-        solver = IBRGameSolver(),
-        control_system,
-        player_cost_models_gt,
-        x0,
-        T,
-        # Init with forward_solution_gt trajectory to make sure we are recoving the correct equilibrium
-        init = (; forward_solution_gt.x, forward_solution_gt.u),
-        solver_attributes = (; print_level = 1),
-    )
+    augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
+end
+
+augmented_estimtes_random = run_cached!(:augmented_estimtes_random) do
+    augment_with_forward_solution(estimates_random; augmentor_kwargs...)
 end
 
 #===================================== Statistical Evaluation ======================================#
@@ -271,10 +294,32 @@ errstats_resKKT = estimator_statistics(
     demo_gt,
     estimator_name = "KKT Residuals",
 )
+errstats_random =
+    estimator_statistics(augmented_estimtes_random, dataset; demo_gt, estimator_name = "Random")
 
 #========================================== Visualization ==========================================#
 
 import ElectronDisplay
+
+position_error_visualizer = @vlplot(
+    mark = {:point, size = 75},
+    x = {:mean_abs_err_pos_obs, title = "Mean Absolute Postion Observation Error [m]"},
+    y = {
+        :mean_abs_err_pos_est,
+        scale = {type = "symlog", constant = 0.01},
+        title = "Mean Absolute Position Prediction Error [m]",
+    },
+    color = {:estimator_name, title = "Estimator"},
+    shape = {:estimator_name, title = "Estimator"},
+#    fill = {
+#        :converged,
+#        title = "Forward Solution Converged",
+#        type = "nominal",
+#        scale = {scheme = "set1"},
+#    },
+    width = 700,
+    height = 400,
+)
 
 parameter_error_visualizer = @vlplot(
     mark = :point,
@@ -282,32 +327,16 @@ parameter_error_visualizer = @vlplot(
     y = {:mean_rel_weight_err, title = "Mean Relative Parameter Error"},
     color = {:estimator_name, title = "Estimator"},
     shape = {:estimator_name, title = "Estimator"},
-    fill = {
-        :converged,
-        title = "Forward Solution Converged",
-        type = "nominal",
-        scale = {scheme = "set1"},
-    },
+#    fill = {
+#        :converged,
+#        title = "Forward Solution Converged",
+#        type = "nominal",
+#        scale = {scheme = "set1"},
+#    },
     width = 700,
     height = 400,
 )
 
-position_error_visualizer = @vlplot(
-    mark = {:point, size = 75},
-    x = {:mean_abs_err_pos_obs, title = "Mean Absolute Postion Observation Error [m]"},
-    y = {:mean_abs_err_pos_est, title = "Mean Absolute Position Prediction Error [m]"},
-    color = {:estimator_name, title = "Estimator"},
-    shape = {:estimator_name, title = "Estimator"},
-    fill = {
-        :converged,
-        title = "Forward Solution Converged",
-        type = "nominal",
-        scale = {scheme = "set1"},
-    },
-    width = 700,
-    height = 400,
-)
-
-errstats = [errstats_conKKT; errstats_resKKT]
+errstats = [errstats_conKKT; errstats_resKKT; errstats_random]
 
 errstats |> @vlplot() + [position_error_visualizer; parameter_error_visualizer]
