@@ -221,20 +221,21 @@ function augment_with_forward_solution(
         converged, forward_solution, forward_opt_model =
             solve_game(solver, control_system, player_cost_models_est, x0, T; kwargs...)
 
-        converged || @warn "Forward KKT did not converge on observation $ii."
+        converged || @warn "Forward solution augmentation did not converge on observation $ii."
 
         merge(estimate, (; forward_solution.x, forward_solution.u, converged))
     end
 end
 
 augmentor_kwargs = (;
-    solver = IBRGameSolver(),
+    solver = KKTGameSolver(),
     control_system,
     player_cost_models_gt,
     x0,
     T,
     # TODO: Could use KKT forward solver with least-squares objective instead.
     # Init with forward_solution_gt trajectory to make sure we are recoving the correct equilibrium
+    match_equilibrium = (; forward_solution_gt.x),
     init = (; forward_solution_gt.x, forward_solution_gt.u),
     solver_attributes = (; print_level = 1),
 )
