@@ -11,7 +11,7 @@ import CollisionAvoidanceGame
 import TestDynamics
 import JuMPOptimalControl.CostUtils
 using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
-using JuMPOptimalControl.ForwardGame: IBRGameSolver, solve_game
+using JuMPOptimalControl.ForwardGame: KKTGameSolver, IBRGameSolver, solve_game
 using JuMPOptimalControl.InverseGames:
     InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
@@ -127,7 +127,7 @@ function estimate(
     solver_attributes,
 )
 
-    @showprogress map(enumerate(dataset)) do (ii, d)
+    @showprogress map(enumerate(dataset)) do (observation_idx, d)
         observation_model = (; d.σ, expected_observation = identity)
 
         converged, estimate, opt_model = solve_inverse_game(
@@ -139,9 +139,9 @@ function estimate(
             solver_attributes,
             # NOTE: right now this does not use the u information for initialization.
         )
-        converged || @warn "conKKT did not converge on observation $ii."
+        converged || @warn "conKKT did not converge on observation $observation_idx."
 
-        merge(estimate, (; converged))
+        merge(estimate, (; converged, observation_idx))
     end
 end
 
@@ -152,7 +152,7 @@ function estimate(
     player_cost_models = player_cost_models_gt,
     solver_attributes = (; print_level = 1),
 )
-    @showprogress map(enumerate(dataset)) do (ii, d)
+    @showprogress map(enumerate(dataset)) do (observation_idx, d)
         converged, estimate, opt_model = solve_inverse_game(
             solver,
             d.x,
@@ -161,9 +161,9 @@ function estimate(
             player_cost_models,
             solver_attributes,
         )
-        converged || @warn "resKKT did not converge on observation $ii."
+        converged || @warn "resKKT did not converge on observation $observation_idx."
 
-        merge(estimate, (; converged))
+        merge(estimate, (; converged, observation_idx))
     end
 end
 
@@ -172,13 +172,13 @@ struct RandomEstimator end
 function estimate(::RandomEstimator; dataset, player_cost_models, kwargs...)
     rng = Random.MersenneTwister(1)
 
-    map(dataset) do _
+    map(eachindex(dataset)) do observation_idx
         player_weights_random = map(player_cost_models) do cost_model
             normalized_random_weights =
                 LinearAlgebra.normalize(rand(rng, length(cost_model.weights)), 1)
             NamedTuple{keys(cost_model.weights)}(normalized_random_weights)
         end
-        (; player_weights = player_weights_random, converged = true)
+        (; player_weights = player_weights_random, converged = true, observation_idx)
     end
 end
 
