@@ -13,14 +13,13 @@ function generate_player_cost_model(;
     input_indices,
     goal_position,
     weights = (;
-        state_goal = 1,
         state_proximity = 1,
         state_velocity = 1,
         control_Δv = 1,
         control_Δθ = 1,
     ),
     cost_prescaling = (;
-        state_goal = 100,
+        state_goal = 100, # The state_goal weight is assumed to be fixed.
         state_proximity = 0.1,
         state_velocity = 1,
         control_Δv = 10,
@@ -67,7 +66,8 @@ function generate_player_cost_model(;
         @objective(
             opt_model,
             Min,
-            sum(weights[k] * cost_prescaling[k] * J̃[k] for k in keys(weights))
+            sum(weights[k] * cost_prescaling[k] * J̃[k] for k in keys(weights)) +
+            J̃.state_goal * cost_prescaling.state_goal * sum(weights) / length(weights)
         )
     end
 
@@ -109,10 +109,12 @@ function generate_player_cost_model(;
                 control_Δv = zeros(size(x_sub_ego)),
                 control_Δθ = zeros(size(x_sub_ego)),
             )
-            dJdx_sub = sum(
-                weights[k] * cost_prescaling[symbol(k)] * dJ̃dx_sub[symbol(k)]
-                for k in keys(weights)
-            )
+            dJdx_sub =
+                sum(
+                    weights[k] * cost_prescaling[symbol(k)] * dJ̃dx_sub[symbol(k)]
+                    for k in keys(weights)
+                ) +
+                dJ̃dx_sub.state_goal * cost_prescaling.state_goal * sum(weights) / length(weights)
             [
                 zeros(first(state_indices) - 1, T)
                 dJdx_sub
