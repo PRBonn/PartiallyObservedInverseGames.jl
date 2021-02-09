@@ -263,17 +263,17 @@ function estimator_statistics(
     trajectory_distance = Distances.meanad,
     parameter_distance = Distances.cosine_dist,
 )
-    mean_abs_err_x_obs = trajectory_distance(demo_gt.x, observation.x)
-    mean_abs_err_u_obs = trajectory_distance(demo_gt.u, observation.u)
-    mean_abs_err_pos_obs =
+    x_observation_error = trajectory_distance(demo_gt.x, observation.x)
+    u_observation_error = trajectory_distance(demo_gt.u, observation.u)
+    position_observation_error =
         trajectory_distance(demo_gt.x[position_indices, :], observation.x[position_indices, :])
 
-    mean_abs_err_x_est = trajectory_distance(demo_gt.x, estimate.x)
-    mean_abs_err_u_est = trajectory_distance(demo_gt.u, estimate.u)
-    mean_abs_err_pos_est =
+    x_estimation_error = trajectory_distance(demo_gt.x, estimate.x)
+    u_estimation_error = trajectory_distance(demo_gt.u, estimate.u)
+    position_estimation_error =
         trajectory_distance(demo_gt.x[position_indices, :], estimate.x[position_indices, :])
 
-    mean_rel_weight_err =
+    parameter_estimation_error =
         map(demo_gt.player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
             @assert sum(weights_est) ≈ 1
             parameter_distance(CostUtils.normalize(cost_model_gt.weights), weights_est)
@@ -283,13 +283,14 @@ function estimator_statistics(
         estimator_name,
         estimate.observation_idx,
         estimate.converged,
-        mean_abs_err_x_obs,
-        mean_abs_err_u_obs,
-        mean_abs_err_pos_obs,
-        mean_abs_err_x_est,
-        mean_abs_err_u_est,
-        mean_abs_err_pos_est,
-        mean_rel_weight_err,
+        observation.σ,
+        x_observation_error,
+        u_observation_error,
+        position_observation_error,
+        x_estimation_error,
+        u_estimation_error,
+        position_estimation_error,
+        parameter_estimation_error,
     )
 end
 
@@ -312,9 +313,9 @@ import ElectronDisplay
 # TODO: share more of the spec to avoid duplication.
 position_error_visualizer = @vlplot(
     mark = {:point, size = 75, tooltip = {content = "data"}},
-    x = {:mean_abs_err_pos_obs, title = "Mean Absolute Postion Observation Error [m]"},
+    x = {:position_observation_error, title = "Mean Absolute Postion Observation Error [m]"},
     y = {
-        :mean_abs_err_pos_est,
+        :position_estimation_error,
         scale = {type = "symlog", constant = 0.01},
         title = "Mean Absolute Position Prediction Error [m]",
     },
@@ -324,7 +325,7 @@ position_error_visualizer = @vlplot(
         :converged,
         title = "Trajectory Reconstructable",
         type = "nominal",
-        scale = {range = ["bisque", "red"]},
+        scale = {domain = [true, false], range = ["bisque", "tomato"]},
     },
     width = 700,
     height = 400,
@@ -332,20 +333,18 @@ position_error_visualizer = @vlplot(
 
 parameter_error_visualizer = @vlplot(
     mark = {:point, size = 75, tooltip = {content = "data"}},
-    x = {:mean_abs_err_x_obs, title = "Mean Absolute State Observation Noise"},
-    y = {:mean_rel_weight_err, title = "Mean Relative Parameter Error"},
+    x = {:position_observation_error, title = "Mean Absolute Postion Observation Error [m]"},
+    y = {:parameter_estimation_error, title = "Mean Parameter Cosine Error"},
     color = {:estimator_name, title = "Estimator"},
     shape = {:estimator_name, title = "Estimator"},
-    fill = {
-        :converged,
-        title = "Trajectory Reconstructable",
-        type = "nominal",
-        scale = {domain = ["true", "false"], range = ["green", "red"]},
-    },
     width = 700,
     height = 400,
 )
 
 errstats = [errstats_conKKT; errstats_resKKT]
 
-errstats |> @vlplot() + [position_error_visualizer; parameter_error_visualizer]
+errstats |>
+@vlplot() + [
+    position_error_visualizer
+    parameter_error_visualizer
+]
