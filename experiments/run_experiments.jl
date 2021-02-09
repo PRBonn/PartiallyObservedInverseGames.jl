@@ -50,7 +50,7 @@ end
 function generate_dataset(
     solve_args = (IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     solve_kwargs = (; solver_attributes = (; print_level = 1)),
-    noise_levels = [0:0.002:0.01; 0.02:0.01:0.1],
+    noise_levels = [0:0.002:0.015; 0.02:0.01:0.1],
     n_trajectory_samples_per_noise_level = 10,
     rng = Random.MersenneTwister(1),
 )
