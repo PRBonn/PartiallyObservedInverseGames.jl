@@ -19,11 +19,3 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
 VegaLite = "112f6efa-9a02-5b7d-90c0-432ed331239a"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
-
-[compat]
-Ipopt = "0.6"
-JuMP = "0.21"
-Plots = "1.10"
-UnPack = "1"
-Zygote = "0.6"
-julia = "1.5"
