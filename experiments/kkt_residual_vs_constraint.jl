@@ -6,6 +6,7 @@ import BSON
 import Glob
 import Dates
 import LinearAlgebra
+import Distances
 
 import CollisionAvoidanceGame
 import TestDynamics
@@ -254,23 +255,28 @@ function estimator_statistics(estimates::AbstractVector, observations::AbstractV
     map((args...) -> estimator_statistics(args...; kwargs...), estimates, observations)
 end
 
-function estimator_statistics(estimate, observation; demo_gt, estimator_name)
-    mean_abs_err_x_obs = Statistics.mean(abs.(demo_gt.x - observation.x))
-    mean_abs_err_u_obs = Statistics.mean(abs.(demo_gt.u - observation.u))
+function estimator_statistics(
+    estimate,
+    observation;
+    demo_gt,
+    estimator_name,
+    trajectory_distance = Distances.meanad,
+    parameter_distance = Distances.cosine_dist,
+)
+    mean_abs_err_x_obs = trajectory_distance(demo_gt.x, observation.x)
+    mean_abs_err_u_obs = trajectory_distance(demo_gt.u, observation.u)
     mean_abs_err_pos_obs =
-        Statistics.mean(abs.(demo_gt.x[position_indices, :] - observation.x[position_indices, :]))
+        trajectory_distance(demo_gt.x[position_indices, :], observation.x[position_indices, :])
 
-    mean_abs_err_x_est = Statistics.mean(abs.(demo_gt.x - estimate.x))
-    mean_abs_err_u_est = Statistics.mean(abs.(demo_gt.u - estimate.u))
+    mean_abs_err_x_est = trajectory_distance(demo_gt.x, estimate.x)
+    mean_abs_err_u_est = trajectory_distance(demo_gt.u, estimate.u)
     mean_abs_err_pos_est =
-        Statistics.mean(abs.(demo_gt.x[position_indices, :] - estimate.x[position_indices, :]))
+        trajectory_distance(demo_gt.x[position_indices, :], estimate.x[position_indices, :])
 
     mean_rel_weight_err =
         map(demo_gt.player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
             @assert sum(weights_est) ≈ 1
-            map(CostUtils.normalize(cost_model_gt.weights), weights_est) do weight_gt, weight_est
-                abs(weight_gt - weight_est) / weight_gt
-            end |> Statistics.mean
+            parameter_distance(CostUtils.normalize(cost_model_gt.weights), weights_est)
         end |> Statistics.mean
 
     (;
