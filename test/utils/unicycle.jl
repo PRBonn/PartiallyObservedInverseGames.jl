@@ -12,9 +12,12 @@ function Base.getproperty(system::Unicycle, sym::Symbol)
     end
 end
 
+#========================================== Visualization ==========================================#
+
 function DynamicsModelInterface.visualize_trajectory(
     system::Unicycle,
-    x;
+    x,
+    ::DynamicsModelInterface.PlotsBackend;
     canvas = Plots.plot(),
     kwargs...,
 )
@@ -31,6 +34,55 @@ function DynamicsModelInterface.visualize_trajectory(
         st = :quiver,
         kwargs...,
     )
+end
+
+function DynamicsModelInterface.visualize_trajectory(
+    system::Unicycle,
+    x,
+    ::DynamicsModelInterface.VegaLiteBackend;
+    canvas = VegaLite.@vlplot(),
+    domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
+    is_observation = false,
+    player,
+)
+
+    trajectory_table = [
+        (; px = xi[1], py = xi[2], v = xi[3], θ = xi[4], player, t)
+        for (t, xi) in enumerate(eachcol(x))
+    ]
+
+    trajectory_visualizer =
+        VegaLite.@vlplot(
+            encoding = {
+                x = {
+                    :px,
+                    type = :quantitative,
+                    scale = {domain = domain},
+                    title = "Position x [m]",
+                },
+                y = {
+                    :py,
+                    type = :quantitative,
+                    scale = {domain = domain},
+                    title = "Position y [m]",
+                },
+                angle = {
+                    :θ,
+                    type = :quantitative,
+                    scale = {domain = [pi, -pi], range = [-90, 270]},
+                },
+                order = :t,
+                color = {:player, title = "Player"},
+            }
+        ) + VegaLite.@vlplot(
+            mark = {:point, shape = :wedge, size = 400, clip = true, filled = !is_observation}
+        )
+
+    if !is_observation
+        trajectory_visualizer += VegaLite.@vlplot(mark = {:line})
+    end
+
+    trajectory_table |> trajectory_visualizer
 end
 
 # These constraints encode the dynamics of a unicycle with state layout x_t = [px, pyL, v, θ] and

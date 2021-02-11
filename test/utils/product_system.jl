@@ -15,15 +15,37 @@ end
 
 function DynamicsModelInterface.visualize_trajectory(
     system::ProductSystem,
-    x;
+    x,
+    backend::DynamicsModelInterface.PlotsBackend;
     canvas = Plots.plot(),
+    kwargs...,
 )
     for (subsystem_idx, subsystem) in enumerate(system.subsystems)
         @views x_sub = x[state_indices(system, subsystem_idx), :]
-        DynamicsModelInterface.visualize_trajectory(subsystem, x_sub; canvas)
+        DynamicsModelInterface.visualize_trajectory(subsystem, x_sub, backend; canvas, kwargs...)
     end
 
     canvas
+end
+
+function DynamicsModelInterface.visualize_trajectory(
+    system::ProductSystem,
+    x,
+    backend::DynamicsModelInterface.VegaLiteBackend;
+    canvas = VegaLite.@vlplot(),
+    kwargs...,
+)
+
+    mapreduce(+, enumerate(system.subsystems); init = canvas) do (ii, subsystem)
+        @views x_sub = x[state_indices(system, ii), :]
+        DynamicsModelInterface.visualize_trajectory(
+            subsystem,
+            x_sub,
+            backend;
+            player = "P$ii",
+            kwargs...,
+        )
+    end
 end
 
 "Returns an iterable of state indices for the `subsystem_idx`th subsystem."
