@@ -1,6 +1,7 @@
 module TestDynamics
 
 import Plots
+import VegaLite
 import JuMPOptimalControl.DynamicsModelInterface
 import JuMP
 using JuMP: @variable, @constraint, @NLconstraint
