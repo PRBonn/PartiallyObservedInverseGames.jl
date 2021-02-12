@@ -1,6 +1,6 @@
 using Test: @test, @testset
 
-using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
+using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
 using JuMPOptimalControl.InverseGames:
     InverseIBRSolver, InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game

@@ -8,7 +8,7 @@ import Distances
 import CollisionAvoidanceGame
 import TestDynamics
 import JuMPOptimalControl.CostUtils
-using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
+using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory
 using JuMPOptimalControl.ForwardGame: KKTGameSolver, IBRGameSolver, solve_game
 using JuMPOptimalControl.InverseGames:
     InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
@@ -46,7 +46,9 @@ end
 #======================================== Generate Dataset =========================================#
 
 # TODO: maybe allow for different noise levels per dimension (i.e. allow to pass covariance matrix
-# here.)
+# here.). But in that case, we would also need to weigh the different dimensions with the correct
+# information matrix in the KKT constraint approach.
+
 function generate_dataset(
     solve_args = (IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     solve_kwargs = (; solver_attributes = (; print_level = 1)),
