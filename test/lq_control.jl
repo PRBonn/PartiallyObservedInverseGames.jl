@@ -66,6 +66,6 @@ end
         @test Q_est[1, 1] / Q_est[2, 2] ≈ Q[1, 1] / Q[2, 2]
         @test Q_est[1, 1] / R_est[1, 1] ≈ Q[1, 1] / R[1, 1]
         @test Q_est[2, 2] / R_est[1, 1] ≈ Q[2, 2] / R[1, 1]
-        @test inverse_solution.x ≈ first(solve_lqr(A, B, Q_est, R_est, x0, T)).x
+        @test inverse_solution.x ≈ solve_lqr(A, B, Q_est, R_est, x0, T)[2].x
     end
 end
