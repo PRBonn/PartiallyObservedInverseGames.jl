@@ -8,7 +8,7 @@ import Distances
 import CollisionAvoidanceGame
 import TestDynamics
 import JuMPOptimalControl.CostUtils
-using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory
+using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory, visualize_trajectory_batch
 using JuMPOptimalControl.ForwardGame: KKTGameSolver, IBRGameSolver, solve_game
 using JuMPOptimalControl.InverseGames:
     InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
@@ -201,7 +201,7 @@ augmentor_kwargs = (;
     solver_attributes = (; print_level = 1),
 )
 
-augmented_estimtes_resKKT = run_cached!(:augmented_estimtes_resKKT) do
+augmented_estimates_resKKT = run_cached!(:augmented_estimates_resKKT) do
     augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
 end
 
@@ -258,7 +258,7 @@ demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
 errstats_conKKT =
     estimator_statistics(estimates_conKKT, dataset; demo_gt, estimator_name = "KKT Constraints")
 errstats_resKKT = estimator_statistics(
-    augmented_estimtes_resKKT,
+    augmented_estimates_resKKT,
     dataset;
     demo_gt,
     estimator_name = "KKT Residuals",
@@ -303,7 +303,15 @@ parameter_error_visualizer = @vlplot(
 
 errstats = [errstats_conKKT; errstats_resKKT]
 
-errstats |> @vlplot() + [
+errstats_visualization = errstats |> @vlplot() + [
     position_error_visualizer
     parameter_error_visualizer
 ]
+
+"Visualize all trajectory `estimates` along with the corresponding ground truth
+`forward_solution_gt`"
+function visualize_estimates(control_system, estimates, forward_solution_gt; only_converged = true)
+    position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
+    estimated_trajectory_batch = [e.x for e in estimates if e.converged || !only_converged]
+    visualize_trajectory_batch(control_system, estimated_trajectory_batch; position_domain)
+end

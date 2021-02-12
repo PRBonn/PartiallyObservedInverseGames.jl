@@ -100,7 +100,7 @@ function TrajectoryVisualization.visualize_trajectory(
     x,
     ::TrajectoryVisualization.VegaLiteBackend;
     canvas = VegaLite.@vlplot(),
-    domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
+    position_domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
     is_observation = false,
     player,
 )
@@ -116,13 +116,13 @@ function TrajectoryVisualization.visualize_trajectory(
                 x = {
                     :px,
                     type = :quantitative,
-                    scale = {domain = domain},
+                    scale = {domain = position_domain},
                     title = "Position x [m]",
                 },
                 y = {
                     :py,
                     type = :quantitative,
-                    scale = {domain = domain},
+                    scale = {domain = position_domain},
                     title = "Position y [m]",
                 },
                 angle = {
@@ -138,7 +138,7 @@ function TrajectoryVisualization.visualize_trajectory(
         )
 
     if !is_observation
-        trajectory_visualizer += VegaLite.@vlplot(mark = {:line})
+        trajectory_visualizer += VegaLite.@vlplot(mark = {:line, clip = true})
     end
 
     trajectory_table |> trajectory_visualizer
