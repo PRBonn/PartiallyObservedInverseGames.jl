@@ -23,6 +23,17 @@ function load_cache!()
     end
 end
 
+macro run_cached(assigned_computation_expr)
+    @assert assigned_computation_expr.head == :(=)
+    var_name, fun_call = assigned_computation_expr.args
+
+    quote
+        run_cached!($(Meta.quot(var_name))) do
+            $fun_call
+        end
+    end
+end
+
 function run_cached!(f, key; force_run = false)
     result = force_run ? f() : get(f, results_cache, key)
     results_cache[key] = result
