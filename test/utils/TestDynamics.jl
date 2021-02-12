@@ -3,10 +3,9 @@ module TestDynamics
 import Plots
 import VegaLite
 import JuMPOptimalControl.DynamicsModelInterface
+import JuMPOptimalControl.TrajectoryVisualization
 import JuMP
 using JuMP: @variable, @constraint, @NLconstraint
-
-export visualize_trajectory, add_dynamics_constraints!, add_dynamics_jacobians!
 
 include("unicycle.jl")
 include("product_system.jl")

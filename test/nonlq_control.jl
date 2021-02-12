@@ -6,7 +6,7 @@ using JuMP: JuMP, @NLconstraint, @objective, @variable, @NLexpression
 using SparseArrays: spzeros
 using JuMPOptimalControl.ForwardOptimalControl: solve_optimal_control
 using JuMPOptimalControl.InverseOptimalControl: solve_inverse_optimal_control
-using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
+using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory
 using JuMPOptimalControl.CostUtils: symbol
 
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))

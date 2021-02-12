@@ -13,41 +13,6 @@ function Base.getproperty(system::ProductSystem, sym::Symbol)
     end
 end
 
-function DynamicsModelInterface.visualize_trajectory(
-    system::ProductSystem,
-    x,
-    backend::DynamicsModelInterface.PlotsBackend;
-    canvas = Plots.plot(),
-    kwargs...,
-)
-    for (subsystem_idx, subsystem) in enumerate(system.subsystems)
-        @views x_sub = x[state_indices(system, subsystem_idx), :]
-        DynamicsModelInterface.visualize_trajectory(subsystem, x_sub, backend; canvas, kwargs...)
-    end
-
-    canvas
-end
-
-function DynamicsModelInterface.visualize_trajectory(
-    system::ProductSystem,
-    x,
-    backend::DynamicsModelInterface.VegaLiteBackend;
-    canvas = VegaLite.@vlplot(),
-    kwargs...,
-)
-
-    mapreduce(+, enumerate(system.subsystems); init = canvas) do (ii, subsystem)
-        @views x_sub = x[state_indices(system, ii), :]
-        DynamicsModelInterface.visualize_trajectory(
-            subsystem,
-            x_sub,
-            backend;
-            player = "P$ii",
-            kwargs...,
-        )
-    end
-end
-
 "Returns an iterable of state indices for the `subsystem_idx`th subsystem."
 function state_indices(system::ProductSystem, subsystem_idx)
     # Note: starting from Julia 1.6 this can be done directly with a sum.
@@ -95,5 +60,42 @@ function DynamicsModelInterface.add_dynamics_jacobians!(system::ProductSystem, o
         @views x_sub = x[state_indices(system, subsystem_idx), :]
         @views u_sub = u[input_indices(system, subsystem_idx), :]
         DynamicsModelInterface.add_dynamics_jacobians!(subsystem, opt_model, x_sub, u_sub)
+    end
+end
+
+#========================================== Visualization ==========================================#
+
+function TrajectoryVisualization.visualize_trajectory(
+    system::ProductSystem,
+    x,
+    backend::TrajectoryVisualization.PlotsBackend;
+    canvas = Plots.plot(),
+    kwargs...,
+)
+    for (subsystem_idx, subsystem) in enumerate(system.subsystems)
+        @views x_sub = x[state_indices(system, subsystem_idx), :]
+        TrajectoryVisualization.visualize_trajectory(subsystem, x_sub, backend; canvas, kwargs...)
+    end
+
+    canvas
+end
+
+function TrajectoryVisualization.visualize_trajectory(
+    system::ProductSystem,
+    x,
+    backend::TrajectoryVisualization.VegaLiteBackend;
+    canvas = VegaLite.@vlplot(),
+    kwargs...,
+)
+
+    mapreduce(+, enumerate(system.subsystems); init = canvas) do (ii, subsystem)
+        @views x_sub = x[state_indices(system, ii), :]
+        TrajectoryVisualization.visualize_trajectory(
+            subsystem,
+            x_sub,
+            backend;
+            player = "P$ii",
+            kwargs...,
+        )
     end
 end

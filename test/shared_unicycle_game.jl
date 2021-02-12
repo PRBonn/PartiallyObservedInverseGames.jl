@@ -5,7 +5,7 @@ import Zygote
 using JuMP: @variable, @constraint, @objective
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
 using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTConstraintSolver, solve_inverse_game
-using JuMPOptimalControl.DynamicsModelInterface: visualize_trajectory
+using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory
 using SparseArrays: spzeros
 using Test: @test, @testset, @test_broken
 using UnPack: @unpack

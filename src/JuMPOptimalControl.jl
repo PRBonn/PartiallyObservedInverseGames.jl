@@ -1,5 +1,6 @@
 module JuMPOptimalControl
 include("DynamicsModelInterface.jl")
+include("TrajectoryVisualization.jl")
 include("JuMPUtils.jl")
 include("CostUtils.jl")
 include("ForwardOptimalControl.jl")
