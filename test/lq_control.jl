@@ -19,10 +19,10 @@ Q = I
 R = 100I
 x0 = [10.0, 10.0]
 
-forward_solution, forward_model = solve_lqr(A, B, Q, R, x0, T)
+forward_converged, forward_solution, forward_model = solve_lqr(A, B, Q, R, x0, T)
 
 @testset "Forward LQR" begin
-    @test JuMP.termination_status(forward_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
+    @test forward_converged
 end
 
 #====================== Inverse LQR as nested constrained optimization problem =====================#

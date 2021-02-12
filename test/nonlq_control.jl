@@ -107,8 +107,13 @@ cost_model = (
 
 #====================================== forward optimal control ====================================#
 
-forward_solution, forward_model = solve_optimal_control(control_system, cost_model, x0, T)
-visualize_trajectory(control_system, forward_solution.x)
+@testset "Forward Solution" begin
+    forward_converged, forward_solution, forward_model =
+        solve_optimal_control(control_system, cost_model, x0, T)
+    @test forward_converged
+    visualize_trajectory(control_system, forward_solution.x)
+    global forward_solution
+end
 
 #===================================== Inverse Optimal Control =====================================#
 
