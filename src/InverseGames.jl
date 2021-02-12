@@ -6,6 +6,7 @@ import ..DynamicsModelInterface
 import ..JuMPUtils
 import ..CostUtils
 import ..InverseOptimalControl
+import ..InversePreSolve
 
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
@@ -30,7 +31,7 @@ function solve_inverse_game(
     max_ibr_rounds = 5,
     ibr_convergence_tolerance = 0.01,
     verbose = false,
-    inner_solver_kwargs...
+    inner_solver_kwargs...,
 )
     @unpack n_controls = control_system
     n_players = length(player_cost_models)
@@ -103,9 +104,10 @@ function solve_inverse_game(
     max_observation_error = nothing,
     init_with_observation = true,
     verbose = false,
+    pre_solve = false,
 )
 
-    T = size(y)[2]
+    T = size(y, 2)
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
 
@@ -122,16 +124,32 @@ function solve_inverse_game(
     x0 = @variable(opt_model, [1:n_states])
     λ0 = @variable(opt_model, [1:n_states, 1:n_players])
 
-    # Initialization
-    if init_with_observation
-        # TODO: This is not always correct. It will only work if
-        # `observation_model.expected_observation` effectively creates an array view into x
-        # (extracting components of the variable).
-        JuMP.set_start_value.(observation_model.expected_observation(x), y)
+    if pre_solve
+        # TODO: also forward init?
+        pre_solve_conveged, pre_solve_init = InversePreSolve.pre_solve(
+            y,
+            nothing;
+            control_system,
+            observation_model,
+            verbose,
+            init,
+            solver,
+            solver_attributes,
+        )
+        @assert pre_solve_conveged
+        JuMP.set_start_value.(x, pre_solve_init.x)
+    else
+        # Initialization
+        if init_with_observation
+            # TODO: This is not always correct. It will only work if
+            # `observation_model.expected_observation` effectively creates an array view into x
+            # (extracting components of the variable).
+            JuMP.set_start_value.(observation_model.expected_observation(x), y)
+        end
+        JuMPUtils.init_if_hasproperty!(x, init, :x)
+        JuMPUtils.init_if_hasproperty!(u, init, :u)
+        JuMPUtils.init_if_hasproperty!(λ, init, :λ)
     end
-    JuMPUtils.init_if_hasproperty!(x, init, :x)
-    JuMPUtils.init_if_hasproperty!(u, init, :u)
-    JuMPUtils.init_if_hasproperty!(λ, init, :λ)
 
     # # TODO: think about initialization for player weights. Make this a kwarg
     # for weights in player_weights
@@ -217,7 +235,7 @@ function solve_inverse_game(
     verbose = false,
 )
 
-    T = size(x)[2]
+    T = size(x, 2)
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
 
