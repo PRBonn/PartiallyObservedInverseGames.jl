@@ -12,11 +12,20 @@ function Base.getproperty(system::Unicycle, sym::Symbol)
     end
 end
 
+function DynamicsModelInterface.next_x(system::Unicycle, x_t, u_t)
+    ΔT = system.ΔT
+    @assert only(size(x_t)) == 4
+    @assert only(size(u_t)) == 2
+    px, py, v, θ = x_t
+    Δv, Δθ = u_t
+    [px + ΔT * v * cos(θ), py + ΔT * v * sin(θ), v + Δv, θ + Δθ]
+end
+
 # These constraints encode the dynamics of a unicycle with state layout x_t = [px, pyL, v, θ] and
 # inputs u_t = [Δv, Δθ].
 function DynamicsModelInterface.add_dynamics_constraints!(system::Unicycle, opt_model, x, u)
     ΔT = system.ΔT
-    T = size(x)[2]
+    T = size(x, 2)
 
     # auxiliary variables for nonlinearities
     cosθ = @variable(opt_model, [1:T])

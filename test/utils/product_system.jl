@@ -63,6 +63,14 @@ function DynamicsModelInterface.add_dynamics_jacobians!(system::ProductSystem, o
     end
 end
 
+function DynamicsModelInterface.next_x(system::ProductSystem, x_t, u_t)
+    mapreduce(vcat, enumerate(system.subsystems)) do (subsystem_idx, subsystem)
+        @views x_t_sub = x_t[state_indices(system, subsystem_idx)]
+        @views u_t_sub = u_t[input_indices(system, subsystem_idx)]
+        DynamicsModelInterface.next_x(subsystem, x_t_sub, u_t_sub)
+    end
+end
+
 #========================================== Visualization ==========================================#
 
 function TrajectoryVisualization.visualize_trajectory(

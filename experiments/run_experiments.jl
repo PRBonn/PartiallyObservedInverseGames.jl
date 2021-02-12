@@ -26,6 +26,10 @@ control_system =
 x0 = vcat([-1, 0, 0.1, 0 + deg2rad(10)], [0, -1, 0.1, pi / 2 + deg2rad(10)])
 position_indices = [1, 2, 5, 6] # TODO: for now just hard-coded
 T = 25
+x_init = reduce(2:T; init = x0[:, :]) do x, _
+    [x DynamicsModelInterface.next_x(control_system, x[:, end], [0, 0, 0, 0])]
+end
+
 player_cost_models_gt = let
     cost_model_p1 = CollisionAvoidanceGame.generate_player_cost_model(;
         T,
