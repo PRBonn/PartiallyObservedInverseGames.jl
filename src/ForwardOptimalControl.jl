@@ -43,7 +43,7 @@ function solve_lqr(
     @constraint(opt_model, x[:, 1] .== x0)
     @objective(opt_model, Min, forward_quadratic_objective(x, u; Q, R))
     @time JuMP.optimize!(opt_model)
-    JuMPUtils.get_values(; x, u), opt_model
+    JuMPUtils.isconverged(opt_model), JuMPUtils.get_values(; x, u), opt_model
 end
 
 #=========================================== Non-LQ-Case ===========================================#
@@ -80,12 +80,14 @@ function solve_optimal_control(
     end
 
     DynamicsModelInterface.add_dynamics_constraints!(control_system, opt_model, x, u)
-    @constraint(opt_model, x[:, 1] .== x0)
+    if !isnothing(x0)
+        @constraint(opt_model, x[:, 1] .== x0)
+    end
     cost_model.add_objective!(opt_model, x, u; cost_model.weights)
     time = @elapsed JuMP.optimize!(opt_model)
     verbose && @info time
 
-    JuMPUtils.get_values(; x, u), opt_model
+    JuMPUtils.isconverged(opt_model), JuMPUtils.get_values(; x, u), opt_model
 end
 
 end

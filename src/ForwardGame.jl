@@ -38,7 +38,7 @@ function solve_game(
 
     for i_ibr in 1:max_ibr_rounds
         for (player_idx, player_cost_model) in enumerate(player_cost_models)
-            last_player_solution, player_opt_models[player_idx] =
+            last_player_converged, last_player_solution, player_opt_models[player_idx] =
                 ForwardOptimalControl.solve_optimal_control(
                     control_system,
                     player_cost_model,
@@ -49,6 +49,7 @@ function solve_game(
                     inner_solver_kwargs...,
                     verbose,
                 )
+            @assert last_player_converged
         end
 
         converged =
