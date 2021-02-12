@@ -79,9 +79,7 @@ function generate_dataset(
     forward_solution_gt, dataset
 end
 
-forward_solution_gt, dataset = run_cached!(:forward_solution_gt_dataset) do
-    generate_dataset()
-end
+@run_cached forward_solution_gt, dataset = generate_dataset()
 
 #========================================= Run estimators ==========================================#
 
@@ -148,21 +146,15 @@ estimator_setup = (;
     solver_attributes = (; print_level = 1),
 )
 
-estimates_conKKT = run_cached!(:estimates_conKKT) do
-    estimate(InverseKKTConstraintSolver(); estimator_setup...)
-end
+@run_cached estimates_conKKT = estimate(InverseKKTConstraintSolver(); estimator_setup...)
 
-estimates_conKKT_partial = run_cached!(:estimates_conKKT_partial) do
-    estimate(
-        InverseKKTConstraintSolver();
-        estimator_setup...,
-        expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :],
-    )
-end
+@run_cached estimates_conKKT_partial = estimate(
+    InverseKKTConstraintSolver();
+    estimator_setup...,
+    expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :],
+)
 
-estimates_resKKT = run_cached!(:estimates_resKKT) do
-    estimate(InverseKKTResidualSolver(); estimator_setup...)
-end
+@run_cached estimates_resKKT = estimate(InverseKKTResidualSolver(); estimator_setup...)
 
 #======== Augment KKT Residual Solution with State and Input Estimate via Forward Solution =========#
 
@@ -203,9 +195,11 @@ augmentor_kwargs = (;
     solver_attributes = (; print_level = 1),
 )
 
-augmented_estimates_resKKT = run_cached!(:augmented_estimates_resKKT) do
+@run_cached augmented_estimates_conKKT_partial =
+    augment_with_forward_solution(estimates_conKKT_partial; augmentor_kwargs...)
+
+@run_cached augmented_estimates_resKKT =
     augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
-end
 
 estimates = [estimates_conKKT; estimates_conKKT_partial; augmented_estimates_resKKT]
 
