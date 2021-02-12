@@ -26,9 +26,6 @@ control_system =
 x0 = vcat([-1, 0, 0.1, 0 + deg2rad(10)], [0, -1, 0.1, pi / 2 + deg2rad(10)])
 position_indices = [1, 2, 5, 6] # TODO: for now just hard-coded
 T = 25
-x_init = reduce(2:T; init = x0[:, :]) do x, _
-    [x DynamicsModelInterface.next_x(control_system, x[:, end], [0, 0, 0, 0])]
-end
 
 player_cost_models_gt = let
     cost_model_p1 = CollisionAvoidanceGame.generate_player_cost_model(;
@@ -91,8 +88,10 @@ function estimate(
     player_cost_models,
     solver_attributes,
     expected_observation = identity,
-    estimator_name = expected_observation === identity ? "KKT Constraints" :
-                     "KKT Constraints Partial",
+    estimator_name = (
+        expected_observation === identity ? "KKT Constraints" : "KKT Constraints Partial"
+    ),
+    solver_kwargs...
 )
 
     @showprogress map(enumerate(dataset)) do (observation_idx, d)
@@ -105,9 +104,7 @@ function estimate(
             observation_model,
             player_cost_models,
             solver_attributes,
-            # TODO: remove; This is only to get a lower bound of how good the method can work with a
-            # good initialization.
-            # init = (; x = x_init),
+            solver_kwargs...
             # NOTE: This estimator does not use any information beyond the state observation!
         )
         converged || @warn "conKKT did not converge on observation $observation_idx."
@@ -152,6 +149,7 @@ estimator_setup = (;
     InverseKKTConstraintSolver();
     estimator_setup...,
     expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :],
+    pre_solve = true,
 )
 
 @run_cached estimates_resKKT = estimate(InverseKKTResidualSolver(); estimator_setup...)
