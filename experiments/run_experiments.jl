@@ -88,23 +88,29 @@ function estimate(
     control_system,
     player_cost_models,
     solver_attributes,
+    expected_observation = identity,
+    estimator_name = expected_observation === identity ? "KKT Constraints" :
+                     "KKT Constraints Partial",
 )
 
     @showprogress map(enumerate(dataset)) do (observation_idx, d)
-        observation_model = (; d.σ, expected_observation = identity)
+        observation_model = (; d.σ, expected_observation)
 
         converged, estimate, opt_model = solve_inverse_game(
             solver,
-            d.x;
+            expected_observation(d.x);
             control_system,
             observation_model,
             player_cost_models,
             solver_attributes,
+            # TODO: remove; This is only to get a lower bound of how good the method can work with a
+            # good initialization.
+            # init = (; x = x_init),
             # NOTE: This estimator does not use any information beyond the state observation!
         )
         converged || @warn "conKKT did not converge on observation $observation_idx."
 
-        merge(estimate, (; converged, observation_idx))
+        merge(estimate, (; converged, observation_idx, estimator_name))
     end
 end
 
@@ -114,6 +120,7 @@ function estimate(
     control_system = control_system,
     player_cost_models = player_cost_models_gt,
     solver_attributes = (; print_level = 1),
+    estimator_name = "KKT Residuals",
 )
     @showprogress map(enumerate(dataset)) do (observation_idx, d)
         converged, estimate, opt_model = solve_inverse_game(
@@ -126,7 +133,7 @@ function estimate(
         )
         converged || @warn "resKKT did not converge on observation $observation_idx."
 
-        merge(estimate, (; converged, observation_idx))
+        merge(estimate, (; converged, observation_idx, estimator_name))
     end
 end
 
@@ -139,6 +146,14 @@ estimator_setup = (;
 
 estimates_conKKT = run_cached!(:estimates_conKKT) do
     estimate(InverseKKTConstraintSolver(); estimator_setup...)
+end
+
+estimates_conKKT_partial = run_cached!(:estimates_conKKT_partial) do
+    estimate(
+        InverseKKTConstraintSolver();
+        estimator_setup...,
+        expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :],
+    )
 end
 
 estimates_resKKT = run_cached!(:estimates_resKKT) do
@@ -188,29 +203,34 @@ augmented_estimates_resKKT = run_cached!(:augmented_estimates_resKKT) do
     augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
 end
 
+estimates = [estimates_conKKT; estimates_conKKT_partial; augmented_estimates_resKKT]
+
 #===================================== Statistical Evaluation ======================================#
 
-function estimator_statistics(estimates::AbstractVector, observations::AbstractVector; kwargs...)
-    map((args...) -> estimator_statistics(args...; kwargs...), estimates, observations)
-end
-
 function estimator_statistics(
-    estimate,
-    observation;
+    estimate;
+    dataset,
     demo_gt,
-    estimator_name,
     trajectory_distance = Distances.meanad,
     parameter_distance = Distances.cosine_dist,
 )
-    x_observation_error = trajectory_distance(demo_gt.x, observation.x)
-    u_observation_error = trajectory_distance(demo_gt.u, observation.u)
-    position_observation_error =
-        trajectory_distance(demo_gt.x[position_indices, :], observation.x[position_indices, :])
 
-    x_estimation_error = trajectory_distance(demo_gt.x, estimate.x)
-    u_estimation_error = trajectory_distance(demo_gt.u, estimate.u)
-    position_estimation_error =
-        trajectory_distance(demo_gt.x[position_indices, :], estimate.x[position_indices, :])
+    function trajectory_component_errors(trajectory)
+        (;
+            x_error = trajectory_distance(demo_gt.x, trajectory.x),
+            u_error = trajectory_distance(demo_gt.u, trajectory.u),
+            position_error = trajectory_distance(
+                demo_gt.x[position_indices, :],
+                trajectory.x[position_indices, :],
+            ),
+        )
+    end
+
+    observation = dataset[estimate.observation_idx]
+    x_observation_error, u_observation_error, position_observation_error =
+        trajectory_component_errors(observation)
+    x_estimation_error, u_estimation_error, position_estimation_error =
+        trajectory_component_errors(estimate)
 
     parameter_estimation_error =
         map(demo_gt.player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
@@ -219,7 +239,7 @@ function estimator_statistics(
         end |> Statistics.mean
 
     (;
-        estimator_name,
+        estimate.estimator_name,
         estimate.observation_idx,
         estimate.converged,
         observation.σ,
@@ -234,16 +254,21 @@ function estimator_statistics(
 end
 
 demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
-errstats_conKKT =
-    estimator_statistics(estimates_conKKT, dataset; demo_gt, estimator_name = "KKT Constraints")
-errstats_resKKT = estimator_statistics(
-    augmented_estimates_resKKT,
-    dataset;
-    demo_gt,
-    estimator_name = "KKT Residuals",
-)
+
+# TODO: add the estimator name already earlier (when estimtes are created).
+errstats = map(estimates) do estimate
+    estimator_statistics(estimate; dataset, demo_gt)
+end
 
 #========================================== Visualization ==========================================#
+
+"Visualize all trajectory `estimates` along with the corresponding ground truth
+`forward_solution_gt`"
+function visualize_estimates(control_system, estimates, forward_solution_gt; only_converged = true)
+    position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
+    estimated_trajectory_batch = [e.x for e in estimates if e.converged || !only_converged]
+    visualize_trajectory_batch(control_system, estimated_trajectory_batch; position_domain)
+end
 
 import ElectronDisplay
 
@@ -278,17 +303,8 @@ parameter_error_visualizer = @vlplot(
     height = 400,
 )
 
-errstats = [errstats_conKKT; errstats_resKKT]
-
-errstats_visualization = errstats |> @vlplot() + [
-    position_error_visualizer
-    parameter_error_visualizer
-]
-
-"Visualize all trajectory `estimates` along with the corresponding ground truth
-`forward_solution_gt`"
-function visualize_estimates(control_system, estimates, forward_solution_gt; only_converged = true)
-    position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
-    estimated_trajectory_batch = [e.x for e in estimates if e.converged || !only_converged]
-    visualize_trajectory_batch(control_system, estimated_trajectory_batch; position_domain)
-end
+errstats_visualization =
+    errstats |> @vlplot() + [
+        position_error_visualizer
+        parameter_error_visualizer
+    ]
