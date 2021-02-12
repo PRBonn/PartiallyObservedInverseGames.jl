@@ -129,6 +129,7 @@ function solve_inverse_game(
         # (extracting components of the variable).
         JuMP.set_start_value.(observation_model.expected_observation(x), y)
     end
+    JuMPUtils.init_if_hasproperty!(x, init, :x)
     JuMPUtils.init_if_hasproperty!(u, init, :u)
     JuMPUtils.init_if_hasproperty!(λ, init, :λ)
 
