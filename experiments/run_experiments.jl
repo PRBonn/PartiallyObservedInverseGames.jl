@@ -264,7 +264,7 @@ end
 `forward_solution_gt`"
 function visualize_estimates(control_system, estimates, forward_solution_gt; only_converged = true)
     position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
-    estimated_trajectory_batch = [e.x for e in estimates if e.converged || !only_converged]
+    estimated_trajectory_batch = [e.x for e in estimates if !only_converged || e.converged]
     visualize_trajectory_batch(control_system, estimated_trajectory_batch; position_domain)
 end
 
