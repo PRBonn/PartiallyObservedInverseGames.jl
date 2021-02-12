@@ -28,7 +28,7 @@ macro run_cached(assigned_computation_expr)
     var_name, fun_call = assigned_computation_expr.args
 
     quote
-        run_cached!($(Meta.quot(var_name))) do
+        $(esc(var_name)) = run_cached!($(Meta.quot(var_name))) do
             $fun_call
         end
     end
