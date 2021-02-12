@@ -100,7 +100,7 @@ function estimate(
             observation_model,
             player_cost_models,
             solver_attributes,
-            # NOTE: right now this does not use the u information for initialization.
+            # NOTE: This estimator does not use any information beyond the state observation!
         )
         converged || @warn "conKKT did not converge on observation $observation_idx."
 
