@@ -8,6 +8,7 @@ import Distances
 import CollisionAvoidanceGame
 import TestDynamics
 import JuMPOptimalControl.CostUtils
+import JuMPOptimalControl.InversePreSolve
 using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory, visualize_trajectory_batch
 using JuMPOptimalControl.ForwardGame: KKTGameSolver, IBRGameSolver, solve_game
 using JuMPOptimalControl.InverseGames:
@@ -89,9 +90,9 @@ function estimate(
     solver_attributes,
     expected_observation = identity,
     estimator_name = (
-        expected_observation === identity ? "KKT Constraints" : "KKT Constraints Partial"
+        expected_observation === identity ? "KKT Constraints Full" : "KKT Constraints Partial"
     ),
-    solver_kwargs...
+    solver_kwargs...,
 )
 
     @showprogress map(enumerate(dataset)) do (observation_idx, d)
@@ -104,7 +105,7 @@ function estimate(
             observation_model,
             player_cost_models,
             solver_attributes,
-            solver_kwargs...
+            solver_kwargs...,
             # NOTE: This estimator does not use any information beyond the state observation!
         )
         converged || @warn "conKKT did not converge on observation $observation_idx."
@@ -119,13 +120,32 @@ function estimate(
     control_system = control_system,
     player_cost_models = player_cost_models_gt,
     solver_attributes = (; print_level = 1),
-    estimator_name = "KKT Residuals",
+    expected_observation = identity,
+    pre_solve = true,
+    estimator_name = (
+        expected_observation === identity ? "KKT Residuals Full" : "KKT Residuals Partial"
+    ),
 )
     @showprogress map(enumerate(dataset)) do (observation_idx, d)
+        observation_model = (; d.σ, expected_observation)
+        observation = if pre_solve
+            pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
+                expected_observation(d.x),
+                (expected_observation === identity ? d.u : nothing);
+                control_system,
+                observation_model,
+                solver_attributes,
+            )
+            @assert pre_solve_converged
+            (; pre_solve_solution.x, pre_solve_solution.u)
+        else
+            (; d.x, d.u)
+        end
+
         converged, estimate, opt_model = solve_inverse_game(
             solver,
-            d.x,
-            d.u;
+            observation.x,
+            observation.u;
             control_system,
             player_cost_models,
             solver_attributes,
@@ -141,18 +161,21 @@ estimator_setup = (;
     control_system,
     player_cost_models = player_cost_models_gt,
     solver_attributes = (; print_level = 1),
-)
-
-@run_cached estimates_conKKT = estimate(InverseKKTConstraintSolver(); estimator_setup...)
-
-@run_cached estimates_conKKT_partial = estimate(
-    InverseKKTConstraintSolver();
-    estimator_setup...,
-    expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :],
     pre_solve = true,
 )
 
+estimator_setup_partial =
+    merge(estimator_setup, (; expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :]))
+
+@run_cached estimates_conKKT = estimate(InverseKKTConstraintSolver(); estimator_setup...)
+
+@run_cached estimates_conKKT_partial =
+    estimate(InverseKKTConstraintSolver(); estimator_setup_partial...)
+
 @run_cached estimates_resKKT = estimate(InverseKKTResidualSolver(); estimator_setup...)
+
+@run_cached estimates_resKKT_partial =
+    estimate(InverseKKTResidualSolver(); estimator_setup_partial...)
 
 #======== Augment KKT Residual Solution with State and Input Estimate via Forward Solution =========#
 
@@ -193,13 +216,18 @@ augmentor_kwargs = (;
     solver_attributes = (; print_level = 1),
 )
 
-@run_cached augmented_estimates_conKKT_partial =
-    augment_with_forward_solution(estimates_conKKT_partial; augmentor_kwargs...)
-
 @run_cached augmented_estimates_resKKT =
     augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
 
-estimates = [estimates_conKKT; estimates_conKKT_partial; augmented_estimates_resKKT]
+@run_cached augmented_estimates_resKKT_partial =
+    augment_with_forward_solution(estimates_resKKT_partial; augmentor_kwargs...)
+
+estimates = [
+    estimates_conKKT
+    estimates_conKKT_partial
+    augmented_estimates_resKKT
+    augmented_estimates_resKKT_partial
+]
 
 #===================================== Statistical Evaluation ======================================#
 
