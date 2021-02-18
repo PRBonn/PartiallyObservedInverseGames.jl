@@ -25,11 +25,11 @@ end
 
 macro run_cached(assigned_computation_expr)
     @assert assigned_computation_expr.head == :(=)
-    var_name, fun_call = assigned_computation_expr.args
+    var, fun = assigned_computation_expr.args
 
     quote
-        $(esc(var_name)) = run_cached!($(Meta.quot(var_name))) do
-            $fun_call
+        $(esc(var)) = run_cached!($(Meta.quot(var))) do
+            $fun
         end
     end
 end

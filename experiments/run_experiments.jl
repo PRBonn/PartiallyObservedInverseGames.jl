@@ -1,9 +1,12 @@
-unique!(push!(LOAD_PATH, realpath(joinpath(@__DIR__, "../test/utils"))))
+const project_root_dir = realpath(joinpath(@__DIR__, ".."))
+unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
 import Random
 import Statistics
 import LinearAlgebra
 import Distances
+import ElectronDisplay
+import VegaLite
 
 import CollisionAvoidanceGame
 import TestDynamics
@@ -18,6 +21,19 @@ using ProgressMeter: @showprogress
 using VegaLite: @vlplot
 
 include("./simple_caching.jl")
+
+#============================================== Utils ==============================================#
+
+macro saveviz(assigned_visualization_expr)
+    println(assigned_visualization_expr)
+    @assert assigned_visualization_expr.head == :(=)
+    var, fun = assigned_visualization_expr.args
+
+    quote
+        $(esc(assigned_visualization_expr))
+        $(esc(var)) |> VegaLite.save(joinpath(project_root_dir, "figures/$($(Meta.quot(var))).pdf"))
+    end
+end
 
 #==================================== Forward Game Formulation =====================================#
 
@@ -288,47 +304,70 @@ end
 
 "Visualize all trajectory `estimates` along with the corresponding ground truth
 `forward_solution_gt`"
-function visualize_estimates(control_system, estimates, forward_solution_gt; only_converged = true)
+function visualize_bundle(
+    control_system,
+    estimates,
+    forward_solution_gt;
+    filter_converged = false,
+    kwargs...,
+)
     position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
-    estimated_trajectory_batch = [e.x for e in estimates if !only_converged || e.converged]
-    visualize_trajectory_batch(control_system, estimated_trajectory_batch; position_domain)
+    estimated_trajectory_batch = [e.x for e in estimates if !filter_converged || e.converged]
+    visualize_trajectory_batch(
+        control_system,
+        estimated_trajectory_batch;
+        position_domain,
+        kwargs...,
+    )
 end
 
-import ElectronDisplay
+global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
 
 # TODO: share more of the spec to avoid duplication.
+
+parameter_error_visualizer = @vlplot(
+    mark = {:point, size = 50, tooltip = {content = "data"}},
+    x = {:position_observation_error, title = "Mean Absolute Postion Observation Error [m]"},
+    y = {:parameter_estimation_error, title = "Mean Parameter Cosine Error"},
+    color = {:estimator_name, title = "Estimator"},
+    shape = {:estimator_name, title = "Estimator"},
+    width = 500,
+    height = 300,
+    config = global_config,
+    #    title = {text = "(a) Position Error", fontWeight = "normal", orient = "bottom"}jjjjj
+)
+
 position_error_visualizer = @vlplot(
-    mark = {:point, size = 75, tooltip = {content = "data"}},
+    mark = {:point, size = 50, tooltip = {content = "data"}},
     x = {:position_observation_error, title = "Mean Absolute Postion Observation Error [m]"},
     y = {
         :position_estimation_error,
         scale = {type = "symlog", constant = 0.01},
         title = "Mean Absolute Position Prediction Error [m]",
     },
-    color = {:estimator_name, title = "Estimator"},
-    shape = {:estimator_name, title = "Estimator"},
+    color = {:estimator_name, title = "Estimator", legend = nothing},
+    shape = {:estimator_name, title = "Estimator", legend = nothing},
     fill = {
         :converged,
         title = "Trajectory Reconstructable",
         type = "nominal",
         scale = {domain = [true, false], range = ["bisque", "tomato"]},
+        legend = nothing,
     },
-    width = 700,
-    height = 400,
+    width = 500,
+    height = 300,
+    config = global_config
 )
 
-parameter_error_visualizer = @vlplot(
-    mark = {:point, size = 75, tooltip = {content = "data"}},
-    x = {:position_observation_error, title = "Mean Absolute Postion Observation Error [m]"},
-    y = {:parameter_estimation_error, title = "Mean Parameter Cosine Error"},
-    color = {:estimator_name, title = "Estimator"},
-    shape = {:estimator_name, title = "Estimator"},
-    width = 700,
-    height = 400,
+@saveviz conKKT_partial_bundle_viz =
+    visualize_bundle(control_system, estimates_conKKT_partial, forward_solution_gt)
+@saveviz resKKT_partial_bundle_viz = visualize_bundle(
+    control_system,
+    augmented_estimates_resKKT_partial,
+    forward_solution_gt;
+    filter_converged = true,
 )
 
-errstats_visualization =
-    errstats |> @vlplot() + [
-        position_error_visualizer
-        parameter_error_visualizer
-    ]
+@saveviz position_error_viz = errstats |> position_error_visualizer
+@saveviz parameter_error_viz = errstats |> parameter_error_visualizer
+@saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
