@@ -19,7 +19,7 @@ function visualize_trajectory_batch(
     control_system,
     trajectory_batch,
     backend::VegaLiteBackend = VegaLiteBackend();
-    canvas = VegaLite.@vlplot(opacity = {value = 0.05}, width = 800, height = 800),
+    canvas = VegaLite.@vlplot(opacity = {value = 0.05}, width = 300, height = 300),
     kwargs...
 )
     mapreduce(+, trajectory_batch; init = canvas) do x
