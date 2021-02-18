@@ -311,41 +311,80 @@ end
 
 global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
 
-# TODO: share more of the spec to avoid duplication.
-
-parameter_error_visualizer = @vlplot(
-    mark = {:point, size = 50, tooltip = {content = "data"}},
-    x = {:position_observation_error, title = "Mean Absolute Postion Observation Error [m]"},
-    y = {:parameter_estimation_error, title = "Mean Parameter Cosine Error"},
-    color = {:estimator_name, title = "Estimator"},
-    shape = {:estimator_name, title = "Estimator"},
+function visualize_paramerr(;
+    scatter_opacity = 0.2,
     width = 500,
     height = 300,
-    config = global_config,
-    #    title = {text = "(a) Position Error", fontWeight = "normal", orient = "bottom"}jjjjj
+    y_label = "Mean Parameter Cosine Error",
 )
+    common_viz = @vlplot(
+        # title = {text = "(a) Position Error", fontWeight = "normal", orient = "bottom"}
+        # shape = {"estimator_name:n", title = "Estimator"},
+        color = {"estimator_name:n", title = "Estimator"},
+        width = width,
+        height = height,
+        config = global_config
+    )
 
-position_error_visualizer = @vlplot(
-    mark = {:point, size = 50, tooltip = {content = "data"}},
-    x = {:position_observation_error, title = "Mean Absolute Postion Observation Error [m]"},
-    y = {
-        :position_estimation_error,
-        scale = {type = "symlog", constant = 0.01},
-        title = "Mean Absolute Position Prediction Error [m]",
-    },
-    color = {:estimator_name, title = "Estimator", legend = nothing},
-    shape = {:estimator_name, title = "Estimator", legend = nothing},
-    fill = {
-        :converged,
-        title = "Trajectory Reconstructable",
-        type = "nominal",
-        scale = {domain = [true, false], range = ["bisque", "tomato"]},
-        legend = nothing,
-    },
+    raw_scatter_viz = @vlplot(
+        mark =
+            {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
+        x = {"position_observation_error:q", title = "Mean Absolute Postion Observation Error [m]"},
+        y = {"parameter_estimation_error:q", title = y_label},
+    )
+
+    median_iqr_viz =
+        @vlplot(
+            x = {"σ:q"},
+            y = {"parameter_estimation_error:q", aggregate = "median", title = y_label}
+        ) +
+        @vlplot(mark = "line") +
+        @vlplot(mark = {"errorband", extent = "iqr"})
+
+    common_viz + median_iqr_viz + raw_scatter_viz
+end
+
+function visualize_poserr(;
+    scatter_opacity = 0.2,
     width = 500,
     height = 300,
-    config = global_config
+    y_label = "Mean Absolute Position Prediciton Error [m]",
 )
+    common_viz = @vlplot(
+        # title = {text = "(a) Position Error", fontWeight = "normal", orient = "bottom"}
+        color = {"estimator_name:n", title = "Estimator"},
+        width = width,
+        height = height,
+        config = global_config
+    )
+
+    raw_scatter_viz = @vlplot(
+        mark =
+            {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
+        shape = {
+            "converged:n",
+            title = "Trajectory Reconstructable",
+            legend = nothing,
+            scale = {domain = [true, false], range = ["circle", "triangle-down"]},
+        },
+        x = {"position_observation_error:q", title = "Mean Absolute Postion Observation Error [m]"},
+        y = {
+            "position_estimation_error:q",
+            title = y_label,
+            scale = {type = "symlog", constant = 0.01},
+        },
+    )
+
+    median_iqr_viz =
+        @vlplot(
+            x = {"σ:q"},
+            y = {"position_estimation_error:q", aggregate = "median", title = y_label}
+        ) +
+        @vlplot(mark = "line") +
+        @vlplot(mark = {"errorband", extent = "iqr"})
+
+    common_viz + median_iqr_viz + raw_scatter_viz
+end
 
 @saveviz conKKT_partial_bundle_viz =
     visualize_bundle(control_system, estimates_conKKT_partial, forward_solution_gt)
@@ -355,7 +394,7 @@ position_error_visualizer = @vlplot(
     forward_solution_gt;
     filter_converged = true,
 )
-
-@saveviz position_error_viz = errstats |> position_error_visualizer
-@saveviz parameter_error_viz = errstats |> parameter_error_visualizer
 @saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
+
+@saveviz parameter_error_viz = errstats |> visualize_paramerr()
+@saveviz position_error_viz = errstats |> visualize_poserr()
