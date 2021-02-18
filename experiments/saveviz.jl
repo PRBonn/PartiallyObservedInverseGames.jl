@@ -1,5 +1,4 @@
 macro saveviz(expr::Expr)
-    println(expr)
     @assert expr.head == :(=)
     var, fun = expr.args
 
