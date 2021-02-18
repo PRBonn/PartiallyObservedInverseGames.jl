@@ -20,33 +20,47 @@ using JuMPOptimalControl.InverseGames:
 using ProgressMeter: @showprogress
 using VegaLite: @vlplot
 
+# Utils
 include("./simple_caching.jl")
 include("./saveviz.jl")
+function unitvector(θ)
+    [cos(θ), sin(θ)]
+end
 
 #==================================== Forward Game Formulation =====================================#
 
-control_system =
-    TestDynamics.ProductSystem([TestDynamics.Unicycle(0.25), TestDynamics.Unicycle(0.25)])
+control_system = TestDynamics.ProductSystem([
+    TestDynamics.Unicycle(0.25),
+    TestDynamics.Unicycle(0.25),
+    # TestDynamics.Unicycle(0.25),
+])
 
-x0 = vcat([-1, 0, 0.1, 0 + deg2rad(10)], [0, -1, 0.1, pi / 2 + deg2rad(10)])
-position_indices = [1, 2, 5, 6] # TODO: for now just hard-coded
+n_players = length(control_system.subsystems)
+
+player_angles = map(eachindex(control_system.subsystems)) do ii
+    (ii - 1) * 2pi / n_players
+end
+
+x0 = mapreduce(vcat, player_angles) do player_angle
+    [unitvector(player_angle + pi); 0.1; player_angle + deg2rad(10)]
+end
+
+position_indices = mapreduce(vcat, eachindex(control_system.subsystems)) do subsystem_idx
+    TestDynamics.state_indices(control_system, subsystem_idx)[1:2]
+end
+partial_state_indices = mapreduce(vcat, eachindex(control_system.subsystems)) do subsystem_idx
+    TestDynamics.state_indices(control_system, subsystem_idx)[[1, 2, 4]]
+end
+
 T = 25
 
-player_cost_models_gt = let
+player_cost_models_gt = map(enumerate(player_angles)) do (ii, player_angle)
     cost_model_p1 = CollisionAvoidanceGame.generate_player_cost_model(;
+        player_idx = ii,
+        control_system,
         T,
-        state_indices = 1:4,
-        input_indices = 1:2,
-        goal_position = [1, 0],
+        goal_position = unitvector(player_angle),
     )
-    cost_model_p2 = CollisionAvoidanceGame.generate_player_cost_model(;
-        T,
-        state_indices = 5:8,
-        input_indices = 3:4,
-        goal_position = [0, 1],
-    )
-
-    (cost_model_p1, cost_model_p2)
 end
 
 #======================================== Generate Dataset =========================================#
@@ -169,7 +183,7 @@ estimator_setup = (;
 )
 
 estimator_setup_partial =
-    merge(estimator_setup, (; expected_observation = x -> x[[1, 2, 4, 5, 6, 8], :]))
+    merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
 
 @run_cached estimates_conKKT = estimate(InverseKKTConstraintSolver(); estimator_setup...)
 

@@ -3,21 +3,17 @@ module CollisionAvoidanceGame
 using JuMP: @NLconstraint, @NLexpression, @objective, @variable
 using JuMPOptimalControl.CostUtils: symbol
 
+unique!(push!(LOAD_PATH, @__DIR__))
+import TestDynamics
+
 export generate_player_cost_model
 
-# TODO We should probably pass the `ProductSystem` and the player index here to compute the
-# `state_indices`, `input_indices`, and `opponent_indices`.
 function generate_player_cost_model(;
+    player_idx,
+    control_system::TestDynamics.ProductSystem,
     T,
-    state_indices,
-    input_indices,
     goal_position,
-    weights = (;
-        state_proximity = 1,
-        state_velocity = 1,
-        control_Δv = 1,
-        control_Δθ = 1,
-    ),
+    weights = (; state_proximity = 1, state_velocity = 1, control_Δv = 1, control_Δθ = 1),
     cost_prescaling = (;
         state_goal = 100, # The state_goal weight is assumed to be fixed.
         state_proximity = 0.1,
@@ -27,15 +23,23 @@ function generate_player_cost_model(;
     ),
     prox_min_regularization = 0.1,
     T_activate_goalcost = T,
-    # TODO: dirty hack
-    opponent_indices = 1 in state_indices ? (5:8) : (1:4),
 )
-    function add_regularized_squared_distance!(opt_model, x_sub_ego, x_sub_opp)
+    state_indices = TestDynamics.state_indices(control_system, player_idx)
+    input_indices = TestDynamics.input_indices(control_system, player_idx)
+
+    opponent_position_indices = let
+        opponent_indices = filter(!=(player_idx), eachindex(control_system.subsystems))
+        map(opponent_indices) do jj
+            TestDynamics.state_indices(control_system, jj)[1:2]
+        end
+    end
+
+    function add_regularized_squared_distance!(opt_model, x_sub_ego, pos_opponent)
         @NLexpression(
             opt_model,
             [t = 1:T],
-            (x_sub_ego[1, t] - x_sub_opp[1, t])^2 +
-            (x_sub_ego[2, t] - x_sub_opp[2, t])^2 +
+            (x_sub_ego[1, t] - pos_opponent[1, t])^2 +
+            (x_sub_ego[2, t] - pos_opponent[2, t])^2 +
             prox_min_regularization
         )
     end
@@ -47,11 +51,13 @@ function generate_player_cost_model(;
         # somewhere else to make it agnostic:
         @views x_sub_ego = x[state_indices, :]
         @views u_sub_ego = u[input_indices, :]
-        @views x_sub_opp = x[opponent_indices, :]
+        @views opponent_positions = map(opponent_position_indices) do opp_position_idxs
+            x[opp_position_idxs, :]
+        end
 
-        prox_cost = let
-            d_sq = add_regularized_squared_distance!(opt_model, x_sub_ego, x_sub_opp)
-            prox_cost = @variable(opt_model, prox_cost[t = 1:T])
+        prox_cost = sum(opponent_positions) do pos_opponent
+            d_sq = add_regularized_squared_distance!(opt_model, x_sub_ego, pos_opponent)
+            prox_cost = @variable(opt_model, [t = 1:T])
             @NLconstraint(opt_model, [t = 1:T], prox_cost[t] == -log(d_sq[t]))
             prox_cost
         end
@@ -76,21 +82,23 @@ function generate_player_cost_model(;
         n_controls = size(u, 1)
         @views x_sub_ego = x[state_indices, :]
         @views u_sub_ego = u[input_indices, :]
-        @views x_sub_opp = x[opponent_indices, :]
+        @views opponent_positions = map(opponent_position_indices) do opp_position_idxs
+            x[opp_position_idxs, :]
+        end
 
-        dprox_dxy = let
-            d_sq = add_regularized_squared_distance!(opt_model, x_sub_ego, x_sub_opp)
+        dprox_dxy = sum(opponent_positions) do pos_opponent
+            d_sq = add_regularized_squared_distance!(opt_model, x_sub_ego, pos_opponent)
             dproxdx = @variable(opt_model, [t = 1:T])
             @NLconstraint(
                 opt_model,
                 [t = 1:T],
-                dproxdx[t] == -2 * (x_sub_ego[1, t] - x_sub_opp[1, t]) / d_sq[t]
+                dproxdx[t] == -2 * (x_sub_ego[1, t] - pos_opponent[1, t]) / d_sq[t]
             )
             dproxdy = @variable(opt_model, [t = 1:T])
             @NLconstraint(
                 opt_model,
                 [t = 1:T],
-                dproxdy[t] == -2 * (x_sub_ego[2, t] - x_sub_opp[2, t]) / d_sq[t]
+                dproxdy[t] == -2 * (x_sub_ego[2, t] - pos_opponent[2, t]) / d_sq[t]
             )
             [dproxdx'; dproxdy']
         end
