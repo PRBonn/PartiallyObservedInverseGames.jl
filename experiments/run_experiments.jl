@@ -21,19 +21,7 @@ using ProgressMeter: @showprogress
 using VegaLite: @vlplot
 
 include("./simple_caching.jl")
-
-#============================================== Utils ==============================================#
-
-macro saveviz(assigned_visualization_expr)
-    println(assigned_visualization_expr)
-    @assert assigned_visualization_expr.head == :(=)
-    var, fun = assigned_visualization_expr.args
-
-    quote
-        $(esc(assigned_visualization_expr))
-        $(esc(var)) |> VegaLite.save(joinpath(project_root_dir, "figures/$($(Meta.quot(var))).pdf"))
-    end
-end
+include("./saveviz.jl")
 
 #==================================== Forward Game Formulation =====================================#
 
