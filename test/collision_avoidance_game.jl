@@ -17,15 +17,15 @@ x0 = vcat([-1, 0, 0.1, 0 + deg2rad(10)], [0, -1, 0.1, pi / 2 + deg2rad(10)])
 T = 25
 player_cost_models = let
     cost_model_p1 = CollisionAvoidanceGame.generate_player_cost_model(;
+        player_idx = 1,
+        control_system,
         T,
-        state_indices = 1:4,
-        input_indices = 1:2,
         goal_position = [1, 0],
     )
     cost_model_p2 = CollisionAvoidanceGame.generate_player_cost_model(;
+        player_idx = 2,
+        control_system,
         T,
-        state_indices = 5:8,
-        input_indices = 3:4,
         goal_position = [0, 1],
     )
 
