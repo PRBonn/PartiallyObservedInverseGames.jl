@@ -107,9 +107,7 @@ function estimate(
     player_cost_models,
     solver_attributes,
     expected_observation = identity,
-    estimator_name = (
-        expected_observation === identity ? "KKT Constraints Full" : "KKT Constraints Partial"
-    ),
+    estimator_name = (expected_observation === identity ? "Ours Full" : "Ours Partial"),
     solver_kwargs...,
 )
 
@@ -140,9 +138,7 @@ function estimate(
     solver_attributes = (; print_level = 1),
     expected_observation = identity,
     pre_solve = true,
-    estimator_name = (
-        expected_observation === identity ? "KKT Residuals Full" : "KKT Residuals Partial"
-    ),
+    estimator_name = (expected_observation === identity ? "Baseline Full" : "Baseline Partial"),
 )
     @showprogress map(enumerate(dataset)) do (observation_idx, d)
         observation_model = (; d.σ, expected_observation)
