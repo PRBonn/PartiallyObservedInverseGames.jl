@@ -145,6 +145,7 @@ function estimate(
         observation = if pre_solve
             pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
                 expected_observation(d.x),
+                # TODO: think about  this. Should "fully observed" imply "observe inputs"?
                 (expected_observation === identity ? d.u : nothing);
                 control_system,
                 observation_model,
@@ -193,6 +194,7 @@ estimator_setup_partial =
 
 #======== Augment KKT Residual Solution with State and Input Estimate via Forward Solution =========#
 
+# TODO: this couuld also use the pre-solver to accelerate augmentation
 function augment_with_forward_solution(
     estimates;
     solver,
