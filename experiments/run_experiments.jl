@@ -295,7 +295,6 @@ end
 
 demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
 
-# TODO: add the estimator name already earlier (when estimtes are created).
 errstats = map(estimates) do estimate
     estimator_statistics(estimate; dataset, demo_gt)
 end
@@ -330,8 +329,6 @@ function visualize_paramerr(;
     y_label = "Mean Parameter Cosine Error",
 )
     common_viz = @vlplot(
-        # title = {text = "(a) Position Error", fontWeight = "normal", orient = "bottom"}
-        # shape = {"estimator_name:n", title = "Estimator"},
         color = {"estimator_name:n", title = "Estimator"},
         width = width,
         height = height,
@@ -363,7 +360,6 @@ function visualize_poserr(;
     y_label = "Mean Absolute Position Prediciton Error [m]",
 )
     common_viz = @vlplot(
-        # title = {text = "(a) Position Error", fontWeight = "normal", orient = "bottom"}
         color = {"estimator_name:n", title = "Estimator"},
         width = width,
         height = height,
