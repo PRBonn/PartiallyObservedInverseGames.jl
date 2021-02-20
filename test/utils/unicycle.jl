@@ -129,10 +129,10 @@ function TrajectoryVisualization.visualize_trajectory(
                 color = {"player:n", title = "Player", legend = nothing},
             }
         ) +
-        VegaLite.@vlplot(mark = {:point, shape = :wedge, size = 50, clip = true, filled = true})
+        VegaLite.@vlplot(mark = {"point", shape = "wedge", size = 50, clip = true, filled = true})
 
     if draw_line
-        trajectory_visualizer += VegaLite.@vlplot(mark = {:line, clip = true})
+        trajectory_visualizer += VegaLite.@vlplot(mark = {"line", clip = true})
     end
 
     trajectory_table |> trajectory_visualizer
