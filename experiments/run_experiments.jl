@@ -12,6 +12,7 @@ import CollisionAvoidanceGame
 import TestDynamics
 import JuMPOptimalControl.CostUtils
 import JuMPOptimalControl.InversePreSolve
+import JuMPOptimalControl.DynamicsModelInterface
 using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory, visualize_trajectory_batch
 using JuMPOptimalControl.ForwardGame: KKTGameSolver, IBRGameSolver, solve_game
 using JuMPOptimalControl.InverseGames:
@@ -80,6 +81,14 @@ function generate_dataset(
         solve_game(solve_args...; solve_kwargs...)
     @assert converged_gt
 
+    # add additional time step to make last x relevant state obseravable in the partially observed
+    # case
+    x_extra = DynamicsModelInterface.next_x(
+        control_system,
+        forward_solution_gt.x[:, end],
+        forward_solution_gt.u[:, end],
+    )
+
     # Note: reducing over inner loop to flatten the dataset
     dataset = mapreduce(vcat, noise_levels) do σ
         n_samples = iszero(σ) ? 1 : n_trajectory_samples_per_noise_level
@@ -88,6 +97,7 @@ function generate_dataset(
                 σ,
                 x = forward_solution_gt.x + σ * randn(rng, size(forward_solution_gt.x)),
                 u = forward_solution_gt.u + σ * randn(rng, size(forward_solution_gt.u)),
+                x_extra = x_extra + σ * randn(rng, size(x_extra)),
             )
         end
     end
@@ -132,42 +142,45 @@ end
 
 function estimate(
     solver::InverseKKTResidualSolver;
-    dataset = dataset,
-    control_system = control_system,
-    player_cost_models = player_cost_models_gt,
-    solver_attributes = (; print_level = 1),
+    dataset,
+    control_system,
+    player_cost_models,
+    solver_attributes,
     expected_observation = identity,
-    pre_solve = true,
     estimator_name = (expected_observation === identity ? "Baseline Full" : "Baseline Partial"),
 )
     @showprogress map(enumerate(dataset)) do (observation_idx, d)
         observation_model = (; d.σ, expected_observation)
-        observation = if pre_solve
+        smoothed_observation = let
             pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
-                expected_observation(d.x),
-                # TODO: think about  this. Should "fully observed" imply "observe inputs"?
-                (expected_observation === identity ? d.u : nothing);
+                # pre-filter for baseline receives one extra state observation to avoid
+                # unobservability of the velocity at the end-point.
+                expected_observation([d.x d.x_extra]),
+                nothing;
                 control_system,
                 observation_model,
                 solver_attributes,
             )
             @assert pre_solve_converged
-            (; pre_solve_solution.x, pre_solve_solution.u)
-        else
-            (; d.x, d.u)
+            # Filtered sequence is truncated to the original length to give all methods the same
+            # number of data-points for inference.
+            (;
+                x = pre_solve_solution.x[:, 1:size(d.x, 2)],
+                u = pre_solve_solution.u[:, 1:size(d.u, 2)],
+            )
         end
 
         converged, estimate, opt_model = solve_inverse_game(
             solver,
-            observation.x,
-            observation.u;
+            smoothed_observation.x,
+            smoothed_observation.u;
             control_system,
             player_cost_models,
             solver_attributes,
         )
         converged || @warn "resKKT did not converge on observation $observation_idx."
 
-        merge(estimate, (; converged, observation_idx, estimator_name))
+        merge(estimate, (; converged, observation_idx, estimator_name, smoothed_observation))
     end
 end
 
@@ -176,7 +189,6 @@ estimator_setup = (;
     control_system,
     player_cost_models = player_cost_models_gt,
     solver_attributes = (; print_level = 1),
-    pre_solve = true,
 )
 
 estimator_setup_partial =
@@ -194,7 +206,6 @@ estimator_setup_partial =
 
 #======== Augment KKT Residual Solution with State and Input Estimate via Forward Solution =========#
 
-# TODO: this couuld also use the pre-solver to accelerate augmentation
 function augment_with_forward_solution(
     estimates;
     solver,
@@ -256,21 +267,22 @@ function estimator_statistics(
 )
 
     function trajectory_component_errors(trajectory)
-        (;
-            x_error = trajectory_distance(demo_gt.x, trajectory.x),
-            u_error = trajectory_distance(demo_gt.u, trajectory.u),
-            position_error = trajectory_distance(
-                demo_gt.x[position_indices, :],
-                trajectory.x[position_indices, :],
-            ),
-        )
+        if haskey(trajectory, :x)
+            (;
+                x_error = trajectory_distance(demo_gt.x, trajectory.x),
+                position_error = trajectory_distance(
+                    demo_gt.x[position_indices, :],
+                    trajectory.x[position_indices, :],
+                ),
+            )
+        else
+            (; x_error = Inf, position_error = Inf)
+        end
     end
 
     observation = dataset[estimate.observation_idx]
-    x_observation_error, u_observation_error, position_observation_error =
-        trajectory_component_errors(observation)
-    x_estimation_error, u_estimation_error, position_estimation_error =
-        trajectory_component_errors(estimate)
+    x_observation_error, position_observation_error = trajectory_component_errors(observation)
+    x_estimation_error, position_estimation_error = trajectory_component_errors(estimate)
 
     parameter_estimation_error =
         map(demo_gt.player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
@@ -284,10 +296,8 @@ function estimator_statistics(
         estimate.converged,
         observation.σ,
         x_observation_error,
-        u_observation_error,
         position_observation_error,
         x_estimation_error,
-        u_estimation_error,
         position_estimation_error,
         parameter_estimation_error,
     )
@@ -301,108 +311,15 @@ end
 
 #========================================== Visualization ==========================================#
 
-"Visualize all trajectory `estimates` along with the corresponding ground truth
-`forward_solution_gt`"
-function visualize_bundle(
-    control_system,
-    estimates,
-    forward_solution_gt;
-    filter_converged = false,
-    kwargs...,
-)
-    position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
-    estimated_trajectory_batch = [e.x for e in estimates if !filter_converged || e.converged]
-    visualize_trajectory_batch(
-        control_system,
-        estimated_trajectory_batch;
-        position_domain,
-        kwargs...,
-    )
-end
+include("visualization.jl")
 
-global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
-
-function visualize_paramerr(;
-    scatter_opacity = 0.2,
-    width = 500,
-    height = 300,
-    y_label = "Mean Parameter Cosine Error",
-)
-    common_viz = @vlplot(
-        color = {"estimator_name:n", title = "Estimator"},
-        width = width,
-        height = height,
-        config = global_config
-    )
-
-    raw_scatter_viz = @vlplot(
-        mark =
-            {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
-        x = {"position_observation_error:q", title = "Mean Absolute Postion Observation Error [m]"},
-        y = {"parameter_estimation_error:q", title = y_label},
-    )
-
-    median_iqr_viz =
-        @vlplot(
-            x = {"σ:q"},
-            y = {"parameter_estimation_error:q", aggregate = "median", title = y_label}
-        ) +
-        @vlplot(mark = "line") +
-        @vlplot(mark = {"errorband", extent = "iqr"})
-
-    common_viz + median_iqr_viz + raw_scatter_viz
-end
-
-function visualize_poserr(;
-    scatter_opacity = 0.2,
-    width = 500,
-    height = 300,
-    y_label = "Mean Absolute Position Prediciton Error [m]",
-)
-    common_viz = @vlplot(
-        color = {"estimator_name:n", title = "Estimator"},
-        width = width,
-        height = height,
-        config = global_config
-    )
-
-    raw_scatter_viz = @vlplot(
-        mark =
-            {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
-        shape = {
-            "converged:n",
-            title = "Trajectory Reconstructable",
-            legend = nothing,
-            scale = {domain = [true, false], range = ["circle", "triangle-down"]},
-        },
-        x = {"position_observation_error:q", title = "Mean Absolute Postion Observation Error [m]"},
-        y = {
-            "position_estimation_error:q",
-            title = y_label,
-            scale = {type = "symlog", constant = 0.01},
-        },
-    )
-
-    median_iqr_viz =
-        @vlplot(
-            x = {"σ:q"},
-            y = {"position_estimation_error:q", aggregate = "median", title = y_label}
-        ) +
-        @vlplot(mark = "line") +
-        @vlplot(mark = {"errorband", extent = "iqr"})
-
-    common_viz + median_iqr_viz + raw_scatter_viz
-end
-
-@saveviz conKKT_partial_bundle_viz =
-    visualize_bundle(control_system, estimates_conKKT_partial, forward_solution_gt)
-@saveviz resKKT_partial_bundle_viz = visualize_bundle(
-    control_system,
-    augmented_estimates_resKKT_partial,
-    forward_solution_gt;
-    filter_converged = true,
-)
-@saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
-
+# @saveviz conKKT_bundle_viz = visualize_bundle(control_system, estimates_conKKT, forward_solution_gt)
+# @saveviz resKKT_bundle_viz = visualize_bundle(
+#     control_system,
+#     augmented_estimates_resKKT,
+#     forward_solution_gt;
+#     filter_converged = true,
+# )
+# @saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
 @saveviz parameter_error_viz = errstats |> visualize_paramerr()
 @saveviz position_error_viz = errstats |> visualize_poserr()

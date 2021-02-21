@@ -10,11 +10,14 @@ function pre_solve(
     u_obs;
     control_system,
     observation_model = (; expected_observation = identity),
+    u_regularization = 0,
     inner_solver_kwargs...,
 )
     function presolve_objective(; x, u, y_obs, u_obs)
         y_expected = observation_model.expected_observation(x)
-        sum(el -> el^2, y_expected - y_obs) + (isnothing(u_obs) ? 0 : sum(el -> el^2, u - u_obs))
+        sum(el -> el^2, y_expected - y_obs) +
+        (isnothing(u_obs) ? 0 : sum(el -> el^2, u - u_obs)) +
+        (iszero(u_regularization) ? 0 : u_regularization * sum(el -> el^2, u))
     end
 
     reconstruction_cost_model = (;
