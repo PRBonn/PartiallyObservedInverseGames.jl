@@ -73,47 +73,6 @@ function visualize_paramerr(;
     )
 end
 
-function visualize_poserr_old(;
-    scatter_opacity = 0.2,
-    width = 500,
-    height = 300,
-    y_label = "Mean Absolute Position Prediciton Error [m]",
-)
-    common_viz = @vlplot(
-        color = estimator_color_encoding,
-        width = width,
-        height = height,
-        config = global_config
-    )
-
-    raw_scatter_viz = @vlplot(
-        mark =
-            {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
-        shape = {
-            "converged:n",
-            title = "Trajectory Reconstructable",
-            legend = nothing,
-            scale = {domain = [true, false], range = ["circle", "triangle-down"]},
-        },
-        x = {"position_observation_error:q", title = "Mean Absolute Postion Observation Error [m]"},
-        y = {
-            "position_estimation_error:q",
-            title = y_label,
-            scale = {type = "symlog", constant = 0.01},
-        },
-    )
-
-    median_iqr_viz =
-        @vlplot(
-            x = {"σ:q"},
-            y = {"position_estimation_error:q", aggregate = "median", title = y_label}
-        ) +
-        @vlplot(mark = "line") +
-        @vlplot(mark = {"errorband", extent = "iqr"})
-
-    common_viz + median_iqr_viz + raw_scatter_viz
-end
-
 function visualize_poserr(;
     scatter_opacity = 0.2,
     width = 500,
@@ -162,7 +121,7 @@ function visualize_poserr(;
     @vlplot(
         mark = {"errorband", extent = "iqr"},
         #x = "σ:q",
-        #y = {"position_estimation_error:q"},
+        #y = {"position_estimation_error:q", title = y_label},
         y = {"error_band_lower:q", title = y_label},
         y2 = "error_band_upper:q",
     )
