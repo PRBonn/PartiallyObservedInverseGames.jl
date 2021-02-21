@@ -104,7 +104,7 @@ function solve_inverse_game(
     max_observation_error = nothing,
     init_with_observation = true,
     verbose = false,
-    pre_solve = false,
+    pre_solve = true,
 )
 
     T = size(y, 2)
@@ -125,7 +125,6 @@ function solve_inverse_game(
     λ0 = @variable(opt_model, [1:n_states, 1:n_players])
 
     if pre_solve
-        # TODO: also forward init?
         pre_solve_conveged, pre_solve_init = InversePreSolve.pre_solve(
             y,
             nothing;
@@ -305,7 +304,10 @@ function solve_inverse_game(
     @objective(
         opt_model,
         Min,
-        sum(sum(el -> el^2, res.dLdx) + sum(el -> el^2, res.dLdu) for res in player_residuals)
+        sum(
+            sum(el -> el^2, res.dLdx) + sum(el -> el^2, res.dLdu[:, 1:(end - 1)])
+            for res in player_residuals
+        )
     )
 
     time = @elapsed JuMP.optimize!(opt_model)
