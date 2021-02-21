@@ -22,12 +22,11 @@ using VegaLite: @vlplot
 
 # Utils
 include("./simple_caching.jl")
-include("./saveviz.jl")
-function unitvector(θ)
-    [cos(θ), sin(θ)]
-end
+include("./utils.jl")
 
 #==================================== Forward Game Formulation =====================================#
+
+T = 25
 
 control_system = TestDynamics.ProductSystem([
     TestDynamics.Unicycle(0.25),
@@ -35,10 +34,12 @@ control_system = TestDynamics.ProductSystem([
     # TestDynamics.Unicycle(0.25),
 ])
 
-n_players = length(control_system.subsystems)
-
-player_angles = map(eachindex(control_system.subsystems)) do ii
-    (ii - 1) * 2pi / n_players
+player_angles = let
+    n_players = length(control_system.subsystems)
+    map(eachindex(control_system.subsystems)) do ii
+        angle_fraction = n_players == 2 ? pi / 2 : 2pi / n_players
+        (ii - 1) * angle_fraction
+    end
 end
 
 x0 = mapreduce(vcat, player_angles) do player_angle
@@ -48,11 +49,10 @@ end
 position_indices = mapreduce(vcat, eachindex(control_system.subsystems)) do subsystem_idx
     TestDynamics.state_indices(control_system, subsystem_idx)[1:2]
 end
+
 partial_state_indices = mapreduce(vcat, eachindex(control_system.subsystems)) do subsystem_idx
     TestDynamics.state_indices(control_system, subsystem_idx)[[1, 2, 4]]
 end
-
-T = 25
 
 player_cost_models_gt = map(enumerate(player_angles)) do (ii, player_angle)
     cost_model_p1 = CollisionAvoidanceGame.generate_player_cost_model(;
