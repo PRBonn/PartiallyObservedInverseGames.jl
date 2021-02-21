@@ -73,8 +73,8 @@ end
 function generate_dataset(
     solve_args = (IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     solve_kwargs = (; solver_attributes = (; print_level = 1)),
-    noise_levels = unique([0:0.001:0.01; 0.01:0.05:0.03; 0.03:0.01:0.1]),
-    n_trajectory_samples_per_noise_level = 10,
+    noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
+    n_observation_sequences_per_noise_level = 20,
     rng = Random.MersenneTwister(1),
 )
     converged_gt, forward_solution_gt, forward_opt_model_gt =
@@ -91,7 +91,7 @@ function generate_dataset(
 
     # Note: reducing over inner loop to flatten the dataset
     dataset = mapreduce(vcat, noise_levels) do σ
-        n_samples = iszero(σ) ? 1 : n_trajectory_samples_per_noise_level
+        n_samples = iszero(σ) ? 1 : n_observation_sequences_per_noise_level
         observations = map(1:n_samples) do _
             (;
                 σ,
