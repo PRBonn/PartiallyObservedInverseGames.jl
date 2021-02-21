@@ -1,4 +1,6 @@
-global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
+viz_global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
+viz_defaults = (; width = 500, height = 300, frame = [-25, 0], scatter_opacity = 0.2)
+
 estimator_color_encoding = VegaLite.@vlfrag(
     field = "estimator_name",
     type = "nominal",
@@ -31,14 +33,14 @@ function visualize_bundle(
 end
 
 function visualize_paramerr(;
-    scatter_opacity = 0.2,
-    width = 500,
-    height = 300,
+    scatter_opacity = viz_defaults.scatter_opacity,
+    width = viz_defaults.width,
+    height = viz_defaults.height,
+    frame = viz_defaults.frame,
     y_label = "Mean Parameter Cosine Error",
-    frame = [-30, 0],
 )
     @vlplot(
-        config = global_config,
+        config = viz_global_config,
         height = height,
         width = width,
         color = estimator_color_encoding,
@@ -75,14 +77,14 @@ function visualize_paramerr(;
 end
 
 function visualize_poserr(;
-    scatter_opacity = 0.2,
-    width = 500,
-    height = 300,
+    scatter_opacity = viz_defaults.scatter_opacity,
+    width = viz_defaults.width,
+    height = viz_defaults.height,
+    frame = viz_defaults.frame,
     y_label = "Mean Absolute Position Prediciton Error [m]",
-    frame = [-30, 0],
 )
     @vlplot(
-        config = global_config,
+        config = viz_global_config,
         height = height,
         width = width,
         color = estimator_color_encoding,
