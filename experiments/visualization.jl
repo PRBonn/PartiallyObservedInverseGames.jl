@@ -1,5 +1,5 @@
 viz_global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
-viz_defaults = (; width = 500, height = 300, frame = [-25, 0], scatter_opacity = 0.2)
+viz_defaults = (; width = 500, height = 300, frame = [-40, 0], scatter_opacity = 0.2)
 
 estimator_color_encoding = VegaLite.@vlfrag(
     field = "estimator_name",
@@ -48,9 +48,9 @@ function visualize_paramerr(;
         transform = [
             {
                 window = [
-                    {field = "parameter_estimation_error", op = "mean", as = "error_average"},
-                    {field = "parameter_estimation_error", op = "ci0", as = "error_band_lower"},
-                    {field = "parameter_estimation_error", op = "ci1", as = "error_band_upper"},
+                    {field = "parameter_estimation_error", op = "median", as = "error_average"},
+                    {field = "parameter_estimation_error", op = "q1", as = "error_band_lower"},
+                    {field = "parameter_estimation_error", op = "q3", as = "error_band_upper"},
                 ],
                 groupby = ["estimator_name"],
                 frame = frame,
@@ -92,9 +92,9 @@ function visualize_poserr(;
         transform = [
             {
                 window = [
-                    {field = "position_estimation_error", op = "mean", as = "error_average"},
-                    {field = "position_estimation_error", op = "ci0", as = "error_band_lower"},
-                    {field = "position_estimation_error", op = "ci1", as = "error_band_upper"},
+                    {field = "position_estimation_error", op = "median", as = "error_average"},
+                    {field = "position_estimation_error", op = "q1", as = "error_band_lower"},
+                    {field = "position_estimation_error", op = "q3", as = "error_band_upper"},
                 ],
                 groupby = ["estimator_name"],
                 frame = frame,
