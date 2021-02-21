@@ -7,6 +7,7 @@ estimator_color_encoding = VegaLite.@vlfrag(
         domain = ["Ours Full", "Ours Partial", "Baseline Full", "Baseline Partial"],
         # Paired color scheme:
         # range = ["#a6cee3", "#1f78b4", "#bdbdbd", "#636363"],
+        range = ["#4c78a8", "#72b7b2", "#e45756", "#f58518"],
     },
 )
 
