@@ -109,7 +109,8 @@ function TrajectoryVisualization.visualize_trajectory(
     x,
     ::TrajectoryVisualization.VegaLiteBackend;
     canvas = VegaLite.@vlplot(),
-    position_domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
+    x_position_domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
+    y_position_domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
     draw_line = true,
     player,
 )
@@ -122,8 +123,8 @@ function TrajectoryVisualization.visualize_trajectory(
     trajectory_visualizer =
         VegaLite.@vlplot(
             encoding = {
-                x = {"px:q", scale = {domain = position_domain}, title = "Position x [m]"},
-                y = {"py:q", scale = {domain = position_domain}, title = "Position y [m]"},
+                x = {"px:q", scale = {domain = x_position_domain}, title = "Position x [m]"},
+                y = {"py:q", scale = {domain = y_position_domain}, title = "Position y [m]"},
                 angle = {"θ:q", scale = {domain = [pi, -pi], range = [-90, 270]}},
                 order = "t:q",
                 color = {"player:n", title = "Player", legend = nothing},
