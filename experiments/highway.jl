@@ -94,9 +94,24 @@ converged_gt, forward_solution_gt, forward_opt_model_gt = solve_game(
     solver_attributes = (; print_level = 1),
 )
 
-visualize_trajectory(
-    control_system,
-    forward_solution_gt.x,
-    VegaLiteBackend();
-    canvas = VegaLite.@vlplot(width = 500, height = 500),
-)
+viz = let
+    max_size = 500
+    y_position_domain = [-0.5, 6.5]
+    x_position_domain = [-0.5, 0.5]
+    x_range = only(diff(extrema(x_position_domain) |> collect))
+    y_range = only(diff(extrema(y_position_domain) |> collect))
+    max_range = max(x_range, y_range)
+    canvas = VegaLite.@vlplot(
+        width = max_size * x_range / max_range,
+        height = max_size * y_range / max_range
+    )
+
+    visualize_trajectory(
+        control_system,
+        forward_solution_gt.x,
+        VegaLiteBackend();
+        x_position_domain,
+        y_position_domain,
+        canvas,
+    )
+end

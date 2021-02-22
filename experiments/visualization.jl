@@ -22,12 +22,13 @@ function visualize_bundle(
     filter_converged = false,
     kwargs...,
 )
-    position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
+    x_position_domain = y_position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
     estimated_trajectory_batch = [e.x for e in estimates if !filter_converged || e.converged]
     visualize_trajectory_batch(
         control_system,
         estimated_trajectory_batch;
-        position_domain,
+        x_position_domain,
+        y_position_domain,
         kwargs...,
     )
 end
