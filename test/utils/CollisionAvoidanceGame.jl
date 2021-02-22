@@ -16,14 +16,14 @@ function generate_player_cost_model(;
     weights = (; state_proximity = 1, state_velocity = 1, control_Δv = 1, control_Δθ = 1),
     cost_prescaling = (;
         state_goal = 100, # The state_goal weight is assumed to be fixed.
-        state_lane = 1,
+        state_lane = 0.1,
         state_proximity = 0.1,
         state_velocity = 1,
         control_Δv = 10,
         control_Δθ = 1,
     ),
-    x_lane_width = nothing,
-    y_lane_width = nothing,
+    x_lane = nothing,
+    y_lane = nothing,
     # TODO: implement or remove
     target_velocity = nothing,
     prox_min_regularization = 0.1,
@@ -67,12 +67,37 @@ function generate_player_cost_model(;
             prox_cost
         end
 
+        state_lane = let
+            function regularized_log_barrier(values, barrier, regularization = prox_min_regularization)
+                b = @variable(opt_model, [t = 1:T])
+                @NLconstraint(
+                    opt_model,
+                    [t = 1:T],
+                    b[t] == -log((values[t] - barrier)^2 + regularization)
+                )
+                b
+            end
+
+            x_lane_cost =
+                isnothing(x_lane) ? 0 :
+                sum(regularized_log_barrier(x_sub_ego[1, :], x_lane.center + x_lane.width / 2 )) +
+                sum(regularized_log_barrier(x_sub_ego[1, :], x_lane.center - x_lane.width / 2 ))
+            y_lane_cost =
+                isnothing(y_lane) ? 0 :
+                sum(regularized_log_barrier(x_sub_ego[2, :], y_lane.center + y_lane.width / 2 )) +
+                sum(regularized_log_barrier(x_sub_ego[2, :], y_lane.center - y_lane.width / 2 ))
+
+            x_lane_cost + y_lane_cost
+        end
+
         J̃ = (;
             # TODO: maybe conditionally deactivate if a target velocity is active
-            state_goal = sum(el -> el^2, x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position),
+            state_goal = (
+                isnothing(target_velocity) ?
+                sum(el -> el^2, x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position) : 0
+            ),
             # TODO: also incooporate lane width; handle in gradient computation.
-            state_lane = (!isnothing(x_lane_width) ? sum(el -> el^2, x_sub_ego[1, :]) : 0) +
-                         (!isnothing(y_lane_width) ? sum(el -> el^2, x_sub_ego[2, :]) : 0),
+            state_lane,
             state_proximity = sum(prox_cost),
             state_velocity = sum(el -> el^2, x_sub_ego[3, :]),
             control_Δv = sum(el -> el^2, u_sub_ego[1, :]),
