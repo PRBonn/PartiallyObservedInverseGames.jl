@@ -16,11 +16,16 @@ function generate_player_cost_model(;
     weights = (; state_proximity = 1, state_velocity = 1, control_Δv = 1, control_Δθ = 1),
     cost_prescaling = (;
         state_goal = 100, # The state_goal weight is assumed to be fixed.
+        state_lane = 1,
         state_proximity = 0.1,
         state_velocity = 1,
         control_Δv = 10,
         control_Δθ = 1,
     ),
+    x_lane_width = nothing,
+    y_lane_width = nothing,
+    # TODO: implement or remove
+    target_velocity = nothing,
     prox_min_regularization = 0.1,
     T_activate_goalcost = T,
 )
@@ -63,7 +68,11 @@ function generate_player_cost_model(;
         end
 
         J̃ = (;
+            # TODO: maybe conditionally deactivate if a target velocity is active
             state_goal = sum(el -> el^2, x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position),
+            # TODO: also incooporate lane width; handle in gradient computation.
+            state_lane = (!isnothing(x_lane_width) ? sum(el -> el^2, x_sub_ego[1, :]) : 0) +
+                         (!isnothing(y_lane_width) ? sum(el -> el^2, x_sub_ego[2, :]) : 0),
             state_proximity = sum(prox_cost),
             state_velocity = sum(el -> el^2, x_sub_ego[3, :]),
             control_Δv = sum(el -> el^2, u_sub_ego[1, :]),
@@ -73,7 +82,11 @@ function generate_player_cost_model(;
             opt_model,
             Min,
             sum(weights[k] * cost_prescaling[k] * J̃[k] for k in keys(weights)) +
-            J̃.state_goal * cost_prescaling.state_goal * sum(weights) / length(weights)
+            # TODO: think about the relative weighting here.
+            (
+                J̃.state_goal * cost_prescaling.state_goal +
+                J̃.state_lane * cost_prescaling.state_lane
+            ) * sum(weights) / length(weights)
         )
     end
 
