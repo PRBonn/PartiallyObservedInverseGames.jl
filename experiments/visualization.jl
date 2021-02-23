@@ -1,5 +1,5 @@
 viz_global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
-viz_defaults = (; width = 500, height = 300, frame = [-40, 0], scatter_opacity = 0.2)
+viz_defaults = (; width = 500, height = 300, frame = [-100, 0], scatter_opacity = 0.2)
 
 estimator_color_encoding = VegaLite.@vlfrag(
     field = "estimator_name",
