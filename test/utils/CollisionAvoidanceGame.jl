@@ -15,13 +15,15 @@ function generate_player_cost_model(;
     goal_position,
     weights = (; state_proximity = 1, state_velocity = 1, control_Δv = 1, control_Δθ = 1),
     cost_prescaling = (;
-        state_goal = 100, # The state_goal weight is assumed to be fixed.
-        state_lane = 1.0,
         state_proximity = 0.1,
-        state_orientation = 2.0,
         state_velocity = 1,
         control_Δv = 10,
         control_Δθ = 1,
+    ),
+    fix_costs = (; # encoding soft-constraints rather than preferences
+        state_goal = 100,
+        state_lane = 1.0,
+        state_orientation = 2.0,
     ),
     x_lane_center = nothing,
     y_lane_center = nothing,
@@ -98,12 +100,8 @@ function generate_player_cost_model(;
             opt_model,
             Min,
             sum(weights[k] * cost_prescaling[k] * J̃[k] for k in keys(weights)) +
-            # TODO: think about the relative weighting here.
-            (
-                J̃.state_goal * cost_prescaling.state_goal +
-                J̃.state_lane * cost_prescaling.state_lane +
-                J̃.state_orientation * cost_prescaling.state_orientation
-            ) * sum(weights) / length(weights)
+            sum(fix_costs[k] * J̃[k] for k in keys(fix_costs)) * sum(weights) /
+            length(weights)
         )
     end
 
