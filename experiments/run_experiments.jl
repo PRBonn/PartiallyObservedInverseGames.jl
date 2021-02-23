@@ -1,5 +1,28 @@
-const project_root_dir = realpath(joinpath(@__DIR__, ".."))
-unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
+import Distributed
+using Distributed: pmap
+include("distributed.jl")
+
+Distributed.@everywhere begin
+    const project_root_dir = realpath(joinpath(@__DIR__, ".."))
+    unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
+
+    import Pkg
+    Pkg.activate(project_root_dir)
+
+    import CollisionAvoidanceGame
+    import TestDynamics
+    import JuMPOptimalControl.CostUtils
+    import JuMPOptimalControl.InversePreSolve
+    import JuMPOptimalControl.DynamicsModelInterface
+    using JuMPOptimalControl.TrajectoryVisualization:
+        visualize_trajectory, visualize_trajectory_batch
+    using JuMPOptimalControl.ForwardGame: KKTGameSolver, IBRGameSolver, solve_game
+    using JuMPOptimalControl.InverseGames:
+        InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
+
+    using ProgressMeter: @showprogress
+    using VegaLite: @vlplot
+end
 
 import Random
 import Statistics
@@ -7,20 +30,6 @@ import LinearAlgebra
 import Distances
 import ElectronDisplay
 import VegaLite
-
-import CollisionAvoidanceGame
-import TestDynamics
-import JuMPOptimalControl.CostUtils
-import JuMPOptimalControl.InversePreSolve
-import JuMPOptimalControl.DynamicsModelInterface
-using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory, visualize_trajectory_batch
-using JuMPOptimalControl.ForwardGame: KKTGameSolver, IBRGameSolver, solve_game
-using JuMPOptimalControl.InverseGames:
-    InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
-
-using ProgressMeter: @showprogress
-using VegaLite: @vlplot
-
 # Utils
 include("./simple_caching.jl")
 include("./utils.jl")
@@ -74,7 +83,7 @@ function generate_dataset(
     solve_args = (IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     solve_kwargs = (; solver_attributes = (; print_level = 1)),
     noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
-    n_observation_sequences_per_noise_level = 20,
+    n_observation_sequences_per_noise_level = 100,
     rng = Random.MersenneTwister(1),
 )
     converged_gt, forward_solution_gt, forward_opt_model_gt =
@@ -121,7 +130,7 @@ function estimate(
     solver_kwargs...,
 )
 
-    @showprogress map(enumerate(dataset)) do (observation_idx, d)
+    @showprogress pmap(enumerate(dataset)) do (observation_idx, d)
         observation_model = (; d.σ, expected_observation)
 
         converged, estimate, opt_model = solve_inverse_game(
@@ -149,7 +158,7 @@ function estimate(
     expected_observation = identity,
     estimator_name = (expected_observation === identity ? "Baseline Full" : "Baseline Partial"),
 )
-    @showprogress map(enumerate(dataset)) do (observation_idx, d)
+    @showprogress pmap(enumerate(dataset)) do (observation_idx, d)
         observation_model = (; d.σ, expected_observation)
         smoothed_observation = let
             pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
@@ -213,9 +222,10 @@ function augment_with_forward_solution(
     player_cost_models_gt,
     x0,
     T,
+    verbose = false,
     kwargs...,
 )
-    @showprogress map(enumerate(estimates)) do (ii, estimate)
+    @showprogress pmap(enumerate(estimates)) do (ii, estimate)
         # overwrite the weights of the ground truth model with the weights of the estimate.
         player_cost_models_est =
             map(player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights
@@ -226,7 +236,7 @@ function augment_with_forward_solution(
         converged, forward_solution, forward_opt_model =
             solve_game(solver, control_system, player_cost_models_est, x0, T; kwargs...)
 
-        converged || @warn "Forward solution augmentation did not converge on observation $ii."
+        converged || verbose && @warn "Forward solution augmentation did not converge on observation $ii."
 
         merge(estimate, (; forward_solution.x, forward_solution.u, converged))
     end
