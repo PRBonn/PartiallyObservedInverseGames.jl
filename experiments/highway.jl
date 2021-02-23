@@ -43,70 +43,66 @@ control_system = TestDynamics.ProductSystem([
 #   - [done] remove log-barriers
 #  - [done] try different IBR orders.
 #  - [done] add antother player merging from the left to the right
-#  - tidy up parameterization of CollisionAvoidanceGame and make sure it's backward compatible with
+#  - [done] tidy up parameterization of CollisionAvoidanceGame
 #  the other experiment.
 #  - implement gradients for additional cost terms
 #       - test gradient with forward solver
 #  - Figure out which parameters are worth inferring here.
+#  - make sure that the old example still works.
 #
 #  Later: vary some parameter dimensions
 #   - fix initial progress, initial speed, initial lane, goal lane, target_speed
-#   - vary prox cost (in low regime near 0.0 to 0.3), speed cost (in high regime near), 
+#   - vary prox cost (in low regime near 0.0 to 0.3), speed cost (in high regime near),
 #
 player_configurations = [
     # Vehicle on the right lane wishing to merge left to go faster
     (;
-        initial_speed = 0.2,
-        initial_progress = 0,
         initial_lane = 1.0,
+        initial_progress = 0,
+        initial_speed = 0.2,
         target_speed = 0.3,
         speed_cost = 1.0,
         target_lane = 0.0,
-        lane_cost = 10.0,
         prox_cost = 0.3,
     ),
     # Fast vehicle from the back that would like to maintain its speed.
     (;
-        initial_speed = 0.4,
-        initial_progress = -3.0,
         initial_lane = 0,
+        initial_progress = -3.0,
+        initial_speed = 0.4,
         target_speed = 0.4,
         target_lane = 0.0,
         speed_cost = 1.0,
-        lane_cost = 10.0,
         prox_cost = 0.3,
     ),
     # Slow truck on the right lane
     (;
-        initial_speed = 0.15,
-        initial_progress = 2,
         initial_lane = 1.0,
+        initial_progress = 2,
+        initial_speed = 0.15,
         target_speed = 0.15,
         speed_cost = 1.0,
         target_lane = 1.0,
-        lane_cost = 10.0,
         prox_cost = 0.1,
     ),
     # Slow truck on the right lane
     (;
-        initial_speed = 0.15,
-        initial_progress = 4,
         initial_lane = 1.0,
+        initial_progress = 4,
+        initial_speed = 0.15,
         target_speed = 0.15,
         speed_cost = 1.0,
         target_lane = 1.0,
-        lane_cost = 10.0,
         prox_cost = 0.1,
     ),
     # Fast vehicle on the left lane wishing to merge back on the right lane and slow down
     (;
-        initial_speed = 0.3,
-        initial_progress = 5,
         initial_lane = 0.0,
+        initial_progress = 5,
+        initial_speed = 0.3,
         target_speed = 0.2,
         speed_cost = 1.0,
         target_lane = 1.0,
-        lane_cost = 10.0,
         prox_cost = 0.3,
     ),
 ]
@@ -125,21 +121,14 @@ player_cost_models_gt = map(Iterators.countfrom(1), player_configurations) do ii
         player_idx = ii,
         control_system,
         T,
-        goal_position = [
-            player_config.target_lane,
-            player_config.initial_progress + Δt * T * player_config.target_speed,
-        ],
-        weights = merge(
-            (;
-                state_proximity = 1,
-                state_velocity = player_config.speed_cost,
-                control_Δv = 1,
-                control_Δθ = 1,
-            ),
-            (; state_proximity = player_config.prox_cost),
+        goal_position = nothing,
+        weights = (;
+            state_proximity = player_config.prox_cost,
+            state_velocity = player_config.speed_cost,
+            control_Δv = 1,
+            control_Δθ = 1,
         ),
-        y_lane = (; center = player_config.target_lane),
-        lane_cost = player_config.lane_cost,
+        y_lane_center = player_config.target_lane,
         target_speed = player_config.target_speed,
     )
 end
