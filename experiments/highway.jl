@@ -19,8 +19,8 @@ include("./utils.jl")
 
 #==================================== Forward Game Formulation =====================================#
 
-T = 50
-Δt = 0.25
+T = 40
+Δt = 0.5
 rng = Random.MersenneTwister(1)
 
 control_system = TestDynamics.ProductSystem([
@@ -41,11 +41,18 @@ control_system = TestDynamics.ProductSystem([
 #   - [done] start off the target lane
 #   - [done] have objective to go at a specific speed
 #   - [done] remove log-barriers
-#  - try different IBR orders.
-#  - add antother player merging from the left to the right
+#  - [done] try different IBR orders.
+#  - [done] add antother player merging from the left to the right
 #  - tidy up parameterization of CollisionAvoidanceGame and make sure it's backward compatible with
 #  the other experiment.
-#  - maybe add a third lane
+#  - implement gradients for additional cost terms
+#       - test gradient with forward solver
+#  - Figure out which parameters are worth inferring here.
+#
+#  Later: vary some parameter dimensions
+#   - fix initial progress, initial speed, initial lane, goal lane, target_speed
+#   - vary prox cost (in low regime near 0.0 to 0.3), speed cost (in high regime near), 
+#
 player_configurations = [
     # Vehicle on the right lane wishing to merge left to go faster
     (;
@@ -54,20 +61,20 @@ player_configurations = [
         initial_lane = 1.0,
         target_speed = 0.3,
         speed_cost = 1.0,
-        goal_lane = 0.0,
+        target_lane = 0.0,
         lane_cost = 10.0,
-        prox_cost = 1.0,
+        prox_cost = 0.3,
     ),
     # Fast vehicle from the back that would like to maintain its speed.
     (;
-        initial_speed = 0.3,
-        initial_progress = -1,
+        initial_speed = 0.4,
+        initial_progress = -3.0,
         initial_lane = 0,
-        target_speed = 0.3,
-        goal_lane = 0.0,
+        target_speed = 0.4,
+        target_lane = 0.0,
         speed_cost = 1.0,
         lane_cost = 10.0,
-        prox_cost = 0.0,
+        prox_cost = 0.3,
     ),
     # Slow truck on the right lane
     (;
@@ -76,7 +83,7 @@ player_configurations = [
         initial_lane = 1.0,
         target_speed = 0.15,
         speed_cost = 1.0,
-        goal_lane = 1.0,
+        target_lane = 1.0,
         lane_cost = 10.0,
         prox_cost = 0.1,
     ),
@@ -87,20 +94,20 @@ player_configurations = [
         initial_lane = 1.0,
         target_speed = 0.15,
         speed_cost = 1.0,
-        goal_lane = 1.0,
+        target_lane = 1.0,
         lane_cost = 10.0,
-        prox_cost = 0.0,
+        prox_cost = 0.1,
     ),
-    # Medium fast vehicle on the left lane wishing to merge back on the right lane
+    # Fast vehicle on the left lane wishing to merge back on the right lane and slow down
     (;
-        initial_speed = 0.2,
+        initial_speed = 0.3,
         initial_progress = 5,
         initial_lane = 0.0,
         target_speed = 0.2,
         speed_cost = 1.0,
-        goal_lane = 1.0,
+        target_lane = 1.0,
         lane_cost = 10.0,
-        prox_cost = 0.5,
+        prox_cost = 0.3,
     ),
 ]
 
@@ -119,7 +126,7 @@ player_cost_models_gt = map(Iterators.countfrom(1), player_configurations) do ii
         control_system,
         T,
         goal_position = [
-            player_config.goal_lane,
+            player_config.target_lane,
             player_config.initial_progress + Δt * T * player_config.target_speed,
         ],
         weights = merge(
@@ -131,7 +138,7 @@ player_cost_models_gt = map(Iterators.countfrom(1), player_configurations) do ii
             ),
             (; state_proximity = player_config.prox_cost),
         ),
-        y_lane = (; center = player_config.goal_lane),
+        y_lane = (; center = player_config.target_lane),
         lane_cost = player_config.lane_cost,
         target_speed = player_config.target_speed,
     )
@@ -148,7 +155,7 @@ converged_gt, forward_solution_gt, forward_opt_model_gt = solve_game(
 
 viz = let
     max_size = 500
-    y_position_domain = [-0.5, 12]
+    y_position_domain = [-3, 13]
     x_position_domain = [-1, 2]
     x_range = only(diff(extrema(x_position_domain) |> collect))
     y_range = only(diff(extrema(y_position_domain) |> collect))
@@ -158,9 +165,11 @@ viz = let
         height = max_size * y_range / max_range
     )
 
+    subsampled_taj = forward_solution_gt.x[:, 1:2:end]
+
     visualize_trajectory(
         control_system,
-        forward_solution_gt.x[:, 1:end],
+        subsampled_taj,
         VegaLiteBackend();
         x_position_domain,
         y_position_domain,
