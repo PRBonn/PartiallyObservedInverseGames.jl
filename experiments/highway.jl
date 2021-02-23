@@ -12,7 +12,8 @@ import CollisionAvoidanceGame
 import TestDynamics
 using JuMPOptimalControl.TrajectoryVisualization:
     visualize_trajectory, visualize_trajectory_batch, VegaLiteBackend
-using JuMPOptimalControl.ForwardGame: IBRGameSolver, solve_game
+using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
+using Test: @test, @testset
 
 # Utils
 include("./utils.jl")
@@ -44,8 +45,11 @@ control_system = TestDynamics.ProductSystem([
 #  - [done] try different IBR orders.
 #  - [done] add antother player merging from the left to the right
 #  - [done] tidy up parameterization of CollisionAvoidanceGame.
-#  - implement gradients for additional cost terms
-#  - test gradient with forward solver against IBR
+#  - [done] implement gradients for additional cost terms
+#       - [done] orientation cost
+#       - [done] lane cost
+#  - [done] test gradient with forward solver against IBR
+#  - run a minimal inverse planning run
 #  - Figure out which parameters are worth inferring here.
 #  - make sure that the old example still works.
 #
@@ -138,8 +142,28 @@ converged_gt, forward_solution_gt, forward_opt_model_gt = solve_game(
     player_cost_models_gt,
     x0,
     T;
+    ibr_convergence_tolerance = 1e-6,
+    verbose = true,
     solver_attributes = (; print_level = 1),
 )
+
+@testset "Gradient integration test" begin
+    converged_gt_kkt, forward_solution_gt_kkt, forward_opt_model_gt_kkt = solve_game(
+        KKTGameSolver(),
+        control_system,
+        player_cost_models_gt,
+        x0,
+        T;
+        init = (; x = forward_solution_gt.x),
+        solver_attributes = (; print_level = 3),
+    )
+
+    global forward_solution_gt_kkt
+
+    @test converged_gt_kkt
+    @test isapprox(forward_solution_gt_kkt.x, forward_solution_gt.x, atol = 1e-2)
+    @test isapprox(forward_solution_gt_kkt.u, forward_solution_gt.u, atol = 1e-4)
+end
 
 viz = let
     max_size = 500

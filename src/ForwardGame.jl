@@ -24,7 +24,7 @@ function solve_game(
     T;
     init = (; x = zeros(control_system.n_states, T), u = zeros(control_system.n_controls, T)),
     max_ibr_rounds = 10,
-    ibr_convergence_tolerance = 0.001,
+    ibr_convergence_tolerance = 1e-3,
     verbose = false,
     inner_solver_kwargs...,
 )
