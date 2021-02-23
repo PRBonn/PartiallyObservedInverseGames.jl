@@ -69,7 +69,6 @@ function generate_player_cost_model(;
         J̃ = (;
             state_goal = isnothing(goal_position) ? 0 :
                          sum(el -> el^2, x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position),
-            # TODO: handle in gradient computation.
             state_lane = let
                 # Note the switched indices. This is on purpose. The lane cost for the lane along y acts
                 # on the x position and vice versa.
@@ -90,9 +89,9 @@ function generate_player_cost_model(;
                 end
                 sum(prox_cost)
             end,
+            state_velocity = sum(el -> el^2, x_sub_ego[3, :] .- target_speed),
             state_orientation = isnothing(target_orientation) ? 0 :
                                 sum(el -> el^2, x_sub_ego[4, :] .- target_orientation),
-            state_velocity = sum(el -> el^2, x_sub_ego[3, :] .- target_speed),
             control_Δv = sum(el -> el^2, u_sub_ego[1, :]),
             control_Δθ = sum(el -> el^2, u_sub_ego[2, :]),
         )
@@ -100,8 +99,7 @@ function generate_player_cost_model(;
             opt_model,
             Min,
             sum(weights[k] * cost_prescaling[k] * J̃[k] for k in keys(weights)) +
-            sum(fix_costs[k] * J̃[k] for k in keys(fix_costs)) * sum(weights) /
-            length(weights)
+            sum(fix_costs[k] * J̃[k] for k in keys(fix_costs)) * sum(weights) / length(weights)
         )
     end
 
@@ -131,17 +129,35 @@ function generate_player_cost_model(;
             [dproxdx'; dproxdy']
         end
 
+        dgoal_dxy =
+            isnothing(goal_position) ? zeros(2, T) :
+            hcat(
+                zeros(2, T_activate_goalcost - 1),
+                2 * (x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position),
+            )
+
+        # Note: x-lane acts on y gradient and vice versa.
+        dlane_dxy = let
+            dlane_dx =
+                isnothing(y_lane_center) ? zeros(T) : 2 * (x_sub_ego[1, :] .- y_lane_center)
+            dlane_dy = isnothing(x_lane_center) ? zeros(T) : 2 * (x_sub_ego[2, :] .- x_lane_center)
+
+            [dlane_dx'; dlane_dy']
+        end
+
+        dorientation_dθ =
+            isnothing(target_orientation) ? zeros(T)' : 2 * (x_sub_ego[4, :] .- target_orientation)'
+
         # TODO: Technically this is missing the negative gradient on the opponents state but we
         # can't control that anyway (certainly not in OL Nash). Must be fixed for non-decoupled
         # systems and potentially FB Nash.
         dJdx = let
             dJ̃dx_sub = (;
-                state_goal = [
-                    zeros(2, T_activate_goalcost - 1) 2*(x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position)
-                    zeros(2, T)
-                ],
+                state_goal = [dgoal_dxy; zeros(2, T)],
+                state_lane = [dlane_dxy; zeros(2, T)],
                 state_proximity = [dprox_dxy; zeros(2, T)],
-                state_velocity = [zeros(2, T); 2 * x_sub_ego[3, :]'; zeros(1, T)],
+                state_velocity = [zeros(2, T); 2 * (x_sub_ego[3, :] .- target_speed)'; zeros(1, T)],
+                state_orientation = [zeros(3, T); dorientation_dθ],
                 control_Δv = zeros(size(x_sub_ego)),
                 control_Δθ = zeros(size(x_sub_ego)),
             )
@@ -150,7 +166,8 @@ function generate_player_cost_model(;
                     weights[k] * cost_prescaling[symbol(k)] * dJ̃dx_sub[symbol(k)]
                     for k in keys(weights)
                 ) +
-                dJ̃dx_sub.state_goal * cost_prescaling.state_goal * sum(weights) / length(weights)
+                sum(fix_costs[k] * dJ̃dx_sub[k] for k in keys(fix_costs)) * sum(weights) /
+                length(weights)
             [
                 zeros(first(state_indices) - 1, T)
                 dJdx_sub
