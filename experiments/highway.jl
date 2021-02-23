@@ -10,9 +10,12 @@ import VegaLite
 
 import CollisionAvoidanceGame
 import TestDynamics
+import TestUtils
 using JuMPOptimalControl.TrajectoryVisualization:
     visualize_trajectory, visualize_trajectory_batch, VegaLiteBackend
 using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
+using JuMPOptimalControl.InverseGames:
+    InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 using Test: @test, @testset
 
 # Utils
@@ -20,8 +23,8 @@ include("./utils.jl")
 
 #==================================== Forward Game Formulation =====================================#
 
-T = 40
-Δt = 0.5
+T = 20
+Δt = 1.0
 rng = Random.MersenneTwister(1)
 
 control_system = TestDynamics.ProductSystem([
@@ -49,7 +52,7 @@ control_system = TestDynamics.ProductSystem([
 #       - [done] orientation cost
 #       - [done] lane cost
 #  - [done] test gradient with forward solver against IBR
-#  - run a minimal inverse planning run
+#  - [done] run a minimal inverse planning
 #  - Figure out which parameters are worth inferring here.
 #  - make sure that the old example still works.
 #
@@ -82,21 +85,21 @@ player_configurations = [
     (;
         initial_lane = 1.0,
         initial_progress = 2,
-        initial_speed = 0.15,
-        target_speed = 0.15,
+        initial_speed = 0.10,
+        target_speed = 0.10,
         speed_cost = 1.0,
         target_lane = 1.0,
-        prox_cost = 0.0,
+        prox_cost = 0.05,
     ),
     # Slow truck on the right lane
     (;
         initial_lane = 1.0,
         initial_progress = 4,
-        initial_speed = 0.15,
-        target_speed = 0.15,
+        initial_speed = 0.10,
+        target_speed = 0.10,
         speed_cost = 1.0,
         target_lane = 1.0,
-        prox_cost = 0.0,
+        prox_cost = 0.05,
     ),
     # Fast vehicle on the left lane wishing to merge back on the right lane and slow down
     (;
@@ -142,8 +145,7 @@ converged_gt, forward_solution_gt, forward_opt_model_gt = solve_game(
     player_cost_models_gt,
     x0,
     T;
-    ibr_convergence_tolerance = 1e-6,
-    verbose = true,
+    ibr_convergence_tolerance = 1e-8,
     solver_attributes = (; print_level = 1),
 )
 
@@ -177,7 +179,7 @@ viz = let
         height = max_size * y_range / max_range
     )
 
-    subsampled_taj = forward_solution_gt.x[:, 1:2:end]
+    subsampled_taj = forward_solution_gt_kkt.x[:, 1:end]
 
     visualize_trajectory(
         control_system,
@@ -187,4 +189,44 @@ viz = let
         y_position_domain,
         canvas,
     )
+end
+
+display(viz)
+
+# TODO: continue here: player 3 and four need proximity cost or must start at a velocity that is not
+# their target speed so that the speed cost remains observable.
+@testset "Inverse solutions integration test" begin
+    @testset "Residual baseline" begin
+        # Minimal inverse test with both solvers:
+        converged_res, estimate_res, opt_model_res = solve_inverse_game(
+            InverseKKTResidualSolver(),
+            forward_solution_gt.x,
+            forward_solution_gt.u;
+            control_system,
+            player_cost_models = player_cost_models_gt,
+        )
+
+        @test converged_res
+        for (cost_model, weights) in zip(player_cost_models_gt, estimate_res.player_weights)
+            TestUtils.test_inverse_solution(weights, cost_model.weights)
+        end
+    end
+
+    @testset "Constraint Solver" begin
+        # Minimal inverse test with both solvers:
+        converged_con, estimate_con, opt_model_con = solve_inverse_game(
+            InverseKKTConstraintSolver(),
+            forward_solution_gt.x;
+            observation_model = (; σ = 0, expected_observation = identity),
+            control_system,
+            player_cost_models = player_cost_models_gt,
+        )
+
+        @test converged_con
+        for (ii, cost_model, weights) in
+            zip(Iterators.countfrom(), player_cost_models_gt, estimate_con.player_weights)
+            println("Player $ii")
+            TestUtils.test_inverse_solution(weights, cost_model.weights; verbose = true)
+        end
+    end
 end
