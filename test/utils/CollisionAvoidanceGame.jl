@@ -22,10 +22,11 @@ function generate_player_cost_model(;
         control_Δv = 10,
         control_Δθ = 1,
     ),
+    lane_cost = 1.0,
     x_lane = nothing,
     y_lane = nothing,
     # TODO: implement or remove
-    target_velocity = nothing,
+    target_speed = nothing,
     prox_min_regularization = 0.1,
     T_activate_goalcost = T,
 )
@@ -78,28 +79,39 @@ function generate_player_cost_model(;
                 b
             end
 
+            # Note the switched indices. This is on purpose. The lane cost for the lane along y acts
+            # on the x position and vice versa.
+            # x_lane_cost =
+            #     isnothing(x_lane) ? 0 :
+            #     sum(regularized_log_barrier(x_sub_ego[2, :], x_lane.center + x_lane.width / 2)) +
+            #     sum(regularized_log_barrier(x_sub_ego[2, :], x_lane.center - x_lane.width / 2))
+            # y_lane_cost =
+            #     isnothing(y_lane) ? 0 :
+            #     sum(regularized_log_barrier(x_sub_ego[1, :], y_lane.center + y_lane.width / 2)) +
+            #     sum(regularized_log_barrier(x_sub_ego[1, :], y_lane.center - y_lane.width / 2))
             x_lane_cost =
-                isnothing(x_lane) ? 0 :
-                sum(regularized_log_barrier(x_sub_ego[1, :], x_lane.center + x_lane.width / 2 )) +
-                sum(regularized_log_barrier(x_sub_ego[1, :], x_lane.center - x_lane.width / 2 ))
+                isnothing(x_lane) ? 0 : sum(el -> el^2, x_sub_ego[2, :] .- x_lane.center)
             y_lane_cost =
-                isnothing(y_lane) ? 0 :
-                sum(regularized_log_barrier(x_sub_ego[2, :], y_lane.center + y_lane.width / 2 )) +
-                sum(regularized_log_barrier(x_sub_ego[2, :], y_lane.center - y_lane.width / 2 ))
+                isnothing(y_lane) ? 0 : sum(el -> el^2, x_sub_ego[1, :] .- y_lane.center)
 
             x_lane_cost + y_lane_cost
         end
 
+        state_steer = sum(el -> el^2, x_sub_ego[4, :] .- pi / 2) * 5.0
+
         J̃ = (;
             # TODO: maybe conditionally deactivate if a target velocity is active
             state_goal = (
-                isnothing(target_velocity) ?
+                isnothing(target_speed) ?
                 sum(el -> el^2, x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position) : 0
             ),
             # TODO: also incooporate lane width; handle in gradient computation.
             state_lane,
             state_proximity = sum(prox_cost),
-            state_velocity = sum(el -> el^2, x_sub_ego[3, :]),
+            state_velocity = sum(
+                el -> el^2,
+                x_sub_ego[3, :] .- (isnothing(target_speed) ? 0 : target_speed),
+            ),
             control_Δv = sum(el -> el^2, u_sub_ego[1, :]),
             control_Δθ = sum(el -> el^2, u_sub_ego[2, :]),
         )
@@ -107,10 +119,11 @@ function generate_player_cost_model(;
             opt_model,
             Min,
             sum(weights[k] * cost_prescaling[k] * J̃[k] for k in keys(weights)) +
+            state_steer +
             # TODO: think about the relative weighting here.
             (
                 J̃.state_goal * cost_prescaling.state_goal +
-                J̃.state_lane * cost_prescaling.state_lane
+                J̃.state_lane * cost_prescaling.state_lane * lane_cost
             ) * sum(weights) / length(weights)
         )
     end

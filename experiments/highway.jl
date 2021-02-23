@@ -19,7 +19,7 @@ include("./utils.jl")
 
 #==================================== Forward Game Formulation =====================================#
 
-T = 25
+T = 100
 Δt = 0.25
 rng = Random.MersenneTwister(1)
 
@@ -32,33 +32,48 @@ control_system = TestDynamics.ProductSystem([
 # TODO: next
 # - [done] remove proximity cost for slow vehicle
 # - [done] add lane cost
-# - add separate initial velocity
-# - remove goal position and add lane and nominal velocity instead
-# - consider
+# - [done] add separate initial velocity
+# - [done] remove goal position and add lane and nominal velocity instead
+# - [done] DFK:
+#   - [done] quadratic penalty to the *target lane*
+#   - [done] start off the target lane
+#   - [done] have objective to go at a specific speed
+#   - [done] remove log-barriers
+#  - try different IBR orders.
+#  - add antother player merging from the left to the right
+#  - tidy up parameterization of CollisionAvoidanceGame and make sure it's backward compatible with
+#  the other experiment.
+#  - maybe add a third lane
 player_configurations = [
     (;
         initial_speed = 0.2,
         initial_progress = 0,
-        initial_lane = 0.02,
-        target_speed = 1,
+        initial_lane = 1.5,
+        target_speed = 0.3,
+        speed_cost = 1.0,
         goal_lane = 0.0,
-        prox_cost = 1,
+        lane_cost = 10.0,
+        prox_cost = 1.0,
     ),
     (;
-        initial_speed = 0.2,
-        initial_progress = 1,
-        initial_lane = 0.01,
-        target_speed = 0.5,
+        initial_speed = 0.3,
+        initial_progress = -1,
+        initial_lane = 0,
+        target_speed = 0.3,
         goal_lane = 0.0,
-        prox_cost = 1,
+        speed_cost = 1.0,
+        lane_cost = 10.0,
+        prox_cost = 0.0,
     ),
     (;
-        initial_speed = 0.2,
+        initial_speed = 0.1,
         initial_progress = 2,
-        initial_lane = -0.5,
-        target_speed = 0.2,
-        goal_lane = -0.5,
-        prox_cost = 0,
+        initial_lane = 1.5,
+        target_speed = 0.1,
+        speed_cost = 1.0,
+        goal_lane = 1.5,
+        lane_cost = 10.0,
+        prox_cost = 0.0,
     ),
 ]
 
@@ -81,10 +96,17 @@ player_cost_models_gt = map(Iterators.countfrom(1), player_configurations) do ii
             player_config.initial_progress + Δt * T * player_config.target_speed,
         ],
         weights = merge(
-            (; state_proximity = 1, state_velocity = 1, control_Δv = 1, control_Δθ = 1),
+            (;
+                state_proximity = 1,
+                state_velocity = player_config.speed_cost,
+                control_Δv = 1,
+                control_Δθ = 1,
+            ),
             (; state_proximity = player_config.prox_cost),
         ),
-        y_lane = (; center = player_config.initial_lane, width = 1.5),
+        y_lane = (; center = player_config.goal_lane),
+        lane_cost = player_config.lane_cost,
+        target_speed = player_config.target_speed,
     )
 end
 
@@ -99,8 +121,8 @@ converged_gt, forward_solution_gt, forward_opt_model_gt = solve_game(
 
 viz = let
     max_size = 500
-    y_position_domain = [-0.5, 6.5]
-    x_position_domain = [-2, 2]
+    y_position_domain = [-0.5, 15]
+    x_position_domain = [-3, 3]
     x_range = only(diff(extrema(x_position_domain) |> collect))
     y_range = only(diff(extrema(y_position_domain) |> collect))
     max_range = max(x_range, y_range)
