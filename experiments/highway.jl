@@ -86,7 +86,7 @@ player_configurations = [
         target_speed = 0.15,
         speed_cost = 1.0,
         target_lane = 1.0,
-        prox_cost = 0.1,
+        prox_cost = 0.0,
     ),
     # Slow truck on the right lane
     (;
@@ -96,7 +96,7 @@ player_configurations = [
         target_speed = 0.15,
         speed_cost = 1.0,
         target_lane = 1.0,
-        prox_cost = 0.1,
+        prox_cost = 0.0,
     ),
     # Fast vehicle on the left lane wishing to merge back on the right lane and slow down
     (;
