@@ -19,11 +19,13 @@ include("./utils.jl")
 
 #==================================== Forward Game Formulation =====================================#
 
-T = 100
+T = 50
 Δt = 0.25
 rng = Random.MersenneTwister(1)
 
 control_system = TestDynamics.ProductSystem([
+    TestDynamics.Unicycle(Δt),
+    TestDynamics.Unicycle(Δt),
     TestDynamics.Unicycle(Δt),
     TestDynamics.Unicycle(Δt),
     TestDynamics.Unicycle(Δt),
@@ -45,16 +47,18 @@ control_system = TestDynamics.ProductSystem([
 #  the other experiment.
 #  - maybe add a third lane
 player_configurations = [
+    # Vehicle on the right lane wishing to merge left to go faster
     (;
         initial_speed = 0.2,
         initial_progress = 0,
-        initial_lane = 1.5,
+        initial_lane = 1.0,
         target_speed = 0.3,
         speed_cost = 1.0,
         goal_lane = 0.0,
         lane_cost = 10.0,
         prox_cost = 1.0,
     ),
+    # Fast vehicle from the back that would like to maintain its speed.
     (;
         initial_speed = 0.3,
         initial_progress = -1,
@@ -65,15 +69,38 @@ player_configurations = [
         lane_cost = 10.0,
         prox_cost = 0.0,
     ),
+    # Slow truck on the right lane
     (;
-        initial_speed = 0.1,
+        initial_speed = 0.15,
         initial_progress = 2,
-        initial_lane = 1.5,
-        target_speed = 0.1,
+        initial_lane = 1.0,
+        target_speed = 0.15,
         speed_cost = 1.0,
-        goal_lane = 1.5,
+        goal_lane = 1.0,
+        lane_cost = 10.0,
+        prox_cost = 0.1,
+    ),
+    # Slow truck on the right lane
+    (;
+        initial_speed = 0.15,
+        initial_progress = 4,
+        initial_lane = 1.0,
+        target_speed = 0.15,
+        speed_cost = 1.0,
+        goal_lane = 1.0,
         lane_cost = 10.0,
         prox_cost = 0.0,
+    ),
+    # Medium fast vehicle on the left lane wishing to merge back on the right lane
+    (;
+        initial_speed = 0.2,
+        initial_progress = 5,
+        initial_lane = 0.0,
+        target_speed = 0.2,
+        speed_cost = 1.0,
+        goal_lane = 1.0,
+        lane_cost = 10.0,
+        prox_cost = 0.5,
     ),
 ]
 
@@ -121,8 +148,8 @@ converged_gt, forward_solution_gt, forward_opt_model_gt = solve_game(
 
 viz = let
     max_size = 500
-    y_position_domain = [-0.5, 15]
-    x_position_domain = [-3, 3]
+    y_position_domain = [-0.5, 12]
+    x_position_domain = [-1, 2]
     x_range = only(diff(extrema(x_position_domain) |> collect))
     y_range = only(diff(extrema(y_position_domain) |> collect))
     max_range = max(x_range, y_range)
@@ -133,7 +160,7 @@ viz = let
 
     visualize_trajectory(
         control_system,
-        forward_solution_gt.x,
+        forward_solution_gt.x[:, 1:end],
         VegaLiteBackend();
         x_position_domain,
         y_position_domain,
