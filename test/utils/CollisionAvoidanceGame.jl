@@ -81,14 +81,6 @@ function generate_player_cost_model(;
 
             # Note the switched indices. This is on purpose. The lane cost for the lane along y acts
             # on the x position and vice versa.
-            # x_lane_cost =
-            #     isnothing(x_lane) ? 0 :
-            #     sum(regularized_log_barrier(x_sub_ego[2, :], x_lane.center + x_lane.width / 2)) +
-            #     sum(regularized_log_barrier(x_sub_ego[2, :], x_lane.center - x_lane.width / 2))
-            # y_lane_cost =
-            #     isnothing(y_lane) ? 0 :
-            #     sum(regularized_log_barrier(x_sub_ego[1, :], y_lane.center + y_lane.width / 2)) +
-            #     sum(regularized_log_barrier(x_sub_ego[1, :], y_lane.center - y_lane.width / 2))
             x_lane_cost =
                 isnothing(x_lane) ? 0 : sum(el -> el^2, x_sub_ego[2, :] .- x_lane.center)
             y_lane_cost =
@@ -97,7 +89,7 @@ function generate_player_cost_model(;
             x_lane_cost + y_lane_cost
         end
 
-        state_steer = sum(el -> el^2, x_sub_ego[4, :] .- pi / 2) * 5.0
+        state_steer = sum(el -> el^2, x_sub_ego[4, :] .- pi / 2) * 2.0
 
         J̃ = (;
             # TODO: maybe conditionally deactivate if a target velocity is active
