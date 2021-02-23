@@ -16,17 +16,23 @@ function generate_player_cost_model(;
     weights = (; state_proximity = 1, state_velocity = 1, control_Δv = 1, control_Δθ = 1),
     cost_prescaling = (;
         state_goal = 100, # The state_goal weight is assumed to be fixed.
-        state_lane = 0.1,
+        state_lane = 1.0,
         state_proximity = 0.1,
+        state_orientation = 2.0,
         state_velocity = 1,
         control_Δv = 10,
         control_Δθ = 1,
     ),
-    lane_cost = 1.0,
-    x_lane = nothing,
-    y_lane = nothing,
-    # TODO: implement or remove
-    target_speed = nothing,
+    x_lane_center = nothing,
+    y_lane_center = nothing,
+    target_speed = 0,
+    target_orientation = if !isnothing(x_lane_center)
+        0
+    elseif !isnothing(y_lane_center)
+        pi / 2
+    else
+        nothing
+    end,
     prox_min_regularization = 0.1,
     T_activate_goalcost = T,
 )
@@ -52,58 +58,39 @@ function generate_player_cost_model(;
 
     function add_objective!(opt_model, x, u; weights)
         T = size(x, 2)
-        # TODO: Currently, this implementation is *not* agnostic to the order of players or
-        # input and state dimensions of other players subsystems. Get these values from
-        # somewhere else to make it agnostic:
         @views x_sub_ego = x[state_indices, :]
         @views u_sub_ego = u[input_indices, :]
         @views opponent_positions = map(opponent_position_indices) do opp_position_idxs
             x[opp_position_idxs, :]
         end
 
-        prox_cost = sum(opponent_positions) do pos_opponent
-            d_sq = add_regularized_squared_distance!(opt_model, x_sub_ego, pos_opponent)
-            prox_cost = @variable(opt_model, [t = 1:T])
-            @NLconstraint(opt_model, [t = 1:T], prox_cost[t] == -log(d_sq[t]))
-            prox_cost
-        end
-
-        state_lane = let
-            function regularized_log_barrier(values, barrier, regularization = prox_min_regularization)
-                b = @variable(opt_model, [t = 1:T])
-                @NLconstraint(
-                    opt_model,
-                    [t = 1:T],
-                    b[t] == -log((values[t] - barrier)^2 + regularization)
-                )
-                b
-            end
-
-            # Note the switched indices. This is on purpose. The lane cost for the lane along y acts
-            # on the x position and vice versa.
-            x_lane_cost =
-                isnothing(x_lane) ? 0 : sum(el -> el^2, x_sub_ego[2, :] .- x_lane.center)
-            y_lane_cost =
-                isnothing(y_lane) ? 0 : sum(el -> el^2, x_sub_ego[1, :] .- y_lane.center)
-
-            x_lane_cost + y_lane_cost
-        end
-
-        state_steer = sum(el -> el^2, x_sub_ego[4, :] .- pi / 2) * 2.0
-
         J̃ = (;
-            # TODO: maybe conditionally deactivate if a target velocity is active
-            state_goal = (
-                isnothing(target_speed) ?
-                sum(el -> el^2, x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position) : 0
-            ),
-            # TODO: also incooporate lane width; handle in gradient computation.
-            state_lane,
-            state_proximity = sum(prox_cost),
-            state_velocity = sum(
-                el -> el^2,
-                x_sub_ego[3, :] .- (isnothing(target_speed) ? 0 : target_speed),
-            ),
+            state_goal = isnothing(goal_position) ? 0 :
+                         sum(el -> el^2, x_sub_ego[1:2, T_activate_goalcost:T] .- goal_position),
+            # TODO: handle in gradient computation.
+            state_lane = let
+                # Note the switched indices. This is on purpose. The lane cost for the lane along y acts
+                # on the x position and vice versa.
+                x_lane_cost =
+                    isnothing(x_lane_center) ? 0 :
+                    sum(el -> el^2, x_sub_ego[2, :] .- x_lane_center)
+                y_lane_cost =
+                    isnothing(y_lane_center) ? 0 :
+                    sum(el -> el^2, x_sub_ego[1, :] .- y_lane_center)
+                x_lane_cost + y_lane_cost
+            end,
+            state_proximity = let
+                prox_cost = sum(opponent_positions) do pos_opponent
+                    d_sq = add_regularized_squared_distance!(opt_model, x_sub_ego, pos_opponent)
+                    prox_cost = @variable(opt_model, [t = 1:T])
+                    @NLconstraint(opt_model, [t = 1:T], prox_cost[t] == -log(d_sq[t]))
+                    prox_cost
+                end
+                sum(prox_cost)
+            end,
+            state_orientation = isnothing(target_orientation) ? 0 :
+                                sum(el -> el^2, x_sub_ego[4, :] .- target_orientation),
+            state_velocity = sum(el -> el^2, x_sub_ego[3, :] .- target_speed),
             control_Δv = sum(el -> el^2, u_sub_ego[1, :]),
             control_Δθ = sum(el -> el^2, u_sub_ego[2, :]),
         )
@@ -111,11 +98,11 @@ function generate_player_cost_model(;
             opt_model,
             Min,
             sum(weights[k] * cost_prescaling[k] * J̃[k] for k in keys(weights)) +
-            state_steer +
             # TODO: think about the relative weighting here.
             (
                 J̃.state_goal * cost_prescaling.state_goal +
-                J̃.state_lane * cost_prescaling.state_lane * lane_cost
+                J̃.state_lane * cost_prescaling.state_lane +
+                J̃.state_orientation * cost_prescaling.state_orientation
             ) * sum(weights) / length(weights)
         )
     end
