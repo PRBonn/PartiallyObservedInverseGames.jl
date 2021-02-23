@@ -43,10 +43,9 @@ control_system = TestDynamics.ProductSystem([
 #   - [done] remove log-barriers
 #  - [done] try different IBR orders.
 #  - [done] add antother player merging from the left to the right
-#  - [done] tidy up parameterization of CollisionAvoidanceGame
-#  the other experiment.
+#  - [done] tidy up parameterization of CollisionAvoidanceGame.
 #  - implement gradients for additional cost terms
-#       - test gradient with forward solver
+#  - test gradient with forward solver against IBR
 #  - Figure out which parameters are worth inferring here.
 #  - make sure that the old example still works.
 #
