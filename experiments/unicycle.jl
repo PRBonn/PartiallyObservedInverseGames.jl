@@ -11,11 +11,12 @@ Distributed.@everywhere begin
     import MonteCarloStudy
     import CollisionAvoidanceGame
     import TestDynamics
-    import ElectronDisplay
     using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver
     using JuMPOptimalControl.InverseGames: InverseKKTConstraintSolver, InverseKKTResidualSolver
 
 end
+
+import ElectronDisplay
 
 # Utils
 include("utils/distributed.jl")
