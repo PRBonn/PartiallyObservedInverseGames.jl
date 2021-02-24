@@ -16,14 +16,13 @@ function save_cache!(result_group)
     BSON.bson(save_path, results_cache)
 end
 
-function load_cache!(result_group)
+function load_cache(result_group)
     result_cache_file_list =
         Glob.glob("results_cache-*.bson", joinpath(project_root_dir, "data", result_group))
     if isempty(result_cache_file_list)
-        false
+        nothing
     else
-        global results_cache = BSON.load(last(result_cache_file_list))
-        true
+        BSON.load(last(result_cache_file_list))
     end
 end
 
@@ -47,16 +46,24 @@ function run_cached!(f, result_group, key; force_run = false)
     result
 end
 
-# TODO: still load if there another results group is in scope
-function load_cache_if_not_defined!(the_result_group)
-    if !isdefined(Main, :results_cache)
-        cache_file_found = load_cache!(the_result_group)
-        if cache_file_found
-            @info "Loaded cached results from file!"
+function load_cache_if_not_defined!(the_result_group; filly_emtpy = true)
+    global results_cache =
+        if isdefined(Main, :results_cache) &&
+           any(!startswith(string(k), "$the_result_group.") for k in keys(results_cache))
+            error("Skipping. Cache contains results for another group. Safe and/or clear first.")
+        elseif !isdefined(Main, :results_cache) || filly_emtpy && isempty(results_cache)
+            loaded_cache = load_cache(the_result_group)
+            if isnothing(loaded_cache)
+                @info "No persisted results cache file found. Resuming with an empty cache."
+                Dict()
+            else
+                @info "Loaded cached results for group \"$the_result_group\" from file!"
+                loaded_cache
+            end
         else
-            @info "No persisted results cache file found. Resuming with an empty cache."
-            global results_cache = Dict()
+            @info "Results for group \"$the_result_group\" present. No additional cache loaded."
+            results_cache
         end
-    end
+
     global result_group = the_result_group
 end
