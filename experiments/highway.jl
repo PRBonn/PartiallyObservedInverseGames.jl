@@ -1,25 +1,31 @@
 const project_root_dir = realpath(joinpath(@__DIR__, ".."))
+unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/MonteCarloStudy"))))
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
-import Random
-import Statistics
-import LinearAlgebra
-import Distances
+import Distributed
+Distributed.@everywhere begin
+    import Pkg
+    Pkg.activate($project_root_dir)
+    union!(LOAD_PATH, $LOAD_PATH)
+
+    import MonteCarloStudy
+    import CollisionAvoidanceGame
+    import TestDynamics
+    using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver
+    using JuMPOptimalControl.InverseGames: InverseKKTConstraintSolver, InverseKKTResidualSolver
+
+end
+
 import ElectronDisplay
 import VegaLite
-
-import CollisionAvoidanceGame
-import TestDynamics
-import TestUtils
-using JuMPOptimalControl.TrajectoryVisualization:
-    visualize_trajectory, visualize_trajectory_batch, VegaLiteBackend
-using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
-using JuMPOptimalControl.InverseGames:
-    InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
-using Test: @test, @testset
+import Random
+using JuMPOptimalControl.TrajectoryVisualization: VegaLiteBackend, visualize_trajectory
 
 # Utils
-include("./utils.jl")
+include("utils/distributed.jl")
+include("utils/misc.jl")
+include("utils/simple_caching.jl")
+load_cache_if_not_defined!("highway")
 
 #==================================== Forward Game Formulation =====================================#
 
@@ -79,7 +85,7 @@ player_configurations = [
     # Fast vehicle on the left lane wishing to merge back on the right lane and slow down
     (;
         initial_lane = 0.0,
-        initial_progress = 5,
+        initial_progress = 6,
         initial_speed = 0.3,
         target_speed = 0.2,
         speed_cost = 1.0,
@@ -95,6 +101,14 @@ x0 = mapreduce(vcat, player_configurations) do player_config
         player_config.initial_speed,
         deg2rad(90),
     ]
+end
+
+position_indices = mapreduce(vcat, eachindex(control_system.subsystems)) do subsystem_idx
+    TestDynamics.state_indices(control_system, subsystem_idx)[1:2]
+end
+
+partial_state_indices = mapreduce(vcat, eachindex(control_system.subsystems)) do subsystem_idx
+    TestDynamics.state_indices(control_system, subsystem_idx)[[1, 2, 4]]
 end
 
 player_cost_models_gt = map(Iterators.countfrom(1), player_configurations) do ii, player_config
@@ -114,94 +128,101 @@ player_cost_models_gt = map(Iterators.countfrom(1), player_configurations) do ii
     )
 end
 
-converged_gt, forward_solution_gt, forward_opt_model_gt = solve_game(
-    IBRGameSolver(),
+#===================================== Additional Visualization ====================================#
+
+function visualize_highway(x; subsampling = 1)
+
+    viz = let
+        max_size = 500
+        y_position_domain = [-3, 13]
+        x_position_domain = [-1, 2]
+        x_range = only(diff(extrema(x_position_domain) |> collect))
+        y_range = only(diff(extrema(y_position_domain) |> collect))
+        max_range = max(x_range, y_range)
+        canvas = VegaLite.@vlplot(
+            width = max_size * x_range / max_range,
+            height = max_size * y_range / max_range
+        )
+
+        subsampled_taj = x[:, 1:subsampling:end]
+
+        visualize_trajectory(
+            control_system,
+            subsampled_taj,
+            VegaLiteBackend();
+            x_position_domain,
+            y_position_domain,
+            canvas,
+        )
+    end
+end
+
+#======================================== Monte Carlo Study ========================================#
+
+## Dataset Generation
+
+#TODO run_cached needs experiments prefix
+@run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;
+    solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
+    noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
+    n_observation_sequences_per_noise_level = 20,
+)
+
+## Estimation
+estimator_setup = (;
+    dataset,
+    control_system,
+    player_cost_models = player_cost_models_gt,
+    solver_attributes = (; print_level = 1),
+)
+estimator_setup_partial =
+    merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
+@run_cached estimates_conKKT =
+    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup...)
+@run_cached estimates_conKKT_partial =
+    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup_partial...)
+@run_cached estimates_resKKT =
+    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup...)
+@run_cached estimates_resKKT_partial =
+    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup_partial...)
+
+## Forward Solution Augmentation
+augmentor_kwargs = (;
+    solver = KKTGameSolver(),
     control_system,
     player_cost_models_gt,
     x0,
-    T;
-    ibr_convergence_tolerance = 1e-8,
+    T,
+    match_equilibrium = (; forward_solution_gt.x),
+    init = (; forward_solution_gt.x, forward_solution_gt.u),
     solver_attributes = (; print_level = 1),
 )
+@run_cached augmented_estimates_resKKT =
+    MonteCarloStudy.augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
+@run_cached augmented_estimates_resKKT_partial =
+    MonteCarloStudy.augment_with_forward_solution(estimates_resKKT_partial; augmentor_kwargs...)
+estimates = [
+    estimates_conKKT
+    estimates_conKKT_partial
+    augmented_estimates_resKKT
+    augmented_estimates_resKKT_partial
+]
 
-@testset "Gradient integration test" begin
-    converged_gt_kkt, forward_solution_gt_kkt, forward_opt_model_gt_kkt = solve_game(
-        KKTGameSolver(),
-        control_system,
-        player_cost_models_gt,
-        x0,
-        T;
-        init = (; x = forward_solution_gt.x),
-        solver_attributes = (; print_level = 3),
-    )
-
-    global forward_solution_gt_kkt
-
-    @test converged_gt_kkt
-    @test isapprox(forward_solution_gt_kkt.x, forward_solution_gt.x, atol = 1e-2)
-    @test isapprox(forward_solution_gt_kkt.u, forward_solution_gt.u, atol = 1e-4)
+## Error Ststistics Computation
+demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
+errstats = map(estimates) do estimate
+    MonteCarloStudy.estimator_statistics(estimate; dataset, demo_gt, position_indices)
 end
 
-viz = let
-    max_size = 500
-    y_position_domain = [-3, 13]
-    x_position_domain = [-1, 2]
-    x_range = only(diff(extrema(x_position_domain) |> collect))
-    y_range = only(diff(extrema(y_position_domain) |> collect))
-    max_range = max(x_range, y_range)
-    canvas = VegaLite.@vlplot(
-        width = max_size * x_range / max_range,
-        height = max_size * y_range / max_range
-    )
+## Visualization
+# @saveviz conKKT_bundle_viz = visualize_bundle(control_system, estimates_conKKT, forward_solution_gt)
+# @saveviz resKKT_bundle_viz = visualize_bundle(
+#     control_system,
+#     augmented_estimates_resKKT,
+#     forward_solution_gt;
+#     filter_converged = true,
+# )
+# @saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
+@saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr()
+@saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr()
 
-    subsampled_taj = forward_solution_gt_kkt.x[:, 1:end]
-
-    visualize_trajectory(
-        control_system,
-        subsampled_taj,
-        VegaLiteBackend();
-        x_position_domain,
-        y_position_domain,
-        canvas,
-    )
-end
-
-display(viz)
-
-# TODO: continue here: player 3 and four need proximity cost or must start at a velocity that is not
-# their target speed so that the speed cost remains observable.
-@testset "Inverse solutions integration test" begin
-    @testset "Residual baseline" begin
-        # Minimal inverse test with both solvers:
-        converged_res, estimate_res, opt_model_res = solve_inverse_game(
-            InverseKKTResidualSolver(),
-            forward_solution_gt.x,
-            forward_solution_gt.u;
-            control_system,
-            player_cost_models = player_cost_models_gt,
-        )
-
-        @test converged_res
-        for (cost_model, weights) in zip(player_cost_models_gt, estimate_res.player_weights)
-            TestUtils.test_inverse_solution(weights, cost_model.weights)
-        end
-    end
-
-    @testset "Constraint Solver" begin
-        # Minimal inverse test with both solvers:
-        converged_con, estimate_con, opt_model_con = solve_inverse_game(
-            InverseKKTConstraintSolver(),
-            forward_solution_gt.x;
-            observation_model = (; σ = 0, expected_observation = identity),
-            control_system,
-            player_cost_models = player_cost_models_gt,
-        )
-
-        @test converged_con
-        for (ii, cost_model, weights) in
-            zip(Iterators.countfrom(), player_cost_models_gt, estimate_con.player_weights)
-            println("Player $ii")
-            TestUtils.test_inverse_solution(weights, cost_model.weights; verbose = true)
-        end
-    end
-end
