@@ -1,3 +1,6 @@
+import FileIO
+import JuMPOptimalControl.DynamicsModelInterface
+
 function unitvector(θ)
     [cos(θ), sin(θ)]
 end
@@ -16,12 +19,12 @@ macro saveviz(expr::Expr)
 
     quote
         $(esc(expr))
-        $(esc(var)) |> VegaLite.save(joinpath(project_root_dir, "figures/$($(Meta.quot(var))).pdf"))
+        $(esc(var)) |> FileIO.save(joinpath(project_root_dir, "figures", result_group, "$($(Meta.quot(var))).pdf"))
     end
 end
 
 macro saveviz(sym::Symbol)
     quote
-        $(esc(sym)) |> VegaLite.save(joinpath(project_root_dir, "figures/$($(Meta.quot(sym))).pdf"))
+        $(esc(sym)) |> FileIO.save(joinpath(project_root_dir, "figures", result_group, "$($(Meta.quot(sym))).pdf"))
     end
 end

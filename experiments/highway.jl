@@ -35,31 +35,6 @@ control_system = TestDynamics.ProductSystem([
     TestDynamics.Unicycle(Δt),
 ])
 
-# TODO: next
-# - [done] remove proximity cost for slow vehicle
-# - [done] add lane cost
-# - [done] add separate initial velocity
-# - [done] remove goal position and add lane and nominal velocity instead
-# - [done] DFK:
-#   - [done] quadratic penalty to the *target lane*
-#   - [done] start off the target lane
-#   - [done] have objective to go at a specific speed
-#   - [done] remove log-barriers
-#  - [done] try different IBR orders.
-#  - [done] add antother player merging from the left to the right
-#  - [done] tidy up parameterization of CollisionAvoidanceGame.
-#  - [done] implement gradients for additional cost terms
-#       - [done] orientation cost
-#       - [done] lane cost
-#  - [done] test gradient with forward solver against IBR
-#  - [done] run a minimal inverse planning
-#  - Figure out which parameters are worth inferring here.
-#  - make sure that the old example still works.
-#
-#  Later: vary some parameter dimensions
-#   - fix initial progress, initial speed, initial lane, goal lane, target_speed
-#   - vary prox cost (in low regime near 0.0 to 0.3), speed cost (in high regime near),
-#
 player_configurations = [
     # Vehicle on the right lane wishing to merge left to go faster
     (;
