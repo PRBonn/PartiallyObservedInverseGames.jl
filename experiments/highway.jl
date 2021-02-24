@@ -160,12 +160,13 @@ end
 #======================================== Monte Carlo Study ========================================#
 
 ## Dataset Generation
+n_observation_sequences_per_noise_level = 20
 
 #TODO run_cached needs experiments prefix
 @run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
-    n_observation_sequences_per_noise_level = 20,
+    n_observation_sequences_per_noise_level,
 )
 
 ## Estimation
@@ -215,6 +216,7 @@ errstats = map(estimates) do estimate
 end
 
 ## Visualization
+
 # @saveviz conKKT_bundle_viz = visualize_bundle(control_system, estimates_conKKT, forward_solution_gt)
 # @saveviz resKKT_bundle_viz = visualize_bundle(
 #     control_system,
@@ -223,6 +225,8 @@ end
 #     filter_converged = true,
 # )
 # @saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
-@saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr()
-@saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr()
+#
+frame = [-n_observation_sequences_per_noise_level, 0]
+@saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
+@saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
 
