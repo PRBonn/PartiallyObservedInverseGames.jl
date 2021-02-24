@@ -53,7 +53,7 @@ function load_cache_if_not_defined!(the_result_group)
         if cache_file_found
             @info "Loaded cached results from file!"
         else
-            @info "No persisted results cache file found. Resuming with an emtpy cache."
+            @info "No persisted results cache file found. Resuming with an empty cache."
             global results_cache = Dict()
         end
     end
