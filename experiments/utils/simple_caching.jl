@@ -47,6 +47,7 @@ function run_cached!(f, result_group, key; force_run = false)
     result
 end
 
+# TODO: still load if there another results group is in scope
 function load_cache_if_not_defined!(the_result_group)
     if !isdefined(Main, :results_cache)
         cache_file_found = load_cache!(the_result_group)
