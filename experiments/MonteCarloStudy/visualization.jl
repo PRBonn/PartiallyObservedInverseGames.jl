@@ -130,4 +130,3 @@ function visualize_poserr(;
         y2 = "error_band_upper:q",
     )
 end
-
