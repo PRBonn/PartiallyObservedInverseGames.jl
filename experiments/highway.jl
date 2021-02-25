@@ -229,4 +229,3 @@ end
 frame = [-n_observation_sequences_per_noise_level, 0]
 @saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
 @saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
-
