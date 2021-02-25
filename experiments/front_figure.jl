@@ -3,16 +3,21 @@
 # visualize_highway
 # forward_solution_gt
 # dataset
+import LinearAlgebra
+import ElectronDisplay
+import FileIO
+using VegaLite: @vlplot
 
 "Returns a cost mapping that can be evaluated at (x, y) to get the running cost for that position."
 function position_cost_mapping(;
-    x_snapshot,
+    x_sequence,
     player_idx,
     control_system,
-    positional_cost_weights = (; state_proximity = 1, state_lane = 1),
+    positional_cost_weights,
     x_lane_center = nothing,
     y_lane_center = nothing,
     prox_min_regularization = 0.01,
+    fix_cost_weights = (; state_lane = 0.1),
 )
 
     opponent_positions = let
@@ -21,7 +26,7 @@ function position_cost_mapping(;
             TestDynamics.state_indices(control_system, jj)[1:2]
         end
         map(opponent_position_indices) do opp_position_idxs
-            x_snapshot[opp_position_idxs]
+            x_sequence[opp_position_idxs, :]
         end
     end
 
@@ -36,43 +41,38 @@ function position_cost_mapping(;
                 y_lane_cost = isnothing(y_lane_center) ? 0 : (px - y_lane_center)^2
                 x_lane_cost + y_lane_cost
             end,
-            state_proximity = sum(opponent_positions) do pos_opponent
-                prox_cost =
+            state_proximity = sum(opponent_positions) do pos_opponent_sequence
+                sum(eachcol(pos_opponent_sequence)) do pos_opponent
                     -log(LinearAlgebra.norm_sqr(pos_ego - pos_opponent) + prox_min_regularization)
+                end
             end,
         )
-        sum(w * J̃_position[k] for (k, w) in pairs(positional_cost_weights))
+        sum(w * J̃_position[k] for (k, w) in pairs(positional_cost_weights)) +
+        sum(w * J̃_position[k] for (k, w) in pairs(fix_cost_weights))
     end
 
 end
 
-observation_idx = lastindex(dataset)
-ground_truth = forward_solution_gt
-demonstration = dataset[observation_idx]
-prefiltered_observation = let
-    d = estimates_resKKT[observation_idx]
-    @assert d.observation_idx == observation_idx
-    d.smoothed_observation
-end
-
-ground_truth_viz = visualize_highway(ground_truth.x)
-raw_observations_viz = visualize_highway(demonstration.x; draw_line = false)
-prefiltered_observation_viz = visualize_highway(prefiltered_observation.x; draw_line = true)
-
-[ground_truth_viz raw_observations_viz prefiltered_observation_viz]
-
-using VegaLite: @vlplot
-
-cost_viz = let
+"Generates a visualiztion of the inferred positional stage for a player."
+function cost_viz(
+    player_idx,
+    player_config = player_configurations[player_idx],
+    player_weights = estimates_conKKT_partial[observation_idx].player_weights[player_idx],
+    ;
+    x_sequence = ground_truth.x[:, 1:1],
+    control_system = control_system,
+    show_y_label = false,
+)
     cost_map = position_cost_mapping(;
-        x_snapshot = ground_truth.x[:, 1],
-        player_idx = 2,
+        x_sequence,
+        player_idx,
         control_system,
-        y_lane_center = 0,
+        y_lane_center = player_config.target_lane,
+        positional_cost_weights = (; state_proximity = player_config.prox_cost),
     )
 
-    x_domain = -1:0.05:2
-    y_domain = -4:0.05:14
+    x_domain = -1:0.09:2
+    y_domain = -4:0.09:14
 
     max_size = 500
     x_position_domain = x_domain
@@ -85,13 +85,44 @@ cost_viz = let
         height = max_size * y_range / max_range
     )
 
-    data = [(; x, y, cost = cost_map(x, y)) for x in x_domain, y in y_domain]
-    data |>
+    normalized_cost = let
+        data = [(; x, y, cost = cost_map(x, y)) for x in x_domain, y in y_domain]
+        cmin, cmax = extrema(d.cost for d in data)
+        [(; d.x, d.y, cost = (d.cost - cmin) / (cmax - cmin)) for d in data]
+    end
+
+    normalized_cost |>
     canvas + @vlplot(
         config = {view = {strokeWidth = 0, step = 13}},
-        mark = {"point", shape = "square", filled = true},
-        x = "x:q",
-        y = "y:q",
-        color = "cost:q"
+        mark = {"point", shape = "square", filled = true, strokeWidth = 0},
+        x = {"x:q", title = "Position x [m]"},
+        y = {"y:q", title = "Position y [m]", axis = show_y_label ? true : nothing},
+        color = {
+            "cost:q",
+            scale = {scheme = "viridis"},
+            legend = {orient = "top", gradientLength = 525},
+            title = "Cost",
+        },
+        title = "Player $player_idx"
     )
 end
+
+observation_idx = lastindex(dataset)
+ground_truth = forward_solution_gt
+demonstration = dataset[observation_idx]
+prefiltered_observation = let
+    d = estimates_resKKT[observation_idx]
+    @assert d.observation_idx == observation_idx
+    d.smoothed_observation
+end
+
+@saveviz highway_frontfig_gt_viz = visualize_highway(ground_truth.x)
+@saveviz highway_frontfig_observation_viz = visualize_highway(demonstration.x; draw_line = false)
+@saveviz prefiltered_observation_viz =
+    visualize_highway(prefiltered_observation.x; draw_line = true)
+
+@saveviz highway_frontfig_player_cost_viz =
+    @vlplot(resolve = {scale = {color = "shared"}, axis = {position_y = "shared"}}) +
+    hcat(cost_viz(1; show_y_label = true), cost_viz(2), cost_viz(3), cost_viz(4), cost_viz(5))
+@saveviz highway_frontfig_estimate_viz =
+    visualize_highway(estimates_conKKT_partial[observation_idx].x)
