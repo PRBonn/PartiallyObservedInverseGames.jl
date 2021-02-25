@@ -9,6 +9,10 @@ function clear_cache!()
     empty!(results_cache)
 end
 
+function unload_cache!()
+    global results_cache = nothing
+end
+
 function save_cache!(result_group)
     save_path =
         joinpath(project_root_dir, "data/$result_group/results_cache-$(Dates.now(Dates.UTC)).bson")
@@ -48,10 +52,7 @@ end
 
 function load_cache_if_not_defined!(the_result_group; filly_emtpy = true)
     global results_cache =
-        if isdefined(Main, :results_cache) &&
-           any(!startswith(string(k), "$the_result_group.") for k in keys(results_cache))
-            error("Skipping. Cache contains results for another group. Safe and/or clear first.")
-        elseif !isdefined(Main, :results_cache) || filly_emtpy && isempty(results_cache)
+        if !isdefined(Main, :results_cache) || isnothing(results_cache)
             loaded_cache = load_cache(the_result_group)
             if isnothing(loaded_cache)
                 @info "No persisted results cache file found. Resuming with an empty cache."
@@ -60,9 +61,14 @@ function load_cache_if_not_defined!(the_result_group; filly_emtpy = true)
                 @info "Loaded cached results for group \"$the_result_group\" from file!"
                 loaded_cache
             end
-        else
-            @info "Results for group \"$the_result_group\" present. No additional cache loaded."
+        elseif isdefined(Main, :results_cache) &&
+           any(!startswith(string(k), "$the_result_group.") for k in keys(results_cache))
+            error("Skipping. Cache contains results for another group. Save and/or unload first.")
+        elseif results_cache isa Dict
+            @info "Cache for group \"$the_result_group\" present. No additional cache loaded."
             results_cache
+        else
+            error("Unknown cache type.")
         end
 
     global result_group = the_result_group
