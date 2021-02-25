@@ -130,7 +130,7 @@ end
 
 #===================================== Additional Visualization ====================================#
 
-function visualize_highway(x; subsampling = 1)
+function visualize_highway(x; subsampling = 1, kwargs...)
 
     viz = let
         max_size = 500
@@ -153,6 +153,7 @@ function visualize_highway(x; subsampling = 1)
             x_position_domain,
             y_position_domain,
             canvas,
+            kwargs...
         )
     end
 end
@@ -217,15 +218,6 @@ end
 
 ## Visualization
 
-# @saveviz conKKT_bundle_viz = visualize_bundle(control_system, estimates_conKKT, forward_solution_gt)
-# @saveviz resKKT_bundle_viz = visualize_bundle(
-#     control_system,
-#     augmented_estimates_resKKT,
-#     forward_solution_gt;
-#     filter_converged = true,
-# )
-# @saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
-#
-frame = [-n_observation_sequences_per_noise_level, 0]
+frame = [-2n_observation_sequences_per_noise_level, 0]
 @saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
 @saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
