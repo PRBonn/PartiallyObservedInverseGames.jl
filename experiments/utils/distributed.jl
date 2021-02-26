@@ -11,7 +11,10 @@ function start_workers(;
     usable(n) = n == :auto || n > 0
 
     if usable(n_remote)
-        # rechenknecht node only works in HULKs network (VPN)
+        if sync_remote
+            sync_remote_files()
+        end
+
         Distributed.addprocs(
             [
                 # ("bonn-201-remote", n_remote),
@@ -29,14 +32,10 @@ function start_workers(;
                 ("bonn-student-85-remote", n_remote),
                 ("bonn-student-86-remote", n_remote),
                 ("bonn-student-87-remote", n_remote),
-                #("bonn-student-89-remote", n_remote),
+                ("bonn-student-89-remote", n_remote),
             ];
             config...,
         )
-
-        if sync_remote
-            sync_remote_files()
-        end
     end
 
     if usable(n_local)
