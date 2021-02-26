@@ -93,7 +93,6 @@ function cost_viz(
 
     normalized_cost |>
     canvas + @vlplot(
-        config = {view = {strokeWidth = 0, step = 13}},
         mark = {"point", shape = "square", filled = true, strokeWidth = 0},
         x = {"x:q", title = "Position x [m]"},
         y = {"y:q", title = "Position y [m]", axis = show_y_label ? true : nothing},
@@ -101,7 +100,7 @@ function cost_viz(
             "cost:q",
             scale = {scheme = "viridis"},
             legend = {orient = "top", gradientLength = 525},
-            title = "Cost",
+            title = "Normalized Cost",
         },
         title = "Player $player_idx"
     )
@@ -117,7 +116,7 @@ prefiltered_observation = let
 end
 
 @saveviz highway_frontfig_gt_viz = visualize_highway(ground_truth.x)
-@saveviz highway_frontfig_observation_viz = visualize_highway(demonstration.x; draw_line = false)
+@saveviz highway_frontfig_observation_viz = visualize_highway(demonstration.x; draw_line = true)
 @saveviz prefiltered_observation_viz =
     visualize_highway(prefiltered_observation.x; draw_line = true)
 
