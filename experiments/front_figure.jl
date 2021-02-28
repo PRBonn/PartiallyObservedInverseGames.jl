@@ -99,10 +99,9 @@ function cost_viz(
         color = {
             "cost:q",
             scale = {scheme = "viridis"},
-            legend = {orient = "top", gradientLength = 525},
+            legend = {gradientLength = 200},
             title = "Normalized Cost",
         },
-        title = "Player $player_idx"
     )
 end
 
@@ -115,13 +114,17 @@ prefiltered_observation = let
     d.smoothed_observation
 end
 
-@saveviz highway_frontfig_gt_viz = visualize_highway(ground_truth.x)
-@saveviz highway_frontfig_observation_viz = visualize_highway(demonstration.x; draw_line = true)
-@saveviz prefiltered_observation_viz =
-    visualize_highway(prefiltered_observation.x; draw_line = true)
-
-@saveviz highway_frontfig_player_cost_viz =
-    @vlplot(resolve = {scale = {color = "shared"}, axis = {position_y = "shared"}}) +
-    hcat(cost_viz(1; show_y_label = true), cost_viz(2), cost_viz(3), cost_viz(4), cost_viz(5))
-@saveviz highway_frontfig_estimate_viz =
-    visualize_highway(estimates_conKKT_partial[observation_idx].x)
+# @saveviz highway_frontfig_gt_viz = visualize_highway(ground_truth.x)
+# 
+# @saveviz highway_frontfig_observation_viz = visualize_highway(demonstration.x; draw_line = false)
+# @saveviz prefiltered_observation_viz =
+#     visualize_highway(prefiltered_observation.x; draw_line = true)
+# 
+# @saveviz highway_frontfig_player_cost_viz =
+#     @vlplot(resolve = {scale = {color = "shared"}, axis = {position_y = "shared"}}) +
+#     hcat(cost_viz(1; show_y_label = true), cost_viz(2), cost_viz(3), cost_viz(4), cost_viz(5))
+# @saveviz highway_frontfig_estimate_viz =
+#     visualize_highway(estimates_conKKT_partial[observation_idx].x)
+# 
+# @saveviz highway_frontfig_cost1 = cost_viz(1; show_y_label = true)
+# @saveviz highway_frontfig_cost5 = cost_viz(5; show_y_label = true)
