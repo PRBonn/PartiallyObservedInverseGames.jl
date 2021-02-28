@@ -130,6 +130,6 @@ end
 #     filter_converged = true,
 # )
 # @saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
-frame = [-2n_observation_sequences_per_noise_level, 0]
+frame = [-1.5n_observation_sequences_per_noise_level, 0]
 @saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
 @saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
