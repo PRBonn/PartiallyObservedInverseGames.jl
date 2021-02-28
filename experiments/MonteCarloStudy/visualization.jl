@@ -13,39 +13,24 @@ estimator_color_encoding = VegaLite.@vlfrag(
     },
 )
 
-"Visualize all trajectory `estimates` along with the corresponding ground truth
-`forward_solution_gt`"
-function visualize_bundle(
-    control_system,
-    estimates,
-    forward_solution_gt;
-    filter_converged = false,
-    kwargs...,
-)
-    x_position_domain = y_position_domain = extrema(forward_solution_gt.x[1:2, :]) .+ (-0.01, 0.01)
-    estimated_trajectory_batch = [e.x for e in estimates if !filter_converged || e.converged]
-    visualize_trajectory_batch(
-        control_system,
-        estimated_trajectory_batch;
-        x_position_domain,
-        y_position_domain,
-        kwargs...,
-    )
-end
-
 function visualize_paramerr(;
     scatter_opacity = viz_defaults.scatter_opacity,
     width = viz_defaults.width,
     height = viz_defaults.height,
     frame = viz_defaults.frame,
     y_label = "Mean Parameter Cosine Error",
+    round_x_axis = true,
 )
     @vlplot(
         config = viz_global_config,
         height = height,
         width = width,
         color = estimator_color_encoding,
-        x = {"position_observation_error:q", title = "Mean Absolute Postion Observation Error [m]"},
+        x = {
+            "position_observation_error:q",
+            title = "Mean Absolute Postion Observation Error [m]",
+            scale = {nice = round_x_axis},
+        },
         transform = [
             {
                 window = [
@@ -62,16 +47,9 @@ function visualize_paramerr(;
         mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
         y = {"parameter_estimation_error:q", title = y_label},
     ) +
-    @vlplot(
-        mark = "line",
-        #x = "σ:q",
-        #y = {"parameter_estimation_error:q", aggregate = "median", title = y_label},
-        y = "error_average:q",
-    ) +
+    @vlplot(mark = "line", y = "error_average:q",) +
     @vlplot(
         mark = {"errorband", extent = "iqr"},
-        #x = "σ:q",
-        #y = {"parameter_estimation_error:q"},
         y = {"error_band_lower:q", title = y_label},
         y2 = "error_band_upper:q"
     )
@@ -83,13 +61,18 @@ function visualize_poserr(;
     height = viz_defaults.height,
     frame = viz_defaults.frame,
     y_label = "Mean Absolute Position Prediciton Error [m]",
+    round_x_axis = true,
 )
     @vlplot(
         config = viz_global_config,
         height = height,
         width = width,
         color = estimator_color_encoding,
-        x = {"position_observation_error:q", title = "Mean Absolute Postion Observation Error [m]"},
+        x = {
+            "position_observation_error:q",
+            title = "Mean Absolute Postion Observation Error [m]",
+            scale = {nice = round_x_axis},
+        },
         transform = [
             {
                 window = [
@@ -116,16 +99,9 @@ function visualize_poserr(;
             scale = {domain = [true, false], range = ["circle", "triangle-down"]},
         },
     ) +
-    @vlplot(
-        mark = "line",
-        #x = "σ:q",
-        #y = {"position_estimation_error:q", aggregate = "median", title = y_label}
-        y = "error_average:q",
-    ) +
+    @vlplot(mark = {"line"}, y = "error_average:q",) +
     @vlplot(
         mark = {"errorband", extent = "iqr"},
-        #x = "σ:q",
-        #y = {"position_estimation_error:q", title = y_label},
         y = {"error_band_lower:q", title = y_label},
         y2 = "error_band_upper:q",
     )

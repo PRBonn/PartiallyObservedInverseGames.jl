@@ -37,5 +37,5 @@ include("estimator_statistics.jl")
 export estimator_statistics
 
 include("visualization.jl")
-export visualize_bundle, visualize_paramerr, visualize_poserr
+export visualize_paramerr, visualize_poserr
 end
