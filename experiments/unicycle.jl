@@ -16,6 +16,7 @@ Distributed.@everywhere begin
 
 end
 
+import JuMPOptimalControl.TrajectoryVisualization
 import ElectronDisplay
 
 # Utils
@@ -122,14 +123,102 @@ errstats = map(estimates) do estimate
 end
 
 ## Visualization
-# @saveviz conKKT_bundle_viz = visualize_bundle(control_system, estimates_conKKT, forward_solution_gt)
-# @saveviz resKKT_bundle_viz = visualize_bundle(
-#     control_system,
-#     augmented_estimates_resKKT,
-#     forward_solution_gt;
-#     filter_converged = true,
-# )
-# @saveviz dataset_bundle_viz = visualize_bundle(control_system, dataset, forward_solution_gt)
+demo_noise_level = 0.1
+
+ground_truth_viz =
+    TrajectoryVisualization.visualize_trajectory(
+        control_system,
+        forward_solution_gt.x,
+        TrajectoryVisualization.VegaLiteBackend(),
+        canvas = VegaLite.@vlplot(width = 200, height = 200),
+        legend = VegaLite.@vlfrag(orient = "top", offset = 5),
+    ) + VegaLite.@vlplot(
+        data = [
+            (;
+                px = forward_solution_gt.x[TestDynamics.state_indices(control_system, ii)[1], 1],
+                py = forward_solution_gt.x[TestDynamics.state_indices(control_system, ii)[2], 1],
+                player = "P$ii",
+            ) for ii in eachindex(control_system.subsystems)
+        ],
+        mark = {"text", dx = 8, dy = 8},
+        text = "player",
+        x = "px",
+        y = "py",
+    )
+
+observations_bundle_viz =
+    VegaLite.@vlplot() + MonteCarloStudy.visualize_trajectory_batch(
+        control_system,
+        [d.x for d in dataset if d.σ == demo_noise_level],
+        x_position_domain = (-1.2, 1.2),
+        y_position_domain = (-1.2, 1.2),
+        draw_line = false,
+    )
+
+conKKT_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
+    control_system,
+    [
+        e.x
+        for
+        e in estimates_conKKT if e.converged && dataset[e.observation_idx].σ == demo_noise_level
+    ];
+    x_position_domain = (-1.2, 1.2),
+    y_position_domain = (-1.2, 1.2),
+)
+
+conKKT_partial_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
+    control_system,
+    [
+        e.x
+        for
+        e in estimates_conKKT_partial if
+        e.converged && dataset[e.observation_idx].σ == demo_noise_level
+    ];
+    x_position_domain = (-1.2, 1.2),
+    y_position_domain = (-1.2, 1.2),
+)
+
+resKKT_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
+    control_system,
+    [
+        e.x
+        for
+        e in augmented_estimates_resKKT if
+        e.converged && dataset[e.observation_idx].σ == demo_noise_level
+    ];
+    x_position_domain = (-1.2, 1.2),
+    y_position_domain = (-1.2, 1.2),
+)
+
+resKKT_partial_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
+    control_system,
+    [
+        e.x
+        for
+        e in augmented_estimates_resKKT_partial if
+        e.converged && dataset[e.observation_idx].σ == demo_noise_level
+    ];
+    x_position_domain = (-1.2, 1.2),
+    y_position_domain = (-1.2, 1.2),
+)
+
+@saveviz demo_trajs_viz = hcat(
+    VegaLite.@vlplot(title = "Ground Truth") + ground_truth_viz,
+    VegaLite.@vlplot(title = "Observations") + observations_bundle_viz,
+)
+
+@saveviz ours_trajs_viz = hcat(
+    VegaLite.@vlplot(title = "Full Observation") + conKKT_bundle_viz,
+    VegaLite.@vlplot(title = "Partial Observation") + conKKT_partial_bundle_viz,
+)
+
+@saveviz baseline_trajs_viz = hcat(
+    VegaLite.@vlplot(title = "Full Observation") + resKKT_bundle_viz,
+    VegaLite.@vlplot(title = "Partial Observation") + resKKT_partial_bundle_viz,
+)
+
 frame = [-1.5n_observation_sequences_per_noise_level, 0]
-@saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
-@saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
+@saveviz parameter_error_viz =
+    errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
+@saveviz position_error_viz =
+    errstats |> MonteCarloStudy.visualize_poserr(; frame, round_x_axis = false)

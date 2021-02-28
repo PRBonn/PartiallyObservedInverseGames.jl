@@ -112,6 +112,7 @@ function TrajectoryVisualization.visualize_trajectory(
     x_position_domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
     y_position_domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
     draw_line = true,
+    legend = nothing,
     player,
 )
 
@@ -127,10 +128,11 @@ function TrajectoryVisualization.visualize_trajectory(
                 y = {"py:q", scale = {domain = y_position_domain}, title = "Position y [m]"},
                 angle = {"θ:q", scale = {domain = [pi, -pi], range = [-90, 270]}},
                 order = "t:q",
-                color = {"player:n", title = "Player", legend = nothing},
+                color = {"player:n", title = "Player", legend = legend},
             }
-        ) +
-        VegaLite.@vlplot(mark = {"point", shape = "circle", size = 25, clip = true, filled = true})
+        ) + VegaLite.@vlplot(
+            mark = {"point", shape = "circle", size = 25, clip = true, filled = true}
+        )
 
     if draw_line
         trajectory_visualizer += VegaLite.@vlplot(mark = {"line", clip = true})
