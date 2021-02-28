@@ -134,7 +134,7 @@ function visualize_highway(x; subsampling = 1, kwargs...)
 
     viz = let
         max_size = 500
-        y_position_domain = [-3, 13]
+        y_position_domain = [-4, 14]
         x_position_domain = [-1, 2]
         x_range = only(diff(extrema(x_position_domain) |> collect))
         y_range = only(diff(extrema(y_position_domain) |> collect))
