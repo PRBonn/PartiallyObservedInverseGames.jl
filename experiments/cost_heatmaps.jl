@@ -57,9 +57,8 @@ end
 function cost_viz(
     player_idx,
     player_config = player_configurations[player_idx],
-    player_weights = estimates_conKKT_partial[observation_idx].player_weights[player_idx],
     ;
-    x_sequence = ground_truth.x[:, 1:1],
+    x_sequence = forward_solution_gt.x[:, 1:1],
     control_system = control_system,
     show_y_label = false,
 )
@@ -104,27 +103,3 @@ function cost_viz(
         },
     )
 end
-
-observation_idx = lastindex(dataset)
-ground_truth = forward_solution_gt
-demonstration = dataset[observation_idx]
-prefiltered_observation = let
-    d = estimates_resKKT[observation_idx]
-    @assert d.observation_idx == observation_idx
-    d.smoothed_observation
-end
-
-# @saveviz highway_frontfig_gt_viz = visualize_highway(ground_truth.x)
-# 
-# @saveviz highway_frontfig_observation_viz = visualize_highway(demonstration.x; draw_line = false)
-# @saveviz prefiltered_observation_viz =
-#     visualize_highway(prefiltered_observation.x; draw_line = true)
-# 
-# @saveviz highway_frontfig_player_cost_viz =
-#     @vlplot(resolve = {scale = {color = "shared"}, axis = {position_y = "shared"}}) +
-#     hcat(cost_viz(1; show_y_label = true), cost_viz(2), cost_viz(3), cost_viz(4), cost_viz(5))
-# @saveviz highway_frontfig_estimate_viz =
-#     visualize_highway(estimates_conKKT_partial[observation_idx].x)
-# 
-# @saveviz highway_frontfig_cost1 = cost_viz(1; show_y_label = true)
-# @saveviz highway_frontfig_cost5 = cost_viz(5; show_y_label = true)
