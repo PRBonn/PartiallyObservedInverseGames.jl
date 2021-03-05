@@ -153,7 +153,7 @@ function visualize_highway(x; subsampling = 1, kwargs...)
             x_position_domain,
             y_position_domain,
             canvas,
-            kwargs...
+            kwargs...,
         )
     end
 end
@@ -217,7 +217,12 @@ errstats = map(estimates) do estimate
 end
 
 ## Visualization
-
 frame = [-1.5n_observation_sequences_per_noise_level, 0]
 @saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
 @saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
+
+include("cost_heatmaps.jl")
+@saveviz highway_frontfig_cost1 = cost_viz(1; show_y_label = true)
+@saveviz highway_frontfig_cost5 = cost_viz(5; show_y_label = true)
+@saveviz highway_frontfig_gt_viz = visualize_highway(forward_solution_gt.x)
+@saveviz highway_frontfig_observation_viz = visualize_highway(dataset[end].x; draw_line = false)
