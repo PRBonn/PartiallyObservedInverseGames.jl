@@ -19,10 +19,10 @@ end
 import ElectronDisplay
 import VegaLite
 import Random
+import Distributor
 using JuMPOptimalControl.TrajectoryVisualization: VegaLiteBackend, visualize_trajectory
 
 # Utils
-include("utils/distributed.jl")
 include("utils/misc.jl")
 include("utils/simple_caching.jl")
 load_cache_if_not_defined!("highway")

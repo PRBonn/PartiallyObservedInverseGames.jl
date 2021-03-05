@@ -202,6 +202,14 @@ version = "0.10.2"
 deps = ["Random", "Serialization", "Sockets"]
 uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 
+[[Distributor]]
+deps = ["Distributed"]
+git-tree-sha1 = "c781540b283b3f8164e813886e1f4926e2daa027"
+repo-rev = "master"
+repo-url = "https://github.com/lassepe/Distributor.jl"
+uuid = "a14d8946-8bfd-45f9-bc07-790c719c043c"
+version = "0.1.0"
+
 [[EarCut_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "92d8f9f208637e8d2d28c664051a00569c01493d"
