@@ -1,6 +1,6 @@
 module InversePreSolve
 
-import JuMPOptimalControl.ForwardOptimalControl
+import PartiallyObservedInverseGames.ForwardOptimalControl
 using JuMP: @objective
 
 export pre_solve

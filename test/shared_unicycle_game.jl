@@ -3,9 +3,9 @@ import Ipopt
 import Zygote
 
 using JuMP: @variable, @constraint, @objective
-using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
-using JuMPOptimalControl.InverseGames: InverseIBRSolver, InverseKKTConstraintSolver, solve_inverse_game
-using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory
+using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
+using PartiallyObservedInverseGames.InverseGames: InverseIBRSolver, InverseKKTConstraintSolver, solve_inverse_game
+using PartiallyObservedInverseGames.TrajectoryVisualization: visualize_trajectory
 using SparseArrays: spzeros
 using Test: @test, @testset, @test_broken
 using UnPack: @unpack
@@ -45,7 +45,6 @@ observation_model = (; σ = 0, expected_observation = identity)
 x0 = [-1, 1, 0.0, 0]
 T = 100
 
-# TODO: think about whichinformation is redundant and could be generated.
 player_cost_models = (
     (;
         player_inputs = [1],
@@ -164,7 +163,6 @@ end
     )
 end
 
-# TODO: robustify
 @testset "Inverse KKT Nash" begin
     converged, inverse_kkt_solution, inverse_kkt_model = solve_inverse_game(
         InverseKKTConstraintSolver(),
@@ -187,18 +185,4 @@ end
         ibr_solution.x,
         ibr_solution.x,
     )
-end
-
-# TODO: does not reliably converge yet
-@test_broken false && begin
-    converged, inverse_ibr_converged, inverse_ibr_solution, inverse_ibr_models, inverse_ibr_player_weights =
-        solve_inverse_game(
-            InverseIBRSolver(),
-            ibr_solution.x;
-            observation_model,
-            control_system,
-            player_cost_models,
-            u_init = ibr_solution.u,
-        )
-    @test converged
 end

@@ -1,4 +1,4 @@
-name = "JuMPOptimalControl"
+name = "PartiallyObservedInverseGames"
 uuid = "899e51af-bf90-43ff-b52b-4512a730ce83"
 authors = ["lassepe <lasse.peters@mailbox.org>"]
 version = "0.1.0"

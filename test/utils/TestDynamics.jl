@@ -2,8 +2,8 @@ module TestDynamics
 
 import Plots
 import VegaLite
-import JuMPOptimalControl.DynamicsModelInterface
-import JuMPOptimalControl.TrajectoryVisualization
+import PartiallyObservedInverseGames.DynamicsModelInterface
+import PartiallyObservedInverseGames.TrajectoryVisualization
 import JuMP
 using JuMP: @variable, @constraint, @NLconstraint
 

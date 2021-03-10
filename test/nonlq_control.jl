@@ -4,10 +4,10 @@ import Random
 
 using JuMP: JuMP, @NLconstraint, @objective, @variable, @NLexpression
 using SparseArrays: spzeros
-using JuMPOptimalControl.ForwardOptimalControl: solve_optimal_control
-using JuMPOptimalControl.InverseOptimalControl: solve_inverse_optimal_control
-using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory
-using JuMPOptimalControl.CostUtils: symbol
+using PartiallyObservedInverseGames.ForwardOptimalControl: solve_optimal_control
+using PartiallyObservedInverseGames.InverseOptimalControl: solve_inverse_optimal_control
+using PartiallyObservedInverseGames.TrajectoryVisualization: visualize_trajectory
+using PartiallyObservedInverseGames.CostUtils: symbol
 
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils

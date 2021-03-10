@@ -2,8 +2,8 @@ import Zygote
 import JuMP
 
 using Test: @test, @testset
-using JuMPOptimalControl.ForwardOptimalControl: solve_lqr
-using JuMPOptimalControl.InverseOptimalControl:
+using PartiallyObservedInverseGames.ForwardOptimalControl: solve_lqr
+using PartiallyObservedInverseGames.InverseOptimalControl:
     solve_inverse_lqr, lqr_lagrangian, lqr_lagrangian_grad_x, lqr_lagrangian_grad_u
 using LinearAlgebra: I
 

@@ -1,7 +1,7 @@
-# JuMPOptimalControl.jl
+# PartiallyObservedInverseGames.jl
 
-![build](https://github.com/lassepe/JuMPOptimalControl.jl/workflows/build/badge.svg)
-[![codecov](https://codecov.io/gh/lassepe/JuMPOptimalControl.jl/branch/master/graph/badge.svg?token=FZoqGLI2gF)](https://codecov.io/gh/lassepe/JuMPOptimalControl.jl)
+![build](https://github.com/lassepe/.jl/workflows/build/badge.svg)
+[![codecov](https://codecov.io/gh/lassepe/PartiallyObservedInverseGames.jl/branch/master/graph/badge.svg?token=FZoqGLI2gF)](https://codecov.io/gh/lassepe/PartiallyObservedInverseGames.jl)
 
 ## Setup
 
@@ -9,9 +9,9 @@ You can install this package as you would with any other Julia package. Either
 clone this repository manually or run the following code in [package
 mode](https://docs.julialang.org/en/v1/stdlib/Pkg/)
 ```julia
-pkg> dev https://github.com/lassepe/JuMPOptimalControl.jl
+pkg> dev https://github.com/lassepe/PartiallyObservedInverseGames.jl
 ```
-which will install the package to `.julia/dev/JuMPOptimalControl`.
+which will install the package to `.julia/dev/PartiallyObservedInverseGames`.
 
 Beyond that, we use [DVC](https://dvc.org) for binary data version control.
 This part of the setup is only required if you want to load our results as

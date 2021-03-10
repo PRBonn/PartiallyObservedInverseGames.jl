@@ -1,5 +1,6 @@
 const project_root_dir = realpath(joinpath(@__DIR__, ".."))
-unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/MonteCarloStudy"))))
+unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/utils/MonteCarloStudy"))))
+unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/utils"))))
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
 import Distributed
@@ -11,8 +12,8 @@ Distributed.@everywhere begin
     import MonteCarloStudy
     import CollisionAvoidanceGame
     import TestDynamics
-    using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver
-    using JuMPOptimalControl.InverseGames: InverseKKTConstraintSolver, InverseKKTResidualSolver
+    using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
+    using PartiallyObservedInverseGames.InverseGames: InverseKKTConstraintSolver, InverseKKTResidualSolver
 
 end
 
@@ -20,7 +21,8 @@ import ElectronDisplay
 import VegaLite
 import Random
 import Distributor
-using JuMPOptimalControl.TrajectoryVisualization: VegaLiteBackend, visualize_trajectory
+import CostHeatmapVisualizer
+using PartiallyObservedInverseGames.TrajectoryVisualization: VegaLiteBackend, visualize_trajectory
 
 # Utils
 include("utils/misc.jl")
@@ -220,9 +222,17 @@ end
 frame = [-1.5n_observation_sequences_per_noise_level, 0]
 @saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
 @saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
-
-include("cost_heatmaps.jl")
-@saveviz highway_frontfig_cost1 = cost_viz(1; show_y_label = true)
-@saveviz highway_frontfig_cost5 = cost_viz(5; show_y_label = true)
+@saveviz highway_frontfig_cost1 = CostHeatmapVisualizer.cost_viz(
+    1,
+    player_configurations[1];
+    x_sequence = forward_solution_gt.x[:, 1:1],
+    control_system,
+)
+@saveviz highway_frontfig_cost5 = CostHeatmapVisualizer.cost_viz(
+    5,
+    player_configurations[5];
+    x_sequence = forward_solution_gt.x[:, 1:1],
+    control_system,
+)
 @saveviz highway_frontfig_gt_viz = visualize_highway(forward_solution_gt.x)
 @saveviz highway_frontfig_observation_viz = visualize_highway(dataset[end].x; draw_line = false)

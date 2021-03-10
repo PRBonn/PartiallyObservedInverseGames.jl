@@ -1,7 +1,7 @@
 module CollisionAvoidanceGame
 
 using JuMP: @NLconstraint, @NLexpression, @objective, @variable
-using JuMPOptimalControl.CostUtils: symbol
+using PartiallyObservedInverseGames.CostUtils: symbol
 
 unique!(push!(LOAD_PATH, @__DIR__))
 import TestDynamics

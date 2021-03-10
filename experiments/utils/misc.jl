@@ -1,5 +1,5 @@
 import FileIO
-import JuMPOptimalControl.DynamicsModelInterface
+import PartiallyObservedInverseGames.DynamicsModelInterface
 
 function unitvector(θ)
     [cos(θ), sin(θ)]
