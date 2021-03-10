@@ -1,6 +1,6 @@
 # PartiallyObservedInverseGames.jl
 
-![build](https://github.com/lassepe/.jl/workflows/build/badge.svg)
+![build](https://github.com/lassepe/PartiallyObservedInverseGames.jl/workflows/build/badge.svg)
 [![codecov](https://codecov.io/gh/lassepe/PartiallyObservedInverseGames.jl/branch/master/graph/badge.svg?token=FZoqGLI2gF)](https://codecov.io/gh/lassepe/PartiallyObservedInverseGames.jl)
 
 ## Setup
