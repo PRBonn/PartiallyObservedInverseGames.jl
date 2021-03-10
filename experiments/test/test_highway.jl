@@ -19,9 +19,6 @@ import TestUtils
     @test isapprox(forward_solution_gt_kkt.u, forward_solution_gt.u, atol = 1e-4)
 end
 
-
-# TODO: continue here: player 3 and four need proximity cost or must start at a velocity that is not
-# their target speed so that the speed cost remains observable.
 @testset "Inverse solutions integration test" begin
     @testset "Residual baseline" begin
         # Minimal inverse test with both solvers:

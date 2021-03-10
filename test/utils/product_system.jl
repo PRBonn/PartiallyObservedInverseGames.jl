@@ -52,8 +52,8 @@ end
 function DynamicsModelInterface.add_dynamics_jacobians!(system::ProductSystem, opt_model, x, u)
     mapreduce(
         # diagonal pairwise concatenationo the elements in df and df_sub to comopse joint Jacobian
-        # TODO dirty hack: scaling with 1 will make sure that d1 is an expression for which
-        # Base.zero is defined.
+        # NOTE: dirty hack; scaling with 1 will make sure that d1 is promoted to an expression for
+        # which Base.zero is defined.
         (df, df_sub) -> map((d1, d2) -> cat(1d1, d2; dims = (1, 2)), df, df_sub),
         enumerate(system.subsystems),
     ) do (subsystem_idx, subsystem)
