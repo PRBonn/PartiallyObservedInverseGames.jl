@@ -11,81 +11,7 @@ import ..InversePreSolve
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
 
-export InverseIBRSolver, InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
-
-#=========================================== Inverse IBR ===========================================#
-
-struct InverseIBRSolver end
-
-# TODO: allow for partial and noisy state observations
-# TODO: This probably does not work so well if the initial strategy for the players does not match
-# the observation well.
-function solve_inverse_game(
-    ::InverseIBRSolver,
-    x̂;
-    observation_model,
-    control_system,
-    player_cost_models,
-    # TODO: dirty hack
-    u_init = nothing,
-    max_ibr_rounds = 5,
-    ibr_convergence_tolerance = 0.01,
-    verbose = false,
-    inner_solver_kwargs...,
-)
-    @unpack n_controls = control_system
-    n_players = length(player_cost_models)
-
-    last_ibr_solution = (; x = x̂, u = u_init, λ = nothing)
-    last_player_solution = last_ibr_solution
-    player_opt_models = resize!(JuMP.Model[], n_players)
-    # TODO: dirty hack
-    player_weights = Any[nothing for _ in 1:n_players]
-    converged = false
-
-    for i_ibr in 1:max_ibr_rounds
-        for (player_idx, player_cost_model) in enumerate(player_cost_models)
-            cost_model = player_cost_models[player_idx]
-            last_player_solution, player_opt_models[player_idx] =
-                InverseOptimalControl.solve_inverse_optimal_control(
-                    x̂;
-                    control_system,
-                    cost_model,
-                    observation_model,
-                    fixed_inputs = filter(i -> i ∉ player_cost_model.player_inputs, 1:n_controls),
-                    init = (;
-                        weights = player_weights[player_idx],
-                        # TODO: think about whether we should initialize with `x̂` or with
-                        # `last_player_solution.x` here
-                        # TODO: think about whether we should also hand over λ or whether it is
-                        # better to start from λ = 0 to make sure we don't enforce the contraints
-                        # immediately.
-                        x = last_player_solution.x,
-                        u = last_player_solution.u,
-                        λ = last_player_solution.λ,
-                    ),
-                    inner_solver_kwargs...,
-                    verbose,
-                )
-
-            player_weights[player_idx] = last_player_solution.weights
-        end
-
-        converged =
-            sum(Δu -> Δu^2, last_player_solution.u .- last_ibr_solution.u) <=
-            ibr_convergence_tolerance
-        last_ibr_solution = last_player_solution
-
-        if converged
-            verbose && @info "Converged at ibr iterate: $i_ibr"
-            break
-        end
-    end
-
-    converged || @warn "IBR terminated pre-maturely."
-
-    converged, last_ibr_solution, player_opt_models, player_weights
-end
+export InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 #================================ Inverse Games via KKT constraints ================================#
 
@@ -140,7 +66,7 @@ function solve_inverse_game(
     else
         # Initialization
         if init_with_observation
-            # TODO: This is not always correct. It will only work if
+            # Note: This is not always correct. It will only work if
             # `observation_model.expected_observation` effectively creates an array view into x
             # (extracting components of the variable).
             JuMP.set_start_value.(observation_model.expected_observation(x), y)
@@ -149,11 +75,6 @@ function solve_inverse_game(
         JuMPUtils.init_if_hasproperty!(u, init, :u)
         JuMPUtils.init_if_hasproperty!(λ, init, :λ)
     end
-
-    # # TODO: think about initialization for player weights. Make this a kwarg
-    # for weights in player_weights
-    #     JuMP.set_start_value.(weights, 1 / length(weights))
-    # end
 
     # constraints
     DynamicsModelInterface.add_dynamics_constraints!(control_system, opt_model, x, u)
@@ -196,9 +117,8 @@ function solve_inverse_game(
     end
 
     y_expected = observation_model.expected_observation(x)
-    # TODO: dirty hack
-    # Only search in a local neighborhood of the demonstration if we have an error-bound on the
-    # noise.
+    # Sometimes useful for debugging: Only search in a local neighborhood of the demonstration if we
+    # have an error-bound on the noise.
     if !isnothing(max_observation_error)
         @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error^2)
     end
@@ -248,10 +168,6 @@ function solve_inverse_game(
 
     # Initialization
     JuMPUtils.init_if_hasproperty!(λ, init, :λ)
-    # # TODO: think about initialization for player weights. Make this a kwarg
-    # for weights in player_weights
-    #     JuMP.set_start_value.(weights, 1 / length(weights))
-    # end
 
     # Compute intermediate results needed for the KKT residual
     # NOTE: In the KKT residual formulation, it is an *unconstrained* optimizatino problem. The only

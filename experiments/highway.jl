@@ -165,7 +165,6 @@ end
 ## Dataset Generation
 n_observation_sequences_per_noise_level = 40
 
-#TODO run_cached needs experiments prefix
 @run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),

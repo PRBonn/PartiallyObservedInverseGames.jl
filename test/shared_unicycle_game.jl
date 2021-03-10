@@ -4,7 +4,7 @@ import Zygote
 
 using JuMP: @variable, @constraint, @objective
 using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
-using PartiallyObservedInverseGames.InverseGames: InverseIBRSolver, InverseKKTConstraintSolver, solve_inverse_game
+using PartiallyObservedInverseGames.InverseGames: InverseKKTConstraintSolver, solve_inverse_game
 using PartiallyObservedInverseGames.TrajectoryVisualization: visualize_trajectory
 using SparseArrays: spzeros
 using Test: @test, @testset, @test_broken

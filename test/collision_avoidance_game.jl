@@ -3,7 +3,7 @@ using Test: @test, @testset
 using PartiallyObservedInverseGames.TrajectoryVisualization: visualize_trajectory
 using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
 using PartiallyObservedInverseGames.InverseGames:
-    InverseIBRSolver, InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
+    InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))
 import TestUtils
@@ -41,7 +41,6 @@ end
     @test all(i in TestDynamics.input_indices(control_system, 1) for i in 1:2)
     @test all(i in TestDynamics.input_indices(control_system, 2) for i in 3:4)
 end
-
 
 @testset "Forward Game" begin
     @testset "IBR" begin

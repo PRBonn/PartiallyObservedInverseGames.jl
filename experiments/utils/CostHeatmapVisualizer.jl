@@ -1,9 +1,7 @@
 module CostHeatmapVisualizer
-# TODO: import/load all the dependencies
+const project_root_dir = realpath(joinpath(@__DIR__, "../.."))
+unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
-# visualize_highway
-# forward_solution_gt
-# dataset
 import LinearAlgebra
 import ElectronDisplay
 import FileIO
