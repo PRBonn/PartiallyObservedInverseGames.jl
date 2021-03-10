@@ -1,5 +1,5 @@
 const project_root_dir = realpath(joinpath(@__DIR__, ".."))
-unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/MonteCarloStudy"))))
+unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/utils/MonteCarloStudy"))))
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
 import Distributed
@@ -11,16 +11,15 @@ Distributed.@everywhere begin
     import MonteCarloStudy
     import CollisionAvoidanceGame
     import TestDynamics
-    using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver
-    using JuMPOptimalControl.InverseGames: InverseKKTConstraintSolver, InverseKKTResidualSolver
+    using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
+    using PartiallyObservedInverseGames.InverseGames: InverseKKTConstraintSolver, InverseKKTResidualSolver
 
 end
 
-import JuMPOptimalControl.TrajectoryVisualization
+import PartiallyObservedInverseGames.TrajectoryVisualization
 import ElectronDisplay
 
 # Utils
-include("utils/distributed.jl")
 include("utils/misc.jl")
 include("utils/simple_caching.jl")
 load_cache_if_not_defined!("unicycle")

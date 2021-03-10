@@ -1,4 +1,4 @@
-module JuMPOptimalControl
+module PartiallyObservedInverseGames
 include("DynamicsModelInterface.jl")
 include("TrajectoryVisualization.jl")
 include("JuMPUtils.jl")

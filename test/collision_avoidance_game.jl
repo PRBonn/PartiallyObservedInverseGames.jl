@@ -1,8 +1,8 @@
 using Test: @test, @testset
 
-using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory
-using JuMPOptimalControl.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
-using JuMPOptimalControl.InverseGames:
+using PartiallyObservedInverseGames.TrajectoryVisualization: visualize_trajectory
+using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver, solve_game
+using PartiallyObservedInverseGames.InverseGames:
     InverseIBRSolver, InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 unique!(push!(LOAD_PATH, joinpath(@__DIR__, "utils")))

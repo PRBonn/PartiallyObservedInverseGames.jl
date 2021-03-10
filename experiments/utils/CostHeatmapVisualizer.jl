@@ -1,3 +1,4 @@
+module CostHeatmapVisualizer
 # TODO: import/load all the dependencies
 
 # visualize_highway
@@ -6,7 +7,10 @@
 import LinearAlgebra
 import ElectronDisplay
 import FileIO
+import TestDynamics
 using VegaLite: @vlplot
+
+export cost_viz
 
 "Returns a cost mapping that can be evaluated at (x, y) to get the running cost for that position."
 function position_cost_mapping(;
@@ -56,9 +60,9 @@ end
 "Generates a visualiztion of the inferred positional stage for a player."
 function cost_viz(
     player_idx,
-    player_config = player_configurations[player_idx],
+    player_config,
     ;
-    x_sequence = forward_solution_gt.x[:, 1:1],
+    x_sequence,
     control_system = control_system,
     show_y_label = false,
 )
@@ -79,10 +83,8 @@ function cost_viz(
     x_range = only(diff(extrema(x_position_domain) |> collect))
     y_range = only(diff(extrema(y_position_domain) |> collect))
     max_range = max(x_range, y_range)
-    canvas = VegaLite.@vlplot(
-        width = max_size * x_range / max_range,
-        height = max_size * y_range / max_range
-    )
+    canvas =
+        @vlplot(width = max_size * x_range / max_range, height = max_size * y_range / max_range)
 
     normalized_cost = let
         data = [(; x, y, cost = cost_map(x, y)) for x in x_domain, y in y_domain]
@@ -102,4 +104,6 @@ function cost_viz(
             title = "Normalized Cost",
         },
     )
+end
+
 end

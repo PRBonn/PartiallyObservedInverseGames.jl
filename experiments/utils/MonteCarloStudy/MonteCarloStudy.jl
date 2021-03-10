@@ -4,9 +4,9 @@ import Distributed
 using Distributed: pmap
 
 # TODO: think about at which level the @everywhere should happen. Probably outside of this.
-import JuMPOptimalControl.InversePreSolve
-using JuMPOptimalControl.ForwardGame: solve_game
-using JuMPOptimalControl.InverseGames:
+import PartiallyObservedInverseGames.InversePreSolve
+using PartiallyObservedInverseGames.ForwardGame: solve_game
+using PartiallyObservedInverseGames.InverseGames:
     InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 import Random
@@ -15,9 +15,9 @@ import LinearAlgebra
 import Distances
 import VegaLite
 
-import JuMPOptimalControl.CostUtils
-import JuMPOptimalControl.DynamicsModelInterface
-using JuMPOptimalControl.TrajectoryVisualization: visualize_trajectory, visualize_trajectory_batch
+import PartiallyObservedInverseGames.CostUtils
+import PartiallyObservedInverseGames.DynamicsModelInterface
+using PartiallyObservedInverseGames.TrajectoryVisualization: visualize_trajectory, visualize_trajectory_batch
 # TODO: ProgressMeter may need to be available for all workers
 using ProgressMeter: @showprogress
 using VegaLite: @vlplot
