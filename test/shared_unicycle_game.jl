@@ -179,7 +179,7 @@ end
     for (cost_model, weights) in zip(player_cost_models, inverse_kkt_solution.player_weights)
         TestUtils.test_inverse_solution(weights, cost_model.weights)
     end
-    TestUtils.test_inverse_model(
+    TestUtils.test_data_fidelity(
         inverse_kkt_model,
         observation_model,
         ibr_solution.x,

@@ -121,7 +121,7 @@ observation_model = (; σ = 0.0, expected_observation = identity)
 
 y = TestUtils.noisy_observation(observation_model, forward_solution.x)
 
-inverse_solution, inverse_model = solve_inverse_optimal_control(
+inverse_converged, inverse_solution, inverse_model = solve_inverse_optimal_control(
     y;
     init = (; forward_solution.u),
     control_system,
@@ -132,6 +132,7 @@ inverse_solution, inverse_model = solve_inverse_optimal_control(
 #============================================== Tests ==============================================#
 
 @testset "Inverse Solution" begin
+    @test inverse_converged
     TestUtils.test_inverse_solution(inverse_solution.weights, cost_model.weights)
-    TestUtils.test_inverse_model(inverse_model, observation_model, forward_solution.x, y)
+    TestUtils.test_data_fidelity(inverse_model, observation_model, forward_solution.x, y)
 end
