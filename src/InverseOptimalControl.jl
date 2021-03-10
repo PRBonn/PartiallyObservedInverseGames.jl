@@ -82,7 +82,12 @@ function solve_inverse_lqr(
 
     @objective(opt_model, Min, sum((x .- x̂) .^ 2))
     @time JuMP.optimize!(opt_model)
-    JuMPUtils.get_values(; q, r, x, u, λ, ∇ₓL, ∇ᵤL), opt_model, JuMP.value.(Q), JuMP.value.(R)
+
+    JuMPUtils.isconverged(opt_model),
+    JuMPUtils.get_values(; q, r, x, u, λ, ∇ₓL, ∇ᵤL),
+    opt_model,
+    JuMP.value.(Q),
+    JuMP.value.(R)
 end
 
 #=========================================== Non-LQ-Case ===========================================#
@@ -163,9 +168,8 @@ function solve_inverse_optimal_control(
     @constraint(opt_model, sum(weights) == 1)
 
     y_expected = observation_model.expected_observation(x)
-    # TODO: dirty hack
-    # Only search in a local neighborhood of the demonstration if we have an error-bound on the
-    # noise.
+    # Sometimes useful for debugging: Only search in a local neighborhood of the demonstration if we
+    # have an error-bound on the noise.
     if !isnothing(max_observation_error)
         @constraint(opt_model, (y_expected - y) .^ 2 .<= max_observation_error^2)
     end
@@ -181,7 +185,7 @@ function solve_inverse_optimal_control(
         JuMPUtils.get_values(; x, u, λ),
     )
 
-    solution, opt_model
+    JuMPUtils.isconverged(opt_model), solution, opt_model
 end
 
 end

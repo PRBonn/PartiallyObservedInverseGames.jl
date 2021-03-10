@@ -86,7 +86,7 @@ end
                 TestUtils.test_inverse_solution(weights, cost_model.weights)
             end
 
-            TestUtils.test_inverse_model(
+            TestUtils.test_data_fidelity(
                 inverse_kkt_model,
                 observation_model,
                 kkt_solution.x,
@@ -110,7 +110,7 @@ end
                 TestUtils.test_inverse_solution(weights, cost_model.weights)
             end
 
-            TestUtils.test_inverse_model(
+            TestUtils.test_data_fidelity(
                 inverse_kkt_model,
                 observation_model,
                 kkt_solution.x,
@@ -133,7 +133,7 @@ end
 
         @test converged
 
-        TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
+        TestUtils.test_data_fidelity(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
     end
 
     @testset "Noise-Free Partial Observation" begin
@@ -152,7 +152,7 @@ end
 
         @test converged
 
-        TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
+        TestUtils.test_data_fidelity(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
     end
 
     @testset "Noisy Partial Observation" begin
@@ -171,6 +171,6 @@ end
 
         @test converged
 
-        TestUtils.test_inverse_model(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
+        TestUtils.test_data_fidelity(inverse_kkt_model, observation_model, kkt_solution.x, y_obs)
     end
 end

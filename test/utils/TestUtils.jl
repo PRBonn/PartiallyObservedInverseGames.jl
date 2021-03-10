@@ -4,7 +4,7 @@ import Random
 import JuMP
 using Test: @test
 
-export test_inverse_solution, test_inverse_model, add_noise
+export test_inverse_solution, test_data_fidelity, add_noise
 
 function noisy_observation(observation_model, x; rng = Random.MersenneTwister(1))
     ŷ = observation_model.expected_observation(x)
@@ -21,10 +21,7 @@ function test_inverse_solution(weights_est, weights_true; atol = 1e-2, verbose =
     end
 end
 
-# TODO: this should be named differently since the JuMP.termination_status test is now trivially
-# performed via `converged`.
-function test_inverse_model(inverse_model, observation_model, x̂, y)
-    @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
+function test_data_fidelity(inverse_model, observation_model, x̂, y)
     ŷ = observation_model.expected_observation(x̂)
     ê_sq = sum((ŷ .- y) .^ 2)
     @test JuMP.objective_value(inverse_model) <= ê_sq + 1e-2

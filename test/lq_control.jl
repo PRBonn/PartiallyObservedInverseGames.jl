@@ -39,7 +39,7 @@ end
         ],
     ]
     R̃ = [R]
-    inverse_solution, inverse_model, Q_est, R_est =
+    inverse_converged, inverse_solution, inverse_model, Q_est, R_est =
         solve_inverse_lqr(forward_solution.x, Q̃, R̃; A, B)
 
     @testset "Gradient Check" begin
@@ -62,7 +62,7 @@ end
     end
 
     @testset "Solution Sanity" begin
-        @test JuMP.termination_status(inverse_model) in (JuMP.MOI.LOCALLY_SOLVED, JuMP.MOI.OPTIMAL)
+        @test inverse_converged
         @test Q_est[1, 1] / Q_est[2, 2] ≈ Q[1, 1] / Q[2, 2]
         @test Q_est[1, 1] / R_est[1, 1] ≈ Q[1, 1] / R[1, 1]
         @test Q_est[2, 2] / R_est[1, 1] ≈ Q[2, 2] / R[1, 1]
