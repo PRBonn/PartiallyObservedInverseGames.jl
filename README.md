@@ -19,7 +19,7 @@ binary data rather than reproducing them yourself be re-running the
 experiments. DVC can be installed as follow:
 
 1. Install [dvc](https://dvc.org/doc/install) with google drive support, e.g.
-   `pip install dvc[gdrive]`
+   `pip install "dvc[gdrive]"`
 2. [Optional] Setup [git
    hooks](https://dvc.org/doc/command-reference/install#installed-git-hooks) to
    automate the process of checking out binary files: `dvc install`
