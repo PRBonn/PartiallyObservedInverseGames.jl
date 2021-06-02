@@ -11,7 +11,7 @@ mode](https://docs.julialang.org/en/v1/stdlib/Pkg/)
 ```julia
 pkg> dev https://github.com/lassepe/PartiallyObservedInverseGames.jl
 ```
-which will install the package to `.julia/dev/PartiallyObservedInverseGames`.
+which will install the package to `~/.julia/dev/PartiallyObservedInverseGames`.
 
 Beyond that, we use [DVC](https://dvc.org) for binary data version control.
 This part of the setup is only required if you want to load our results as
