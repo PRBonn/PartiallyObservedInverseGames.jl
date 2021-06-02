@@ -15,14 +15,14 @@ which will install the package to `~/.julia/dev/PartiallyObservedInverseGames`.
 
 Beyond that, we use [DVC](https://dvc.org) for binary data version control.
 This part of the setup is only required if you want to load our results as
-binary data rather than reproducing them yourself be re-running the
+binary data rather than reproducing them yourself by re-running the
 experiments. DVC can be installed as follow:
 
 1. Install [dvc](https://dvc.org/doc/install) with google drive support, e.g.
    `pip install "dvc[gdrive]"`
 2. [Optional] Setup [git
    hooks](https://dvc.org/doc/command-reference/install#installed-git-hooks) to
-   automate the process of checking out binary files: `dvc install`
+   automate the process of checking out dvc-controlled files: `dvc install`
 
 Now you can download the binary data and figures by running `dvc pull`.
 
@@ -30,7 +30,7 @@ Now you can download the binary data and figures by running `dvc pull`.
 
 - `src/` contains the implementations of our method and the baseline for
   inverse planning. Beyond that it contains implementations of forward game
-  solvers and visualization utilities. The most important files here are
+  solvers and visualization utilities.
 
 - `test/` contains unit and integration tests for the code in `src/`
 
@@ -39,7 +39,7 @@ Now you can download the binary data and figures by running `dvc pull`.
   scenario (`experiments/highway.jl`).
 
 - After setting up `dvc` as described above and running `dvc pull` the
-  directory `data/` contains the binary data (as `.bson` file) of our results
+  directory `data/` contains the binary data of our results (as `.bson` file) 
   as well as their visualization (as `.pdf` file).
 
 ## Reproducing Results
