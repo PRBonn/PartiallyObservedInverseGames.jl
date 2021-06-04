@@ -8,7 +8,7 @@ state observations of non-cooperative multi-agent interactions.
 
 ## Paper
 
-[![](figures/teaser.png)](https://arxiv.org/)
+[![](media/teaser.png)](https://arxiv.org/)
 
 **TODO: Add videourl and ArXiv link once uploaded**
 
