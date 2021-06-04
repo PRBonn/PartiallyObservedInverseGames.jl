@@ -3,6 +3,25 @@
 ![build](https://github.com/lassepe/PartiallyObservedInverseGames.jl/workflows/build/badge.svg)
 [![codecov](https://codecov.io/gh/lassepe/PartiallyObservedInverseGames.jl/branch/master/graph/badge.svg?token=FZoqGLI2gF)](https://codecov.io/gh/lassepe/PartiallyObservedInverseGames.jl)
 
+An inverse game solver for inferring objectives from noise-corrupted partial
+state observations of non-cooperative multi-agent interactions.
+
+## Paper
+
+[![](figures/teaser.png)](https://arxiv.org/)
+
+**TODO: Add videourl and ArXiv link once uploaded**
+
+```latex
+@inproceedings{peters2021rss
+    title     = {Inferring Objectives in Continuous Dynamic Games from Noise-Corrupted Partial State Observations},
+    author    = {Peters, Lasse and Fridovich-Keil, David and Rubies-Royo, Vicenc and Tomlin, Clair J. and Stachniss, Cyrill},
+    booktitle = {Proc.~of Robotics: Science and Systems (RSS)},
+    year      = {2021}
+    codeurl   = {https://github.com/PRBonn/PartiallyObservedInverseGames.jl}
+}
+```
+
 ## Setup
 
 You can install this package as you would with any other Julia package. Either
@@ -75,7 +94,3 @@ be achieved by mounting the repository to a shared directory that is available
 from all nodes in the (potentially heterogeneous) cluster or by utilizing
 `rsync`. A suit of useful utility functions for this task can also be found in
 [Distributor.jl](https://github.com/lassepe/Distributor.jl).
-
-## Citation
-
-`TODO: Add paper with teaser.png`
