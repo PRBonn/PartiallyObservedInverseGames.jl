@@ -12,12 +12,13 @@ Distributed.@everywhere begin
     import CollisionAvoidanceGame
     import TestDynamics
     using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
-    using PartiallyObservedInverseGames.InverseGames: InverseKKTConstraintSolver, InverseKKTResidualSolver
-
+    using PartiallyObservedInverseGames.InverseGames:
+        InverseKKTConstraintSolver, InverseKKTResidualSolver
 end
 
 import PartiallyObservedInverseGames.TrajectoryVisualization
-import ElectronDisplay
+import VegaLite
+import LazyGroupBy: grouped
 
 # Utils
 include("utils/misc.jl")
@@ -28,11 +29,8 @@ load_cache_if_not_defined!("unicycle")
 
 T = 25
 
-control_system = TestDynamics.ProductSystem([
-    TestDynamics.Unicycle(0.25),
-    TestDynamics.Unicycle(0.25),
-    # TestDynamics.Unicycle(0.25),
-])
+control_system =
+    TestDynamics.ProductSystem([TestDynamics.Unicycle(0.25), TestDynamics.Unicycle(0.25)])
 
 player_angles = let
     n_players = length(control_system.subsystems)
@@ -116,28 +114,41 @@ estimates = [
 
 ## Error Ststistics Computation
 demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
-errstats = map(estimates) do estimate
+@save_json errstats = map(estimates) do estimate
     MonteCarloStudy.estimator_statistics(estimate; dataset, demo_gt, position_indices)
 end
 
 ## Visualization
 demo_noise_level = 0.1
 
+@save_json trajectory_data_gt =
+    TrajectoryVisualization.trajectory_data(control_system, forward_solution_gt.x)
+
+@save_json trajectory_data_obs = [
+    TrajectoryVisualization.trajectory_data(control_system, d.x) for
+    d in dataset if d.σ == demo_noise_level
+]
+
+@save_json trajectory_data_estimates =
+    map.(
+        e -> TrajectoryVisualization.trajectory_data(control_system, e.x),
+        grouped(
+            e -> e.estimator_name,
+            Iterators.filter(
+                e -> e.converged && dataset[e.observation_idx].σ == demo_noise_level,
+                estimates,
+            ),
+        ),
+    )
+
 ground_truth_viz =
     TrajectoryVisualization.visualize_trajectory(
-        control_system,
-        forward_solution_gt.x,
-        TrajectoryVisualization.VegaLiteBackend(),
+        trajectory_data_gt,
+        TrajectoryVisualization.VegaLiteBackend();
         canvas = VegaLite.@vlplot(width = 200, height = 200),
         legend = VegaLite.@vlfrag(orient = "top", offset = 5),
     ) + VegaLite.@vlplot(
-        data = [
-            (;
-                px = forward_solution_gt.x[TestDynamics.state_indices(control_system, ii)[1], 1],
-                py = forward_solution_gt.x[TestDynamics.state_indices(control_system, ii)[2], 1],
-                player = "P$ii",
-            ) for ii in eachindex(control_system.subsystems)
-        ],
+        data = filter(s -> s.t == 1, trajectory_data_gt),
         mark = {"text", dx = 8, dy = 8},
         text = "player",
         x = "px",
@@ -146,58 +157,18 @@ ground_truth_viz =
 
 observations_bundle_viz =
     VegaLite.@vlplot() + MonteCarloStudy.visualize_trajectory_batch(
-        control_system,
-        [d.x for d in dataset if d.σ == demo_noise_level],
+        trajectory_data_obs;
         x_position_domain = (-1.2, 1.2),
         y_position_domain = (-1.2, 1.2),
         draw_line = false,
     )
 
-conKKT_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
-    control_system,
-    [
-        e.x
-        for
-        e in estimates_conKKT if e.converged && dataset[e.observation_idx].σ == demo_noise_level
-    ];
-    x_position_domain = (-1.2, 1.2),
-    y_position_domain = (-1.2, 1.2),
-)
-
-conKKT_partial_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
-    control_system,
-    [
-        e.x
-        for
-        e in estimates_conKKT_partial if
-        e.converged && dataset[e.observation_idx].σ == demo_noise_level
-    ];
-    x_position_domain = (-1.2, 1.2),
-    y_position_domain = (-1.2, 1.2),
-)
-
-resKKT_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
-    control_system,
-    [
-        e.x
-        for
-        e in augmented_estimates_resKKT if
-        e.converged && dataset[e.observation_idx].σ == demo_noise_level
-    ];
-    x_position_domain = (-1.2, 1.2),
-    y_position_domain = (-1.2, 1.2),
-)
-
-resKKT_partial_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
-    control_system,
-    [
-        e.x
-        for
-        e in augmented_estimates_resKKT_partial if
-        e.converged && dataset[e.observation_idx].σ == demo_noise_level
-    ];
-    x_position_domain = (-1.2, 1.2),
-    y_position_domain = (-1.2, 1.2),
+viz_trajectory_estiamtes = Dict(
+    k => TrajectoryVisualization.visualize_trajectory_batch(
+        v;
+        x_position_domain = (-1.2, 1.2),
+        y_position_domain = (-1.2, 1.2),
+    ) for (k, v) in trajectory_data_estimates
 )
 
 @saveviz demo_trajs_viz = hcat(
@@ -206,13 +177,13 @@ resKKT_partial_bundle_viz = TrajectoryVisualization.visualize_trajectory_batch(
 )
 
 @saveviz ours_trajs_viz = hcat(
-    VegaLite.@vlplot(title = "Full Observation") + conKKT_bundle_viz,
-    VegaLite.@vlplot(title = "Partial Observation") + conKKT_partial_bundle_viz,
+    VegaLite.@vlplot(title = "Full Observation") + viz_trajectory_estiamtes["Ours Full"],
+    VegaLite.@vlplot(title = "Partial Observation") + viz_trajectory_estiamtes["Ours Partial"],
 )
 
 @saveviz baseline_trajs_viz = hcat(
-    VegaLite.@vlplot(title = "Full Observation") + resKKT_bundle_viz,
-    VegaLite.@vlplot(title = "Partial Observation") + resKKT_partial_bundle_viz,
+    VegaLite.@vlplot(title = "Full Observation") + viz_trajectory_estiamtes["Baseline Full"],
+    VegaLite.@vlplot(title = "Partial Observation") + viz_trajectory_estiamtes["Baseline Partial"],
 )
 
 frame = [-1.5n_observation_sequences_per_noise_level, 0]

@@ -104,40 +104,9 @@ function TrajectoryVisualization.visualize_trajectory(
     )
 end
 
-function TrajectoryVisualization.visualize_trajectory(
-    ::Unicycle,
-    x,
-    ::TrajectoryVisualization.VegaLiteBackend;
-    canvas = VegaLite.@vlplot(),
-    x_position_domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
-    y_position_domain = extrema(x[1:2, :]) .+ (-0.01, 0.01),
-    draw_line = true,
-    legend = nothing,
-    player,
-)
-
-    trajectory_table = [
-        (; px = xi[1], py = xi[2], v = xi[3], θ = xi[4], player, t)
-        for (t, xi) in enumerate(eachcol(x))
+function TrajectoryVisualization.trajectory_data(::Unicycle, x, player = 1)
+    [
+        (; px = xi[1], py = xi[2], v = xi[3], θ = xi[4], player, t) for
+        (t, xi) in enumerate(eachcol(x))
     ]
-
-    trajectory_visualizer =
-        VegaLite.@vlplot(
-            encoding = {
-                x = {"px:q", scale = {domain = x_position_domain}, title = "Position x [m]"},
-                y = {"py:q", scale = {domain = y_position_domain}, title = "Position y [m]"},
-                angle = {"θ:q", scale = {domain = [pi, -pi], range = [-90, 270]}},
-                order = "t:q",
-                color = {"player:n", title = "Player", legend = legend},
-            }
-        ) + VegaLite.@vlplot(
-            mark = {"point", shape = "circle", size = 25, clip = true, filled = true}
-        )
-
-    if draw_line
-        trajectory_visualizer += VegaLite.@vlplot(mark = {"line", clip = true})
-    end
-
-    trajectory_table |> trajectory_visualizer
 end
-

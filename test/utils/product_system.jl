@@ -88,22 +88,11 @@ function TrajectoryVisualization.visualize_trajectory(
     canvas
 end
 
-function TrajectoryVisualization.visualize_trajectory(
-    system::ProductSystem,
-    x,
-    backend::TrajectoryVisualization.VegaLiteBackend;
-    canvas = VegaLite.@vlplot(),
-    kwargs...,
-)
-
-    mapreduce(+, enumerate(system.subsystems); init = canvas) do (ii, subsystem)
+function TrajectoryVisualization.trajectory_data(system::ProductSystem, x)
+    Iterators.map(enumerate(system.subsystems)) do (ii, subsystem)
         @views x_sub = x[state_indices(system, ii), :]
-        TrajectoryVisualization.visualize_trajectory(
-            subsystem,
-            x_sub,
-            backend;
-            player = "P$ii",
-            kwargs...,
-        )
-    end
+        TrajectoryVisualization.trajectory_data(subsystem, x_sub, "P$ii")
+    end |>
+    Iterators.flatten |>
+    collect
 end

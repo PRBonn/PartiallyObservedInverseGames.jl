@@ -17,7 +17,6 @@ Distributed.@everywhere begin
 
 end
 
-import ElectronDisplay
 import VegaLite
 import Random
 import Distributor

@@ -2,7 +2,6 @@
 # TODO: Currently this assumes the presence of a global variable `project_root_dir`, `result_cache`
 # and `result_group`
 import BSON
-import Glob
 
 function clear_cache!()
     empty!(results_cache)
@@ -13,18 +12,17 @@ function unload_cache!()
 end
 
 function save_cache!(result_group)
-    save_path = joinpath(project_root_dir, "data/$result_group.bson")
+    save_path = joinpath(project_root_dir, "data/$result_group/cache.bson")
     @assert !isfile(save_path)
     BSON.bson(save_path, results_cache)
 end
 
 function load_cache(result_group)
-    result_cache_file_list =
-        Glob.glob("$result_group.bson", joinpath(project_root_dir, "data"))
-    if isempty(result_cache_file_list)
+    result_cache_file = joinpath(project_root_dir, "data/$result_group/cache.bson")
+    if !isfile(result_cache_file)
         nothing
     else
-        BSON.load(only(result_cache_file_list))
+        BSON.load(result_cache_file)
     end
 end
 
@@ -33,10 +31,9 @@ macro run_cached(assigned_computation_expr)
     var, fun = assigned_computation_expr.args
 
     quote
-        $(esc(var)) =
-            run_cached!(result_group, $(Meta.quot(var))) do
-                $fun
-            end
+        $(esc(var)) = run_cached!(result_group, $(Meta.quot(var))) do
+            $fun
+        end
     end
 end
 
