@@ -37,11 +37,8 @@ This part of the setup is only required if you want to load our results as
 binary data rather than reproducing them yourself by re-running the
 experiments. DVC can be installed as follow:
 
-1. Install [dvc](https://dvc.org/doc/install) with google drive support, e.g.
-   `pip install "dvc[gdrive]"`
-2. [Optional] Setup [git
-   hooks](https://dvc.org/doc/command-reference/install#installed-git-hooks) to
-   automate the process of checking out dvc-controlled files: `dvc install`
+1. Install [dvc](https://dvc.org/doc/install) with http support, e.g. `pip install "dvc[http]"`
+2. [Optional] Setup [git hooks](https://dvc.org/doc/command-reference/install#installed-git-hooks) to automate the process of checking out dvc-controlled files: `dvc install`
 
 Now you can download the binary data and figures by running `dvc pull`.
 
