@@ -10,8 +10,6 @@ state observations of non-cooperative multi-agent interactions.
 
 [![](media/teaser.png)](https://arxiv.org/)
 
-**TODO: Add videourl and ArXiv link once uploaded**
-
 ```latex
 @inproceedings{peters2021rss
     title     = {Inferring Objectives in Continuous Dynamic Games from Noise-Corrupted Partial State Observations},
@@ -19,6 +17,8 @@ state observations of non-cooperative multi-agent interactions.
     booktitle = {Proc.~of Robotics: Science and Systems (RSS)},
     year      = {2021}
     codeurl   = {https://github.com/PRBonn/PartiallyObservedInverseGames.jl}
+    videourl  = {TODO}
+    url       = {TODO-ArXiv}
 }
 ```
 
