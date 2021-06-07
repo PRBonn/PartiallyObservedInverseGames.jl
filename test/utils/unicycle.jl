@@ -82,28 +82,6 @@ end
 
 #========================================== Visualization ==========================================#
 
-function TrajectoryVisualization.visualize_trajectory(
-    system::Unicycle,
-    x,
-    ::TrajectoryVisualization.PlotsBackend;
-    canvas = Plots.plot(),
-    kwargs...,
-)
-    ΔT = system.ΔT
-    (x_min, x_max) = extrema(x[1, :]) .+ (-0.5, 0.5)
-    (y_min, y_max) = extrema(x[2, :]) .+ (-0.5, 0.5)
-
-    Plots.plot!(
-        canvas,
-        x[1, :],
-        x[2, :];
-        quiver = (abs.(ΔT * x[3, :]) .* cos.(x[4, :]), abs.(ΔT * x[3, :]) .* sin.(x[4, :])),
-        # line_z = axes(x)[2],
-        st = :quiver,
-        kwargs...,
-    )
-end
-
 function TrajectoryVisualization.trajectory_data(::Unicycle, x, player = 1)
     [
         (; px = xi[1], py = xi[2], v = xi[3], θ = xi[4], player, t) for

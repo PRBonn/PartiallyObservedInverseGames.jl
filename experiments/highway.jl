@@ -13,15 +13,15 @@ Distributed.@everywhere begin
     import CollisionAvoidanceGame
     import TestDynamics
     using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
-    using PartiallyObservedInverseGames.InverseGames: InverseKKTConstraintSolver, InverseKKTResidualSolver
-
+    using PartiallyObservedInverseGames.InverseGames:
+        InverseKKTConstraintSolver, InverseKKTResidualSolver
 end
 
 import VegaLite
 import Random
 import Distributor
 import CostHeatmapVisualizer
-using PartiallyObservedInverseGames.TrajectoryVisualization: VegaLiteBackend, visualize_trajectory
+using PartiallyObservedInverseGames.TrajectoryVisualization: visualize_trajectory
 
 # Utils
 include("utils/misc.jl")
@@ -132,7 +132,6 @@ end
 #===================================== Additional Visualization ====================================#
 
 function visualize_highway(x; subsampling = 1, kwargs...)
-
     viz = let
         max_size = 500
         y_position_domain = [-4, 14]
@@ -149,8 +148,7 @@ function visualize_highway(x; subsampling = 1, kwargs...)
 
         visualize_trajectory(
             control_system,
-            subsampled_taj,
-            VegaLiteBackend();
+            subsampled_taj;
             x_position_domain,
             y_position_domain,
             canvas,

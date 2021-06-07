@@ -1,50 +1,27 @@
 module TrajectoryVisualization
 import VegaLite
 
-export PlotsBackend, VegaLiteBackend, visualize_trajectory, visualize_trajectory_batch
+export visualize_trajectory, visualize_trajectory_batch
 
 #=========================== Visualization Interface for Dynamics  Models ==========================#
 
-struct PlotsBackend end
-struct VegaLiteBackend end
-
-function visualize_trajectory end
-
-"""
-Visualizes a single trajectory `x` given as a matrix of states for a preset `control_system` and
-visualziation `backend`.
-"""
-visualize_trajectory(control_system, x, backend;  canvas, kwargs...)
-
-"""
-Generic visualization of a single tarjectory `trajectory_data` via a given `backend`. Here, the
-`trajectory_data` is provided in a tabular format and is self-contained. That is, the table-liek
-format must have columns have positions `px` and `py`, time `t`, and player identifier `player`.
-"""
-visualize_trajectory(trajectory_data, backend; canvas, kwargs...)
-
-"The multi-trajectory version of `visualize_trajectory`. Simply draws multiple trajectories on top
-of eachother."
-function visualize_trajectory_batch end
-
 function trajectory_data end
-
 "Converts the state matrix x into a tabular format of `trajectory_data` that can be handed to
 visualize_trajectory"
 trajectory_data(control_system, x, player)
 
 #===================================== generic implementations =====================================#
 
-
-function visualize_trajectory(control_system, x, backend::VegaLiteBackend; kwargs...)
+function visualize_trajectory(control_system, x; kwargs...)
     td = trajectory_data(control_system, x)
-    visualize_trajectory(td, backend; kwargs...)
+    visualize_trajectory(td; kwargs...)
 end
 
-"The default-implementation of generic "
+"""
+Visualizes a single trajectory `x` given as a matrix of states for a preset `control_system`.
+"""
 function visualize_trajectory(
-    trajectory_data,
-    ::VegaLiteBackend;
+    trajectory_data;
     canvas = VegaLite.@vlplot(),
     x_position_domain = extrema(s.px for s in trajectory_data) .+ (-0.01, 0.01),
     y_position_domain = extrema(s.py for s in trajectory_data) .+ (-0.01, 0.01),
@@ -69,26 +46,29 @@ function visualize_trajectory(
     canvas + (trajectory_data |> trajectory_visualizer)
 end
 
+"""
+Generic visualization of a single tarjectory `trajectory_data`. Here, the `trajectory_data` is
+provided in a tabular format and is self-contained. That is, the table-liek format must have columns
+have positions `px` and `py`, time `t`, and player identifier `player`.
+"""
 function visualize_trajectory_batch(
     control_system,
-    trajectory_batch,
-    backend::VegaLiteBackend = VegaLiteBackend();
+    trajectory_batch;
     canvas = VegaLite.@vlplot(opacity = {value = 0.2}, width = 200, height = 200),
     kwargs...,
 )
     mapreduce(+, trajectory_batch; init = canvas) do x
-        visualize_trajectory(control_system, x, backend; kwargs...)
+        visualize_trajectory(control_system, x; kwargs...)
     end
 end
 
 function visualize_trajectory_batch(
-    trajectory_data_batch,
-    backend::VegaLiteBackend = VegaLiteBackend();
+    trajectory_data_batch;
     canvas = VegaLite.@vlplot(opacity = {value = 0.2}, width = 200, height = 200),
     kwargs...,
 )
     mapreduce(+, trajectory_data_batch; init = canvas) do trajectory_data
-        visualize_trajectory(trajectory_data, backend; kwargs...)
+        visualize_trajectory(trajectory_data; kwargs...)
     end
 end
 

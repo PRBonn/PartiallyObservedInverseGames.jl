@@ -73,21 +73,6 @@ end
 
 #========================================== Visualization ==========================================#
 
-function TrajectoryVisualization.visualize_trajectory(
-    system::ProductSystem,
-    x,
-    backend::TrajectoryVisualization.PlotsBackend;
-    canvas = Plots.plot(),
-    kwargs...,
-)
-    for (subsystem_idx, subsystem) in enumerate(system.subsystems)
-        @views x_sub = x[state_indices(system, subsystem_idx), :]
-        TrajectoryVisualization.visualize_trajectory(subsystem, x_sub, backend; canvas, kwargs...)
-    end
-
-    canvas
-end
-
 function TrajectoryVisualization.trajectory_data(system::ProductSystem, x)
     Iterators.map(enumerate(system.subsystems)) do (ii, subsystem)
         @views x_sub = x[state_indices(system, ii), :]

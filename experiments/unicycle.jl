@@ -144,8 +144,7 @@ trajectory_viz_domain = (; x_position_domain = (-1.2, 1.2), y_position_domain = 
 
 ground_truth_viz =
     TrajectoryVisualization.visualize_trajectory(
-        trajectory_data_gt,
-        TrajectoryVisualization.VegaLiteBackend();
+        trajectory_data_gt;
         canvas = VegaLite.@vlplot(width = 200, height = 200),
         legend = VegaLite.@vlfrag(orient = "top", offset = 5),
         trajectory_viz_domain...,
