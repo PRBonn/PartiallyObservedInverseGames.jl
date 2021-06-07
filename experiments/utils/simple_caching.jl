@@ -57,7 +57,9 @@ function load_cache_if_not_defined!(the_result_group; filly_emtpy = true)
         end
     elseif isdefined(Main, :results_cache) &&
            any(!startswith(string(k), "$the_result_group.") for k in keys(results_cache))
-        error("Skipping. Cache contains results for another group. Save and/or unload first.")
+        error("Skipping. Cache contains results for another group. In order to proceed, call
+              `unload_cache()`. If you want to keep the cached results, make sure to call
+              `save_cache!()` first.")
     elseif results_cache isa Dict
         @info "Cache for group \"$the_result_group\" present. No additional cache loaded."
         results_cache
