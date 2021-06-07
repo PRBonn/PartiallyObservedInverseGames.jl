@@ -24,8 +24,7 @@ state observations of non-cooperative multi-agent interactions.
 
 ## Setup
 
-
-### Julia Setup
+### Basic
 
 Either clone this repository manually or hit `]` in a Julia REPL to enter
 [package mode](https://docs.julialang.org/en/v1/stdlib/Pkg/) and run
