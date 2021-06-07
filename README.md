@@ -40,7 +40,9 @@ versions recorded in the `Manifest.toml`:
 2. Start Julia in project mode: `julia --project`
 3. Hit `]` to enter package mode and run: `pkg> instantiate`
 
-Now you are ready to use the package. See [Directory Layout](#directory-layout) for further details.
+Finally, you can run the unit tests via `] test` to confirm that the setup was
+successful. Now you are ready to use the package. See [Directory
+Layout](#directory-layout) for further details.
 
 ### Binary Data Version Control
 
@@ -50,7 +52,9 @@ binary data rather than reproducing them yourself by re-running the
 experiments. DVC can be installed as follow:
 
 1. Install [dvc](https://dvc.org/doc/install) with http support, e.g. `pip install "dvc[http]"`
-2. [Optional] Setup [git hooks](https://dvc.org/doc/command-reference/install#installed-git-hooks) to automate the process of checking out dvc-controlled files: `dvc install`
+2. [Optional] Setup [git
+   hooks](https://dvc.org/doc/command-reference/install#installed-git-hooks) to
+   automate the process of checking out dvc-controlled files: `dvc install`
 
 Now you can download the binary data and figures by running `dvc pull`.
 
