@@ -1,6 +1,4 @@
-# TODO: Maybe move this to a module.
-# TODO: Currently this assumes the presence of a global variable `project_root_dir`, `result_cache`
-# and `result_group`
+# Note: This code assumes the presence of a global variable `project_root_dir`.
 import BSON
 
 function clear_cache!()

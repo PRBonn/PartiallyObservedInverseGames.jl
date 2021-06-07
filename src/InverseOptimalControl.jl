@@ -131,9 +131,8 @@ function solve_inverse_optimal_control(
 
     # Initialization
     if init_with_observation
-        # TODO: This is not always correct. It will only work if
-        # `observation_model.expected_observation` effectively creates an array view into x
-        # (extracting components of the variable).
+        # Note: This initialization is only works if `observation_model.expected_observation`
+        # effectively creates an array view into x (extracting sub-components of the state).
         JuMP.set_start_value.(observation_model.expected_observation(x), y)
     end
     JuMPUtils.init_if_hasproperty!(u, init, :u)
