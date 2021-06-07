@@ -71,7 +71,7 @@ Now you can download the binary data and figures by running `dvc pull`.
   scenario (`experiments/highway.jl`).
 
 - After setting up `dvc` as described above and running `dvc pull` the
-  directory `data/` contains the binary data of our results (as `.bson` file) 
+  directory `data/` contains the binary data of our results (as `.bson` file)
   as well as their visualization (as `.pdf` file).
 
 ## Reproducing Results
@@ -84,10 +84,10 @@ corresponding scripts in `experiments/`:
 
 ### Caching
 
-Both scripts will check for cached results in `data/`. If cached results have
-been found, they will be loaded and the figures will be reproduced from this
-data. In order to reproduce results from scratch you will have to clear the
-cache first by calling `clear_cache!()` (implemented in
+The scripts located in `experiments/` will check for cached results in `data/`.
+If cached results are found, they will be loaded and the figures will be
+reproduced from this data. In order to reproduce results from scratch you will
+have to clear the cache first by calling `clear_cache!()` (implemented in
 `experiments/utils/simple_caching.jl`). Alternatively, you can remove the
 `@run_cached`  macro in front the function calls in the experiment to disable
 caching for that call.
