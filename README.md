@@ -24,13 +24,26 @@ state observations of non-cooperative multi-agent interactions.
 
 ## Setup
 
-You can install this package as you would with any other Julia package. Either
-clone this repository manually or run the following code in [package
-mode](https://docs.julialang.org/en/v1/stdlib/Pkg/)
+
+### Julia Setup
+
+Either clone this repository manually or hit `]` in a Julia REPL to enter
+[package mode](https://docs.julialang.org/en/v1/stdlib/Pkg/) and run
 ```julia
 pkg> dev https://github.com/lassepe/PartiallyObservedInverseGames.jl
 ```
-which will install the package to `~/.julia/dev/PartiallyObservedInverseGames`.
+which will clone the package to `~/.julia/dev/PartiallyObservedInverseGames`.
+
+After you have cloned the repository, you can install all dependencies at the
+versions recorded in the `Manifest.toml`:
+
+1. Navigate to the installation directory, e.g. `cd ~/.julia/dev/PartiallyObservedInverseGames`
+2. Start Julia in project mode: `julia --project`
+3. Hit `]` to enter package mode and run: `pkg> instantiate`
+
+Now you are ready to use the package. See [Directory Layout](#directory-layout) for further details.
+
+### Binary Data Version Control
 
 Beyond that, we use [DVC](https://dvc.org) for binary data version control.
 This part of the setup is only required if you want to load our results as
