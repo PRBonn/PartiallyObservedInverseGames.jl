@@ -120,6 +120,7 @@ end
 
 ## Visualization
 demo_noise_level = 0.1
+trajectory_viz_domain = (; x_position_domain = (-1.2, 1.2), y_position_domain = (-1.2, 1.2))
 
 @save_json trajectory_data_gt =
     TrajectoryVisualization.trajectory_data(control_system, forward_solution_gt.x)
@@ -147,6 +148,7 @@ ground_truth_viz =
         TrajectoryVisualization.VegaLiteBackend();
         canvas = VegaLite.@vlplot(width = 200, height = 200),
         legend = VegaLite.@vlfrag(orient = "top", offset = 5),
+        trajectory_viz_domain...,
     ) + VegaLite.@vlplot(
         data = filter(s -> s.t == 1, trajectory_data_gt),
         mark = {"text", dx = 8, dy = 8},
@@ -158,17 +160,13 @@ ground_truth_viz =
 observations_bundle_viz =
     VegaLite.@vlplot() + MonteCarloStudy.visualize_trajectory_batch(
         trajectory_data_obs;
-        x_position_domain = (-1.2, 1.2),
-        y_position_domain = (-1.2, 1.2),
+        trajectory_viz_domain...,
         draw_line = false,
     )
 
 viz_trajectory_estiamtes = Dict(
-    k => TrajectoryVisualization.visualize_trajectory_batch(
-        v;
-        x_position_domain = (-1.2, 1.2),
-        y_position_domain = (-1.2, 1.2),
-    ) for (k, v) in trajectory_data_estimates
+    k => TrajectoryVisualization.visualize_trajectory_batch(v; trajectory_viz_domain...) for
+    (k, v) in trajectory_data_estimates
 )
 
 @saveviz demo_trajs_viz = hcat(

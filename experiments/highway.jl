@@ -212,7 +212,7 @@ estimates = [
 
 ## Error Ststistics Computation
 demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
-errstats = map(estimates) do estimate
+@save_json errstats = map(estimates) do estimate
     MonteCarloStudy.estimator_statistics(estimate; dataset, demo_gt, position_indices)
 end
 

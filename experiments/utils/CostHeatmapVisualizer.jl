@@ -3,7 +3,6 @@ const project_root_dir = realpath(joinpath(@__DIR__, "../.."))
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
 import LinearAlgebra
-import ElectronDisplay
 import FileIO
 import TestDynamics
 using VegaLite: @vlplot

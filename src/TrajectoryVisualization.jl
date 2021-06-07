@@ -45,7 +45,7 @@ end
 function visualize_trajectory(
     trajectory_data,
     ::VegaLiteBackend;
-    canvas = nothing,
+    canvas = VegaLite.@vlplot(),
     x_position_domain = extrema(s.px for s in trajectory_data) .+ (-0.01, 0.01),
     y_position_domain = extrema(s.py for s in trajectory_data) .+ (-0.01, 0.01),
     draw_line = true,
@@ -66,7 +66,7 @@ function visualize_trajectory(
         trajectory_visualizer += VegaLite.@vlplot(mark = {"line", clip = true})
     end
 
-    trajectory_data |> trajectory_visualizer
+    canvas + (trajectory_data |> trajectory_visualizer)
 end
 
 function visualize_trajectory_batch(
