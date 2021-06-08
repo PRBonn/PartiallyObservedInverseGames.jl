@@ -24,6 +24,8 @@ state observations of non-cooperative multi-agent interactions.
 
 ## Setup
 
+This code was tested with Julia versions 1.5 and 1.6.
+
 ### Basic
 
 Either clone this repository manually or hit `]` in a Julia REPL to enter
