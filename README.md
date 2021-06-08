@@ -8,7 +8,7 @@ state observations of non-cooperative multi-agent interactions.
 
 ## Paper
 
-[![](media/teaser.png)](https://arxiv.org/)
+[![](media/teaser.png)](https://arxiv.org/abs/2106.03611)
 
 ```latex
 @inproceedings{peters2021rss
@@ -18,7 +18,7 @@ state observations of non-cooperative multi-agent interactions.
     year      = {2021}
     codeurl   = {https://github.com/PRBonn/PartiallyObservedInverseGames.jl}
     videourl  = {TODO}
-    url       = {TODO-ArXiv}
+    url       = {https://arxiv.org/abs/2106.03611}
 }
 ```
 
