@@ -15,9 +15,9 @@ state observations of non-cooperative multi-agent interactions.
     title     = {Inferring Objectives in Continuous Dynamic Games from Noise-Corrupted Partial State Observations},
     author    = {Peters, Lasse and Fridovich-Keil, David and Rubies-Royo, Vicenc and Tomlin, Clair J. and Stachniss, Cyrill},
     booktitle = {Proc.~of Robotics: Science and Systems (RSS)},
-    year      = {2021}
-    codeurl   = {https://github.com/PRBonn/PartiallyObservedInverseGames.jl}
-    videourl  = {TODO}
+    year      = {2021},
+    codeurl   = {https://github.com/PRBonn/PartiallyObservedInverseGames.jl},
+    videourl  = {TODO},
     url       = {https://arxiv.org/abs/2106.03611}
 }
 ```
