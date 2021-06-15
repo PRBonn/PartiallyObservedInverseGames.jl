@@ -1,7 +1,7 @@
 # PartiallyObservedInverseGames.jl
 
-![build](https://github.com/lassepe/PartiallyObservedInverseGames.jl/workflows/build/badge.svg)
-[![codecov](https://codecov.io/gh/lassepe/PartiallyObservedInverseGames.jl/branch/master/graph/badge.svg?token=FZoqGLI2gF)](https://codecov.io/gh/lassepe/PartiallyObservedInverseGames.jl)
+![build](https://github.com/PRBonn/PartiallyObservedInverseGames.jl/workflows/build/badge.svg)
+[![codecov](https://codecov.io/gh/PRBonn/PartiallyObservedInverseGames.jl/branch/master/graph/badge.svg?token=AUd9TmzfI2)](https://codecov.io/gh/PRBonn/PartiallyObservedInverseGames.jl)
 
 An inverse game solver for inferring objectives from noise-corrupted partial
 state observations of non-cooperative multi-agent interactions.
