@@ -30,7 +30,7 @@ This code was tested with Julia versions 1.5 and 1.6.
 Either clone this repository manually or hit `]` in a Julia REPL to enter
 [package mode](https://docs.julialang.org/en/v1/stdlib/Pkg/) and run
 ```julia
-pkg> dev https://github.com/lassepe/PartiallyObservedInverseGames.jl
+pkg> dev https://github.com/PRBonn/PartiallyObservedInverseGames.jl
 ```
 which will clone the package to `~/.julia/dev/PartiallyObservedInverseGames`.
 
