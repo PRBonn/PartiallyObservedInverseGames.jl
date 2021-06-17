@@ -17,6 +17,7 @@ state observations of non-cooperative multi-agent interactions.
     booktitle = {Proc.~of Robotics: Science and Systems (RSS)},
     year      = {2021},
     codeurl   = {https://github.com/PRBonn/PartiallyObservedInverseGames.jl},
+    videourl  = {https://www.youtube.com/watch?v=BogCsYQX9Pc},
     url       = {https://arxiv.org/abs/2106.03611}
 }
 ```
