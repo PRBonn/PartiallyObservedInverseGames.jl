@@ -1,6 +1,13 @@
 name: build
 on:
   push:
+    paths-ignore:
+      - '**/README.md'
+      - '**/LICENSE'
+      - "/.dvc"
+      - '/data'
+      - '/figures'
+      - '/media'
   pull_request:
 
 jobs:
