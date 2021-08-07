@@ -60,7 +60,7 @@ function visualize_poserr(;
     width = viz_defaults.width,
     height = viz_defaults.height,
     frame = viz_defaults.frame,
-    y_label = "Mean Absolute Position Prediciton Error [m]",
+    y_label = "Mean Absolute Position Prediction Error [m]",
     round_x_axis = true,
 )
     @vlplot(
