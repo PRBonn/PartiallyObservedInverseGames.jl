@@ -1,12 +1,12 @@
 module InverseGames
 
-import JuMP
-import Ipopt
-import ..DynamicsModelInterface
-import ..JuMPUtils
-import ..CostUtils
-import ..InverseOptimalControl
-import ..InversePreSolve
+using JuMP: JuMP
+using Ipopt: Ipopt
+using ..DynamicsModelInterface: DynamicsModelInterface
+using ..JuMPUtils: JuMPUtils
+using ..CostUtils: CostUtils
+using ..InverseOptimalControl: InverseOptimalControl
+using ..InversePreSolve: InversePreSolve
 
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
@@ -17,12 +17,15 @@ export InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 struct InverseKKTConstraintSolver end
 
+using Infiltrator: @infiltrate as @bp
+
 function solve_inverse_game(
     ::InverseKKTConstraintSolver,
     y;
     control_system,
     observation_model,
     player_cost_models,
+    T = size(y, 2),
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
@@ -32,8 +35,6 @@ function solve_inverse_game(
     verbose = false,
     pre_solve = true,
 )
-
-    T = size(y, 2)
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
 
@@ -62,7 +63,9 @@ function solve_inverse_game(
             solver_attributes,
         )
         @assert pre_solve_conveged
-        JuMP.set_start_value.(x, pre_solve_init.x)
+        # TODO: think about how to set an initial guess for the tail end. Maybe Just constant
+        # velocity rollout?
+        JuMP.set_start_value.(@view(x[CartesianIndices(pre_solve_init.x)]), pre_solve_init.x)
     else
         # Initialization
         if init_with_observation
@@ -116,7 +119,7 @@ function solve_inverse_game(
         @constraint(opt_model, sum(weights) .== 1)
     end
 
-    y_expected = observation_model.expected_observation(x)
+    y_expected = observation_model.expected_observation(x)[:, 1:size(y, 2)]
     # Sometimes useful for debugging: Only search in a local neighborhood of the demonstration if we
     # have an error-bound on the noise.
     if !isnothing(max_observation_error)
@@ -153,7 +156,6 @@ function solve_inverse_game(
     cmin = 1e-5,
     verbose = false,
 )
-
     T = size(x, 2)
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
@@ -221,8 +223,8 @@ function solve_inverse_game(
         opt_model,
         Min,
         sum(
-            sum(el -> el^2, res.dLdx) + sum(el -> el^2, res.dLdu[:, 1:(end - 1)])
-            for res in player_residuals
+            sum(el -> el^2, res.dLdx) + sum(el -> el^2, res.dLdu[:, 1:(end - 1)]) for
+            res in player_residuals
         )
     )
 

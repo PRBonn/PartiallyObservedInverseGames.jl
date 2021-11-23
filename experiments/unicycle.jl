@@ -2,22 +2,22 @@ const project_root_dir = realpath(joinpath(@__DIR__, ".."))
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/utils/MonteCarloStudy"))))
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
-import Distributed
+using Distributed: Distributed
 Distributed.@everywhere begin
-    import Pkg
+    using Pkg: Pkg
     Pkg.activate($project_root_dir)
     union!(LOAD_PATH, $LOAD_PATH)
 
-    import MonteCarloStudy
-    import CollisionAvoidanceGame
-    import TestDynamics
+    using MonteCarloStudy: MonteCarloStudy
+    using CollisionAvoidanceGame: CollisionAvoidanceGame
+    using TestDynamics: TestDynamics
     using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
     using PartiallyObservedInverseGames.InverseGames:
-        InverseKKTConstraintSolver, InverseKKTResidualSolver
+        InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 end
 
 import PartiallyObservedInverseGames.TrajectoryVisualization
-import VegaLite
+using VegaLite: VegaLite
 import LazyGroupBy: grouped
 
 # Utils
@@ -81,6 +81,25 @@ estimator_setup = (;
 )
 estimator_setup_partial =
     merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
+
+# truncated horizon inference test
+estimated_traj_data = let
+    d = dataset[begin]
+    y = d.x[:, 1:(T ÷ 2)]
+    observation_model = (; d.σ, expected_observation = identity)
+    converged, sol = solve_inverse_game(
+        InverseKKTConstraintSolver(),
+        y;
+        control_system,
+        observation_model,
+        player_cost_models = player_cost_models_gt,
+        T,
+    )
+    TrajectoryVisualization.trajectory_data(control_system, sol.x)
+end
+
+#==
+
 @run_cached estimates_conKKT =
     MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup...)
 @run_cached estimates_conKKT_partial =
@@ -188,3 +207,5 @@ frame = [-1.5n_observation_sequences_per_noise_level, 0]
     errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
 @saveviz position_error_viz =
     errstats |> MonteCarloStudy.visualize_poserr(; frame, round_x_axis = false)
+
+==#
