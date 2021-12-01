@@ -10,12 +10,15 @@ function pre_solve(
     u_obs;
     control_system,
     observation_model = (; expected_observation = identity),
+    T = size(y_obs, 2),
     u_regularization = 0,
     inner_solver_kwargs...,
 )
+    T >= size(y_obs, 2) ||
+        throw(ArgumentError("Horizon `T` must be at least as long as number of observations."))
     function presolve_objective(; x, u, y_obs, u_obs)
         y_expected = observation_model.expected_observation(x)
-        sum(el -> el^2, y_expected - y_obs) +
+        sum(el -> el^2, y_expected[:, 1:size(y_obs, 2)] - y_obs) +
         (isnothing(u_obs) ? 0 : sum(el -> el^2, u - u_obs)) +
         (iszero(u_regularization) ? 0 : u_regularization * sum(el -> el^2, u))
     end
@@ -27,7 +30,6 @@ function pre_solve(
         end,
         weights = (),
     )
-    T = size(y_obs, 2)
 
     ForwardOptimalControl.solve_optimal_control(
         control_system,

@@ -35,6 +35,9 @@ function solve_inverse_game(
     verbose = false,
     pre_solve = true,
 )
+    T >= size(y, 2) ||
+        throw(ArgumentError("Horizon `T` must be at least as long as number of observations."))
+
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
 
@@ -57,6 +60,7 @@ function solve_inverse_game(
             nothing;
             control_system,
             observation_model,
+            T,
             verbose,
             init,
             solver,
