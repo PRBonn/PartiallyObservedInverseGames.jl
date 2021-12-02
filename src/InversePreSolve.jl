@@ -11,7 +11,7 @@ function pre_solve(
     control_system,
     observation_model = (; expected_observation = identity),
     T = size(y_obs, 2),
-    u_regularization = 0.001,
+    u_regularization = 0,
     inner_solver_kwargs...,
 )
     T >= size(y_obs, 2) ||

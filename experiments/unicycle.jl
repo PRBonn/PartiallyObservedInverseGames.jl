@@ -95,6 +95,9 @@ estimated_traj_data = let
         observation_model,
         player_cost_models = player_cost_models_gt,
         T,
+        cmin = 1e-3,
+        player_weight_prior = nothing, #[ones(4) / 4 for _ in 1:2],
+        pre_solve_kwargs = (; u_regularization = 1e-5),
     )
     @assert converged
     TrajectoryVisualization.trajectory_data(control_system, sol.x)

@@ -11,8 +11,6 @@ using ..InversePreSolve: InversePreSolve
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
 
-using Infiltrator: @infiltrate as @bp
-
 export InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 #================================ Inverse Games via KKT constraints ================================#
@@ -29,12 +27,13 @@ function solve_inverse_game(
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
-    cmin = 1e-2,
+    cmin = 1e-5,
     max_observation_error = nothing,
     player_weight_prior = nothing,
     init_with_observation = true,
     verbose = false,
     pre_solve = true,
+    pre_solve_kwargs = (;),
 )
     T >= size(y, 2) ||
         throw(ArgumentError("Horizon `T` must be at least as long as number of observations."))
@@ -66,6 +65,7 @@ function solve_inverse_game(
             init,
             solver,
             solver_attributes,
+            pre_solve_kwargs...,
         )
         @assert pre_solve_conveged
         # TODO: think about how to set an initial guess for the tail end. Maybe Just constant
@@ -133,13 +133,14 @@ function solve_inverse_game(
 
     # The inverse objective: match the observed demonstration
     if !isnothing(player_weight_prior)
-        throw(ErrorException("Not Implemented"))
+        # TODO implement proper weighting
+        @warn "TODO: Prior on cost weights is not weighted correctly yet!"
         @objective(
             opt_model,
             Min,
             sum(el -> el^2, y_expected .- y) +
-            sum(zip(player_weights, player_weight_prior)) do w, w_prior
-                sum(el -> el^2, w - w_prior) * 0.001
+            sum(zip(player_weights, player_weight_prior)) do (w, w_prior)
+                sum(el -> el^2, w .- w_prior) * 1
             end
         )
     else
@@ -151,13 +152,11 @@ function solve_inverse_game(
 
     solution = merge(
         JuMPUtils.get_values(; x, u, λ),
-        #pre_solve_init,
         (; player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights)),
     )
 
     (
         JuMPUtils.isconverged(opt_model),
-        #true,
         solution,
         opt_model,
     )
