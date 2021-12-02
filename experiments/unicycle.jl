@@ -85,7 +85,8 @@ estimator_setup_partial =
 # truncated horizon inference test
 estimated_traj_data = let
     d = dataset[begin]
-    y = d.x[:, 1:(T ÷ 2)]
+    observation_horizon = T ÷ 3
+    y = d.x[:, 1:observation_horizon]
     observation_model = (; d.σ, expected_observation = identity)
     converged, sol = solve_inverse_game(
         InverseKKTConstraintSolver(),
@@ -95,8 +96,11 @@ estimated_traj_data = let
         player_cost_models = player_cost_models_gt,
         T,
     )
+    @assert converged
     TrajectoryVisualization.trajectory_data(control_system, sol.x)
 end
+
+estimated_traj_data |> TrajectoryVisualization.visualize_trajectory
 
 #==
 

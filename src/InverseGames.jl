@@ -11,13 +11,13 @@ using ..InversePreSolve: InversePreSolve
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
 
+using Infiltrator: @infiltrate as @bp
+
 export InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
 
 #================================ Inverse Games via KKT constraints ================================#
 
 struct InverseKKTConstraintSolver end
-
-using Infiltrator: @infiltrate as @bp
 
 function solve_inverse_game(
     ::InverseKKTConstraintSolver,
@@ -29,8 +29,9 @@ function solve_inverse_game(
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
-    cmin = 1e-5,
+    cmin = 1e-2,
     max_observation_error = nothing,
+    player_weight_prior = nothing,
     init_with_observation = true,
     verbose = false,
     pre_solve = true,
@@ -131,17 +132,35 @@ function solve_inverse_game(
     end
 
     # The inverse objective: match the observed demonstration
-    @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
+    if !isnothing(player_weight_prior)
+        throw(ErrorException("Not Implemented"))
+        @objective(
+            opt_model,
+            Min,
+            sum(el -> el^2, y_expected .- y) +
+            sum(zip(player_weights, player_weight_prior)) do w, w_prior
+                sum(el -> el^2, w - w_prior) * 0.001
+            end
+        )
+    else
+        @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
+    end
 
     time = @elapsed JuMP.optimize!(opt_model)
     verbose && @info time
 
     solution = merge(
         JuMPUtils.get_values(; x, u, λ),
+        #pre_solve_init,
         (; player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights)),
     )
 
-    JuMPUtils.isconverged(opt_model), solution, opt_model
+    (
+        JuMPUtils.isconverged(opt_model),
+        #true,
+        solution,
+        opt_model,
+    )
 end
 
 #========================================== KKT Residual ===========================================#
