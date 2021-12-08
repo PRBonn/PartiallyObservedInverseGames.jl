@@ -3,6 +3,12 @@ unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/utils/
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
 using Distributed: Distributed
+
+# TODO: Dependecies for online debugging. Factor out into another file
+using Distances: Distances
+using PartiallyObservedInverseGames.CostUtils: CostUtils
+using Statistics: Statistics
+
 Distributed.@everywhere begin
     using Pkg: Pkg
     Pkg.activate($project_root_dir)
@@ -82,9 +88,11 @@ estimator_setup = (;
 estimator_setup_partial =
     merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
 
+# TODO: Move
+# Static Online Case
 # truncated horizon inference test
-estimated_traj_data = let
-    d = dataset[begin]
+let
+    d = dataset[begin + 500]
     observation_horizon = T ÷ 3
     y = d.x[:, 1:observation_horizon]
     observation_model = (; d.σ, expected_observation = identity)
@@ -100,10 +108,31 @@ estimated_traj_data = let
         pre_solve_kwargs = (; u_regularization = 1e-5),
     )
     @assert converged
-    TrajectoryVisualization.trajectory_data(control_system, sol.x)
-end
 
-estimated_traj_data |> TrajectoryVisualization.visualize_trajectory
+    # visualization
+    let
+        gt = TrajectoryVisualization.trajectory_data(control_system, dataset[begin].x)
+        observation = TrajectoryVisualization.trajectory_data(control_system, y)
+        estimate = TrajectoryVisualization.trajectory_data(control_system, sol.x)
+
+        canvas = TrajectoryVisualization.visualize_trajectory(gt)
+        canvas = TrajectoryVisualization.visualize_trajectory(observation; canvas)
+        canvas = TrajectoryVisualization.visualize_trajectory(estimate; canvas)
+        display(canvas)
+    end
+
+    # TODO: compute parameter error
+    function parameter_error(ps1, ps2)
+        map(ps1, ps2) do p1, p2
+            p1 = CostUtils.normalize(p1)
+            p2 = CostUtils.normalize(p2)
+            Distances.cosine_dist(p1, p2)
+        end |> Statistics.mean
+    end
+
+    ws_gt = [m.weights for m in player_cost_models_gt]
+    @show parameter_error(ws_gt, sol.player_weights)
+end
 
 #==
 
