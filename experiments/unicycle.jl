@@ -92,9 +92,9 @@ estimator_setup_partial =
 # Static Online Case
 # truncated horizon inference test
 let
-    d = dataset[begin + 500]
+    d = dataset[begin + 50]
     observation_horizon = T ÷ 3
-    y = d.x[:, 1:observation_horizon]
+    y = d.x[:, (1:observation_horizon) .+ 10]
     observation_model = (; d.σ, expected_observation = identity)
     converged, sol = solve_inverse_game(
         InverseKKTConstraintSolver(),
@@ -106,6 +106,7 @@ let
         cmin = 1e-3,
         player_weight_prior = nothing, #[ones(4) / 4 for _ in 1:2],
         pre_solve_kwargs = (; u_regularization = 1e-5),
+        max_observation_error = nothing,
     )
     @assert converged
 
