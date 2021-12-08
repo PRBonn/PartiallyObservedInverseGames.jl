@@ -115,9 +115,11 @@ let
         observation = TrajectoryVisualization.trajectory_data(control_system, y)
         estimate = TrajectoryVisualization.trajectory_data(control_system, sol.x)
 
-        canvas = TrajectoryVisualization.visualize_trajectory(gt)
-        canvas = TrajectoryVisualization.visualize_trajectory(observation; canvas)
-        canvas = TrajectoryVisualization.visualize_trajectory(estimate; canvas)
+        canvas = TrajectoryVisualization.visualize_trajectory(gt; group = "ground truth")
+        canvas =
+            TrajectoryVisualization.visualize_trajectory(observation; canvas, group = "observation")
+        canvas =
+            TrajectoryVisualization.visualize_trajectory(estimate; canvas, group = "estimation")
         display(canvas)
     end
 

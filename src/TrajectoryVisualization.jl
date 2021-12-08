@@ -1,5 +1,5 @@
 module TrajectoryVisualization
-import VegaLite
+using VegaLite: VegaLite
 
 export visualize_trajectory, visualize_trajectory_batch
 
@@ -27,6 +27,7 @@ function visualize_trajectory(
     y_position_domain = extrema(s.py for s in trajectory_data) .+ (-0.01, 0.01),
     draw_line = true,
     legend = nothing,
+    group = "",
 )
     trajectory_visualizer =
         VegaLite.@vlplot(
@@ -34,7 +35,9 @@ function visualize_trajectory(
                 x = {"px:q", scale = {domain = x_position_domain}, title = "Position x [m]"},
                 y = {"py:q", scale = {domain = y_position_domain}, title = "Position y [m]"},
                 order = "t:q",
-                color = {"player:n", title = "Player", legend = legend},
+                # TODO: allow empty group
+                color = {datum = group},
+                detail = {"player:n"},
             }
         ) +
         VegaLite.@vlplot(mark = {"point", shape = "circle", size = 25, clip = true, filled = true})
