@@ -155,14 +155,60 @@ function solve_inverse_game(
         (; player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights)),
     )
 
-    (
-        JuMPUtils.isconverged(opt_model),
-        solution,
-        opt_model,
-    )
+    (JuMPUtils.isconverged(opt_model), solution, opt_model)
 end
 
 #========================================== KKT Residual ===========================================#
+#
+struct PrefilteredInverseKKTResidualSolver end
+
+# TODO: partially observed dispatch
+# Maybe this should be another solver? Like `FilteringInverseKKTResidualSolver`
+function solve_inverse_game(
+    inverse_solver::PrefilteredInverseKKTResidualSolver,
+    y;
+    control_system,
+    observation_model,
+    player_cost_models,
+    solver = Ipopt.Optimizer,
+    solver_attributes = (; print_level = 3),
+    verbose = false,
+    pre_solve_kwargs = (;),
+    # TODO: implement these features...
+    T = nothing,
+    player_weight_prior = nothing,
+    max_observation_error = nothing,
+    solver_args...,
+)
+    smoothed_observation = let
+        pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
+            y,
+            nothing;
+            control_system,
+            observation_model,
+            solver_attributes,
+            verbose,
+            pre_solve_kwargs...,
+        )
+        @assert pre_solve_converged
+        # Filtered sequence is truncated to the original length to give all methods the same
+        # number of data-points for inference.
+        # TODO: Think about how to cleanly handle the "extra observation" case here
+        (; x = pre_solve_solution.x[:, 1:size(y, 2)], u = pre_solve_solution.u[:, 1:size(y, 2)])
+    end
+
+    converged, estimate, opt_model = solve_inverse_game(
+        InverseKKTResidualSolver(),
+        smoothed_observation.x,
+        smoothed_observation.u;
+        control_system,
+        player_cost_models,
+        solver,
+        solver_attributes,
+        verbose,
+        solver_args...,
+    )
+end
 
 struct InverseKKTResidualSolver end
 

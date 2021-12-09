@@ -20,7 +20,10 @@ Distributed.@everywhere begin
     using TestDynamics: TestDynamics
     using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
     using PartiallyObservedInverseGames.InverseGames:
-        InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
+        InverseKKTConstraintSolver,
+        InverseKKTResidualSolver,
+        PrefilteredInverseKKTResidualSolver,
+        solve_inverse_game
 end
 
 import PartiallyObservedInverseGames.TrajectoryVisualization
@@ -103,21 +106,20 @@ estimator_setup = (;
 estimator_setup_partial =
     merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
 
-# TODO: actually use the truncated setup ...
 @run_cached estimates_conKKT =
     MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup...)
-#@run_cached estimates_conKKT_partial =
-#    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup_partial...)
-#@run_cached estimates_resKKT =
-#    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup...)
-#@run_cached estimates_resKKT_partial =
-#    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup_partial...)
+@run_cached estimates_conKKT_partial =
+    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup_partial...)
+@run_cached estimates_resKKT =
+    MonteCarloStudy.estimate(PrefilteredInverseKKTResidualSolver(); estimator_setup...)
+@run_cached estimates_resKKT_partial =
+    MonteCarloStudy.estimate(PrefilteredInverseKKTResidualSolver(); estimator_setup_partial...)
 
 estimates = [
-    estimates_conKKT;
-    #    estimates_conKKT_partial
-    #    estimates_resKKT
-    #    estimates_resKKT_partial
+    estimates_conKKT
+    estimates_conKKT_partial
+    estimates_resKKT
+    estimates_resKKT_partial
 ]
 
 demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
@@ -134,7 +136,7 @@ end
 frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]
 parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
 
-# Debugging test
+# Debugging code
 #=
 
 d = dataset[end]

@@ -29,6 +29,36 @@ function estimate(
 end
 
 function estimate(
+    solver::PrefilteredInverseKKTResidualSolver;
+    dataset,
+    control_system,
+    player_cost_models,
+    solver_attributes,
+    expected_observation = identity,
+    estimator_name = (expected_observation === identity ? "Baseline Full" : "Baseline Partial"),
+    solver_kwargs...,
+)
+    @showprogress pmap(enumerate(dataset)) do (observation_idx, d)
+        observation_model = (; d.σ, expected_observation)
+
+        converged, estimate, opt_model = solve_inverse_game(
+            solver,
+            expected_observation(d.x);
+            control_system,
+            observation_model,
+            player_cost_models,
+            solver_attributes,
+            solver_kwargs...,
+            # NOTE: This estimator does not use any information beyond the state observation!
+        )
+        converged || @warn "conKKT did not converge on observation $observation_idx."
+
+        merge(estimate, (; converged, observation_idx, estimator_name))
+    end
+end
+
+# TODO: maybe get rid of this (use `PrefilteredInverseKKTResidualSolver` instead)
+function estimate(
     solver::InverseKKTResidualSolver;
     dataset,
     control_system,
@@ -36,6 +66,7 @@ function estimate(
     solver_attributes,
     expected_observation = identity,
     estimator_name = (expected_observation === identity ? "Baseline Full" : "Baseline Partial"),
+    pre_solve_kwargs = (;),
 )
     @showprogress pmap(enumerate(dataset)) do (observation_idx, d)
         observation_model = (; d.σ, expected_observation)
@@ -49,6 +80,7 @@ function estimate(
                 control_system,
                 observation_model,
                 solver_attributes,
+                pre_solve_kwargs...,
             )
             @assert pre_solve_converged
             # Filtered sequence is truncated to the original length to give all methods the same
