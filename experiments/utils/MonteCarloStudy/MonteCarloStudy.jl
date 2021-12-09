@@ -8,7 +8,7 @@ using PartiallyObservedInverseGames.ForwardGame: solve_game
 using PartiallyObservedInverseGames.InverseGames:
     InverseKKTConstraintSolver,
     InverseKKTResidualSolver,
-    PrefilteredInverseKKTResidualSolver,
+    AugmentedInverseKKTResidualSolver,
     solve_inverse_game
 
 using Random: Random

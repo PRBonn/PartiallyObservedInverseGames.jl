@@ -29,7 +29,7 @@ function estimate(
 end
 
 function estimate(
-    solver::PrefilteredInverseKKTResidualSolver;
+    solver::AugmentedInverseKKTResidualSolver;
     dataset,
     control_system,
     player_cost_models,
@@ -57,7 +57,7 @@ function estimate(
     end
 end
 
-# TODO: maybe get rid of this (use `PrefilteredInverseKKTResidualSolver` instead)
+# TODO: maybe get rid of this (use `AugmentedInverseKKTResidualSolver` instead)
 function estimate(
     solver::InverseKKTResidualSolver;
     dataset,

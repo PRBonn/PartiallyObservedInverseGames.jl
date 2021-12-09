@@ -79,9 +79,9 @@ estimator_setup_partial =
 @run_cached estimates_conKKT_partial =
     MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup_partial...)
 @run_cached estimates_resKKT =
-    MonteCarloStudy.estimate(PrefilteredInverseKKTResidualSolver(); estimator_setup...)
+    MonteCarloStudy.estimate(AugmentedInverseKKTResidualSolver(); estimator_setup...)
 @run_cached estimates_resKKT_partial =
-    MonteCarloStudy.estimate(PrefilteredInverseKKTResidualSolver(); estimator_setup_partial...)
+    MonteCarloStudy.estimate(AugmentedInverseKKTResidualSolver(); estimator_setup_partial...)
 
 estimates = [
     estimates_conKKT
@@ -92,13 +92,7 @@ estimates = [
 
 demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
 errstats = map(estimates) do estimate
-    MonteCarloStudy.estimator_statistics(
-        estimate;
-        dataset,
-        demo_gt,
-        position_indices,
-        observation_window,
-    )
+    MonteCarloStudy.estimator_statistics(estimate; dataset, demo_gt, position_indices)
 end
 
 frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]

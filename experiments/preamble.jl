@@ -16,7 +16,7 @@ Distributed.@everywhere begin
     using PartiallyObservedInverseGames.InverseGames:
         InverseKKTConstraintSolver,
         InverseKKTResidualSolver,
-        PrefilteredInverseKKTResidualSolver,
+        AugmentedInverseKKTResidualSolver,
         solve_inverse_game
 end
 

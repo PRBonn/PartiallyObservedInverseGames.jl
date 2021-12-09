@@ -160,12 +160,12 @@ end
 
 #========================================== KKT Residual ===========================================#
 #
-struct PrefilteredInverseKKTResidualSolver end
+struct AugmentedInverseKKTResidualSolver end
 
 # TODO: partially observed dispatch
 # Maybe this should be another solver? Like `FilteringInverseKKTResidualSolver`
 function solve_inverse_game(
-    inverse_solver::PrefilteredInverseKKTResidualSolver,
+    inverse_solver::AugmentedInverseKKTResidualSolver,
     y;
     control_system,
     observation_model,
@@ -208,6 +208,9 @@ function solve_inverse_game(
         verbose,
         solver_args...,
     )
+
+    # TODO: this should probably also augment the states beyond the observation horizon
+    converged, (; smoothed_observation..., estimate...), opt_model
 end
 
 struct InverseKKTResidualSolver end

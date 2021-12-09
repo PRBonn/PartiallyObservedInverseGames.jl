@@ -14,7 +14,12 @@ function generate_dataset(;
         solve_game(solve_args...; solve_kwargs...)
     @assert converged_gt
 
-    truncated_forward_solution_gt = (;
+    forward_solution_gt_truncated = (;
+        x = forward_solution_gt.x[:, (observation_window[begin]):end],
+        u = forward_solution_gt.u[:, (observation_window[begin]):end],
+    )
+
+    forward_solution_gt_observation_window = (;
         x = forward_solution_gt.x[:, observation_window],
         u = forward_solution_gt.u[:, observation_window],
     )
@@ -23,8 +28,8 @@ function generate_dataset(;
     # case
     x_extra = DynamicsModelInterface.next_x(
         solve_args.control_system,
-        truncated_forward_solution_gt.x[:, end],
-        truncated_forward_solution_gt.u[:, end],
+        forward_solution_gt_observation_window.x[:, end],
+        forward_solution_gt_observation_window.u[:, end],
     )
 
     # Note: reducing over inner loop to flatten the dataset
@@ -33,14 +38,14 @@ function generate_dataset(;
         observations = map(1:n_samples) do _
             (;
                 σ,
-                x = truncated_forward_solution_gt.x +
-                    σ * randn(rng, size(truncated_forward_solution_gt.x)),
-                u = truncated_forward_solution_gt.u +
-                    σ * randn(rng, size(truncated_forward_solution_gt.u)),
+                x = forward_solution_gt_observation_window.x +
+                    σ * randn(rng, size(forward_solution_gt_observation_window.x)),
+                u = forward_solution_gt_observation_window.u +
+                    σ * randn(rng, size(forward_solution_gt_observation_window.u)),
                 x_extra = x_extra + σ * randn(rng, size(x_extra)),
             )
         end
     end
 
-    forward_solution_gt, dataset
+    forward_solution_gt_truncated, dataset
 end
