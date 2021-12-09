@@ -2,28 +2,22 @@ const project_root_dir = realpath(joinpath(@__DIR__, ".."))
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/utils/MonteCarloStudy"))))
 unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
 
-using Distributed: Distributed
-
-# TODO: Dependecies for online debugging. Factor out into another file
-using Distances: Distances
-using PartiallyObservedInverseGames.CostUtils: CostUtils
-using Statistics: Statistics
-
+import Distributed
 Distributed.@everywhere begin
-    using Pkg: Pkg
+    import Pkg
     Pkg.activate($project_root_dir)
     union!(LOAD_PATH, $LOAD_PATH)
 
-    using MonteCarloStudy: MonteCarloStudy
-    using CollisionAvoidanceGame: CollisionAvoidanceGame
-    using TestDynamics: TestDynamics
+    import MonteCarloStudy
+    import CollisionAvoidanceGame
+    import TestDynamics
     using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
     using PartiallyObservedInverseGames.InverseGames:
-        InverseKKTConstraintSolver, InverseKKTResidualSolver, solve_inverse_game
+        InverseKKTConstraintSolver, InverseKKTResidualSolver
 end
 
 import PartiallyObservedInverseGames.TrajectoryVisualization
-using VegaLite: VegaLite
+import VegaLite
 import LazyGroupBy: grouped
 
 # Utils
@@ -87,58 +81,6 @@ estimator_setup = (;
 )
 estimator_setup_partial =
     merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
-
-# TODO: Move
-# Static Online Case
-# truncated horizon inference test
-let
-    d = dataset[begin + 50]
-    observation_horizon = T ÷ 3
-    y = d.x[:, (1:observation_horizon) .+ 10]
-    observation_model = (; d.σ, expected_observation = identity)
-    converged, sol = solve_inverse_game(
-        InverseKKTConstraintSolver(),
-        y;
-        control_system,
-        observation_model,
-        player_cost_models = player_cost_models_gt,
-        T,
-        cmin = 1e-3,
-        player_weight_prior = nothing, #[ones(4) / 4 for _ in 1:2],
-        pre_solve_kwargs = (; u_regularization = 1e-5),
-        max_observation_error = nothing,
-    )
-    @assert converged
-
-    # visualization
-    let
-        gt = TrajectoryVisualization.trajectory_data(control_system, dataset[begin].x)
-        observation = TrajectoryVisualization.trajectory_data(control_system, y)
-        estimate = TrajectoryVisualization.trajectory_data(control_system, sol.x)
-
-        canvas = TrajectoryVisualization.visualize_trajectory(gt; group = "ground truth")
-        canvas =
-            TrajectoryVisualization.visualize_trajectory(observation; canvas, group = "observation")
-        canvas =
-            TrajectoryVisualization.visualize_trajectory(estimate; canvas, group = "estimation")
-        display(canvas)
-    end
-
-    # TODO: compute parameter error
-    function parameter_error(ps1, ps2)
-        map(ps1, ps2) do p1, p2
-            p1 = CostUtils.normalize(p1)
-            p2 = CostUtils.normalize(p2)
-            Distances.cosine_dist(p1, p2)
-        end |> Statistics.mean
-    end
-
-    ws_gt = [m.weights for m in player_cost_models_gt]
-    @show parameter_error(ws_gt, sol.player_weights)
-end
-
-#==
-
 @run_cached estimates_conKKT =
     MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup...)
 @run_cached estimates_conKKT_partial =
@@ -246,5 +188,3 @@ frame = [-1.5n_observation_sequences_per_noise_level, 0]
     errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
 @saveviz position_error_viz =
     errstats |> MonteCarloStudy.visualize_poserr(; frame, round_x_axis = false)
-
-==#
