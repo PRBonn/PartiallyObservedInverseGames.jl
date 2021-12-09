@@ -7,7 +7,7 @@ function generate_dataset(;
     solve_kwargs = (; solver_attributes = (; print_level = 1)),
     noise_levels,
     n_observation_sequences_per_noise_level,
-    observation_range = 1:(solve_args.T),
+    observation_window = 1:(solve_args.T),
     rng = Random.MersenneTwister(1),
 )
     converged_gt, forward_solution_gt, forward_opt_model_gt =
@@ -15,8 +15,8 @@ function generate_dataset(;
     @assert converged_gt
 
     truncated_forward_solution_gt = (;
-        x = forward_solution_gt.x[:, observation_range],
-        u = forward_solution_gt.u[:, observation_range],
+        x = forward_solution_gt.x[:, observation_window],
+        u = forward_solution_gt.u[:, observation_window],
     )
 
     # add additional time step to make last x relevant state obseravable in the partially observed

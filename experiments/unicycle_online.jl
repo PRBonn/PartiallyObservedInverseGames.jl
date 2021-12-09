@@ -43,19 +43,20 @@ end
 #======================================== Monte Carlo Study ========================================#
 
 ## Dataset Generation
+# TODO restore the original number of samples (40)
 n_observation_sequences_per_noise_level = 5
 # TODO: think about how to add different time windows to the dataset
 # TODO: make sure that the window is aligned properly in evaluation:
 #   - When we the window does not start at 1 then we would be comapring differnt time steps
-observation_range = 1:(T ÷ 3)
+observation_window = 1:(T ÷ 3)
 
-@run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;#=@run_cached=#
+@run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     # TODO restore exisiting noise levels
     noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
     #noise_levels = unique([0, 0.01]),
     n_observation_sequences_per_noise_level,
-    observation_range,
+    observation_window,
 )
 
 ## Estimation
@@ -96,7 +97,7 @@ errstats = map(estimates) do estimate
         dataset,
         demo_gt,
         position_indices,
-        observation_range,
+        observation_window,
     )
 end
 

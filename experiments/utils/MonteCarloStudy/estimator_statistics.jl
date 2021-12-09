@@ -5,15 +5,15 @@ function estimator_statistics(
     position_indices,
     trajectory_distance = Distances.meanad,
     parameter_distance = Distances.cosine_dist,
-    observation_range = :,
+    observation_window = :,
 )
-    function trajectory_component_errors(trajectory; range = :)
+    function trajectory_component_errors(trajectory; window = :)
         if haskey(trajectory, :x)
             (;
-                x_error = trajectory_distance(demo_gt.x[:, range], trajectory.x[:, range]),
+                x_error = trajectory_distance(demo_gt.x[:, window], trajectory.x[:, window]),
                 position_error = trajectory_distance(
-                    demo_gt.x[position_indices, range],
-                    trajectory.x[position_indices, range],
+                    demo_gt.x[position_indices, window],
+                    trajectory.x[position_indices, window],
                 ),
             )
         else
@@ -23,7 +23,7 @@ function estimator_statistics(
 
     observation = dataset[estimate.observation_idx]
     x_observation_error, position_observation_error =
-        trajectory_component_errors(observation; range = observation_range)
+        trajectory_component_errors(observation; window = observation_window)
     x_estimation_error, position_estimation_error = trajectory_component_errors(estimate)
 
     parameter_estimation_error =
