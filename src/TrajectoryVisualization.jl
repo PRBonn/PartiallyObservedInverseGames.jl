@@ -36,7 +36,8 @@ function visualize_trajectory(
                 y = {"py:q", scale = {domain = y_position_domain}, title = "Position y [m]"},
                 order = "t:q",
                 # TODO: allow empty group
-                color = {datum = group},
+                color = {datum = group, legend = legend},
+                shape = {"player:n", title = "Player", legend = legend},
                 detail = {"player:n"},
             }
         ) +
