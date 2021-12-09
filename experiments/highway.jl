@@ -189,7 +189,7 @@ demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
 end
 
 ## Visualization
-frame = [-1.5n_observation_sequences_per_noise_level, 0]
+frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]
 @saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
 @saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
 @saveviz highway_frontfig_cost1 = CostHeatmapVisualizer.cost_viz(

@@ -165,7 +165,7 @@ viz_trajectory_estiamtes = Dict(
     VegaLite.@vlplot(title = "Partial Observation") + viz_trajectory_estiamtes["Baseline Partial"],
 )
 
-frame = [-1.5n_observation_sequences_per_noise_level, 0]
+frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]
 @saveviz parameter_error_viz =
     errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
 @saveviz position_error_viz =
