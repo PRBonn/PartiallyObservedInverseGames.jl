@@ -1,38 +1,5 @@
 const project_root_dir = realpath(joinpath(@__DIR__, ".."))
-unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/utils/MonteCarloStudy"))))
-unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
-
-using Distributed: Distributed
-
-# TODO: Dependecies for online debugging. Factor out into another file
-using Distances: Distances
-using PartiallyObservedInverseGames.CostUtils: CostUtils
-using PartiallyObservedInverseGames.InversePreSolve: InversePreSolve
-using Statistics: Statistics
-
-Distributed.@everywhere begin
-    using Pkg: Pkg
-    Pkg.activate($project_root_dir)
-    union!(LOAD_PATH, $LOAD_PATH)
-
-    using MonteCarloStudy: MonteCarloStudy
-    using CollisionAvoidanceGame: CollisionAvoidanceGame
-    using TestDynamics: TestDynamics
-    using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
-    using PartiallyObservedInverseGames.InverseGames:
-        InverseKKTConstraintSolver,
-        InverseKKTResidualSolver,
-        PrefilteredInverseKKTResidualSolver,
-        solve_inverse_game
-end
-
-import PartiallyObservedInverseGames.TrajectoryVisualization
-using VegaLite: VegaLite
-import LazyGroupBy: grouped
-
-# Utils
-include("utils/misc.jl")
-include("utils/simple_caching.jl")
+include("preamble.jl")
 load_cache_if_not_defined!("unicycle_online")
 
 #==================================== Forward Game Formulation =====================================#

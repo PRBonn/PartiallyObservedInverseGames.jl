@@ -1,23 +1,5 @@
 const project_root_dir = realpath(joinpath(@__DIR__, ".."))
-unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "experiments/utils/MonteCarloStudy"))))
-unique!(push!(LOAD_PATH, realpath(joinpath(project_root_dir, "test/utils"))))
-
-import Distributed
-Distributed.@everywhere begin
-    import Pkg
-    Pkg.activate($project_root_dir)
-    union!(LOAD_PATH, $LOAD_PATH)
-
-    import MonteCarloStudy
-    import CollisionAvoidanceGame
-    import TestDynamics
-    using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
-    using PartiallyObservedInverseGames.InverseGames:
-        InverseKKTConstraintSolver, InverseKKTResidualSolver
-end
-
-import PartiallyObservedInverseGames.TrajectoryVisualization
-import VegaLite
+include("preamble.jl")
 import LazyGroupBy: grouped
 
 # Utils
