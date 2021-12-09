@@ -65,7 +65,6 @@ player_cost_models_gt = map(enumerate(player_angles)) do (ii, player_angle)
         control_system,
         T,
         goal_position = unitvector(player_angle),
-        # TODO: this needs to be turned off again for the original experiments
         T_activate_goalcost = 1,
         fix_costs = (; state_goal = 0.1),
     )
@@ -74,12 +73,19 @@ end
 #======================================== Monte Carlo Study ========================================#
 
 ## Dataset Generation
-n_observation_sequences_per_noise_level = 40
+n_observation_sequences_per_noise_level = 5
+# TODO: think about how to add different time windows to the dataset
+# TODO: make sure that the window is aligned properly in evaluation:
+#   - When we the window does not start at 1 then we would be comapring differnt time steps
+observation_range = 1:(T ÷ 3)
 
-forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;#=@run_cached=#
+@run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;#=@run_cached=#
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
-    noise_levels = [0, 0.03],#unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
+    # TODO restore exisiting noise levels
+    noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
+    #noise_levels = unique([0, 0.01]),
     n_observation_sequences_per_noise_level,
+    observation_range,
 )
 
 ## Estimation
@@ -88,9 +94,48 @@ estimator_setup = (;
     control_system,
     player_cost_models = player_cost_models_gt,
     solver_attributes = (; print_level = 1),
+    T,
+    cmin = 1e-3,
+    player_weight_prior = nothing,
+    pre_solve_kwargs = (; u_regularization = 1e-5),
+    max_observation_error = nothing,
 )
 estimator_setup_partial =
     merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
+
+# TODO: actually use the truncated setup ...
+@run_cached estimates_conKKT =
+    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup...)
+#@run_cached estimates_conKKT_partial =
+#    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup_partial...)
+#@run_cached estimates_resKKT =
+#    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup...)
+#@run_cached estimates_resKKT_partial =
+#    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup_partial...)
+
+estimates = [
+    estimates_conKKT;
+    #    estimates_conKKT_partial
+    #    estimates_resKKT
+    #    estimates_resKKT_partial
+]
+
+demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
+errstats = map(estimates) do estimate
+    MonteCarloStudy.estimator_statistics(
+        estimate;
+        dataset,
+        demo_gt,
+        position_indices,
+        observation_range,
+    )
+end
+
+frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]
+parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
+
+# Debugging test
+#=
 
 d = dataset[end]
 observation_horizon = T ÷ 3
@@ -168,3 +213,4 @@ end
 
 ws_gt = [m.weights for m in player_cost_models_gt]
 @show parameter_error(ws_gt, sol.player_weights)
+=#

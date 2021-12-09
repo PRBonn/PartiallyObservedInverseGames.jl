@@ -9,7 +9,6 @@ function estimate(
     estimator_name = (expected_observation === identity ? "Ours Full" : "Ours Partial"),
     solver_kwargs...,
 )
-
     @showprogress pmap(enumerate(dataset)) do (observation_idx, d)
         observation_model = (; d.σ, expected_observation)
 
@@ -44,6 +43,7 @@ function estimate(
             pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
                 # pre-filter for baseline receives one extra state observation to avoid
                 # unobservability of the velocity at the end-point.
+                # TODO: allow to disable this
                 expected_observation([d.x d.x_extra]),
                 nothing;
                 control_system,
@@ -72,4 +72,3 @@ function estimate(
         merge(estimate, (; converged, observation_idx, estimator_name, smoothed_observation))
     end
 end
-
