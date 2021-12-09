@@ -1,5 +1,5 @@
 # Note: This code assumes the presence of a global variable `project_root_dir`.
-import BSON
+using BSON: BSON
 
 function clear_cache!()
     empty!(results_cache)
@@ -9,9 +9,13 @@ function unload_cache!()
     global results_cache = nothing
 end
 
-function save_cache!(result_group)
+function save_cache!(result_group; force = false)
     save_path = joinpath(project_root_dir, "data/$result_group/cache.bson")
-    @assert !isfile(save_path)
+    if !force
+        !isfile(save_path) ||
+            error("$save_path already exists. If you want to overwrite this file, call with kwarg \
+                  `force = true`.")
+    end
     BSON.bson(save_path, results_cache)
 end
 
