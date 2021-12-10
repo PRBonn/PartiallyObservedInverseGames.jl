@@ -45,13 +45,11 @@ end
 ## Dataset Generation
 # TODO restore the original number of samples (40)
 n_observation_sequences_per_instance = 5
-# TODO: think about how to add different time windows to the dataset
 observation_horizons = 5:T
 
-dataset = MonteCarloStudy.generate_dataset_noise_sweep(;
-    #observation_horizons,
-    noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
-    #noise_level = 0.0,
+dataset = MonteCarloStudy.generate_dataset_observation_window_sweep(;
+    observation_horizons,
+    noise_level = 0.05,
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     n_observation_sequences_per_instance,
 )
@@ -66,7 +64,7 @@ estimator_setup = (;
     dataset,
     control_system,
     player_cost_models = player_cost_models_gt,
-    solver_attributes = (; print_level = 1),
+    solver_attributes = (; print_level = 1, max_iter = 500),
     T,
     cmin = 1e-3,
     player_weight_prior = nothing,
@@ -85,17 +83,18 @@ estimator_setup_partial =
 @run_cached estimates_resKKT_partial =
     MonteCarloStudy.estimate(AugmentedInverseKKTResidualSolver(); estimator_setup_partial...)
 
-estimates = [
-    estimates_conKKT
-    estimates_conKKT_partial
-    estimates_resKKT
-    estimates_resKKT_partial
-]
+estimates =
+    [
+        estimates_conKKT
+        estimates_conKKT_partial
+        estimates_resKKT
+        estimates_resKKT_partial
+    ] |> e -> filter(e -> e.converged, e)
 
 errstats = map(estimates) do estimate
     MonteCarloStudy.estimator_statistics(estimate; player_cost_models_gt, position_indices)
 end
 
-#frame = [-floor(1.5n_observation_sequences_per_instance), 0]
-frame = [-1, 0]
-parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
+frame = [-floor(1.5n_observation_sequences_per_instance), 0]
+parameter_error_viz =
+    errstats |> MonteCarloStudy.visualize_paramerr_over_obshorizon(; frame, round_x_axis = false)

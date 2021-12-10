@@ -13,7 +13,7 @@ estimator_color_encoding = VegaLite.@vlfrag(
     },
 )
 
-function visualize_paramerr(;
+function visualize_paramerr_over_noise(;
     scatter_opacity = viz_defaults.scatter_opacity,
     width = viz_defaults.width,
     height = viz_defaults.height,
@@ -55,7 +55,7 @@ function visualize_paramerr(;
     )
 end
 
-function visualize_poserr(;
+function visualize_poserr_over_noise(;
     scatter_opacity = viz_defaults.scatter_opacity,
     width = viz_defaults.width,
     height = viz_defaults.height,
@@ -72,6 +72,100 @@ function visualize_poserr(;
             "position_observation_error:q",
             title = "Mean Absolute Postion Observation Error [m]",
             scale = {nice = round_x_axis},
+        },
+        transform = [
+            {
+                window = [
+                    {field = "position_estimation_error", op = "median", as = "error_average"},
+                    {field = "position_estimation_error", op = "q1", as = "error_band_lower"},
+                    {field = "position_estimation_error", op = "q3", as = "error_band_upper"},
+                ],
+                groupby = ["estimator_name"],
+                frame = frame,
+            },
+        ]
+    ) +
+    @vlplot(
+        mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
+        y = {
+            "position_estimation_error:q",
+            title = y_label,
+            scale = {type = "symlog", constant = 0.01},
+        },
+        shape = {
+            "converged:n",
+            title = "Trajectory Reconstructable",
+            legend = nothing,
+            scale = {domain = [true, false], range = ["circle", "triangle-down"]},
+        },
+    ) +
+    @vlplot(mark = {"line"}, y = "error_average:q",) +
+    @vlplot(
+        mark = {"errorband", extent = "iqr"},
+        y = {"error_band_lower:q", title = y_label},
+        y2 = "error_band_upper:q",
+    )
+end
+
+function visualize_paramerr_over_obshorizon(;
+    scatter_opacity = viz_defaults.scatter_opacity,
+    width = viz_defaults.width,
+    height = viz_defaults.height,
+    frame = viz_defaults.frame,
+    y_label = "Mean Parameter Cosine Error",
+    round_x_axis = true,
+)
+    @vlplot(
+        config = viz_global_config,
+        height = height,
+        width = width,
+        color = estimator_color_encoding,
+        x = {
+            "observation_horizon:q",
+            title = "Observation Horizon",
+            scale = {nice = round_x_axis, zero = false},
+        },
+        transform = [
+            {
+                window = [
+                    {field = "parameter_estimation_error", op = "median", as = "error_average"},
+                    {field = "parameter_estimation_error", op = "q1", as = "error_band_lower"},
+                    {field = "parameter_estimation_error", op = "q3", as = "error_band_upper"},
+                ],
+                groupby = ["estimator_name"],
+                frame = frame,
+            },
+        ]
+    ) +
+    @vlplot(
+        mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
+        y = {"parameter_estimation_error:q", title = y_label},
+    ) +
+    @vlplot(mark = "line", y = "error_average:q",) +
+    @vlplot(
+        mark = {"errorband", extent = "iqr"},
+        y = {"error_band_lower:q", title = y_label},
+        y2 = "error_band_upper:q"
+    )
+end
+
+function visualize_poserr_over_obshorizon(;
+    scatter_opacity = viz_defaults.scatter_opacity,
+    width = viz_defaults.width,
+    height = viz_defaults.height,
+    frame = viz_defaults.frame,
+    y_label = "Mean Absolute Position Prediction Error [m]",
+    round_x_axis = true,
+)
+    @vlplot(
+        config = viz_global_config,
+        height = height,
+        width = width,
+        color = estimator_color_encoding,
+        x = {
+            "observation_horizon:q",
+            title = "Observation Horizon",
+            scale = {nice = round_x_axis, zero = false},
         },
         transform = [
             {
