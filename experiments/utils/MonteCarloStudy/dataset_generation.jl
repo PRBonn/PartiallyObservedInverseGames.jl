@@ -39,11 +39,13 @@ function generate_dataset_noise_sweep(;
         end
     end
 
-    dataset
+    map(dataset, Iterators.countfrom()) do d, idx
+        (; d..., idx)
+    end
 end
 
 function generate_dataset_observation_window_sweep(; observation_horizons, noise_level, kwargs...)
-    mapreduce(vcat, observation_horizons) do observation_horizon
+    dataset = mapreduce(vcat, observation_horizons) do observation_horizon
         dataset = generate_dataset_noise_sweep(; kwargs..., noise_levels = [noise_level])
 
         # computing observation window in a way that aligns them on the right. That is, we want to
@@ -52,12 +54,18 @@ function generate_dataset_observation_window_sweep(; observation_horizons, noise
 
         map(dataset) do d
             # truncate the forward_solution_gt to start at the first observation index
-            gt_truncated =
-                (; x = d.ground_truth.x[:, ow[begin]:end], u = d.ground_truth.u[:, ow[begin]:end])
+            gt_truncated = (;
+                x = d.ground_truth.x[:, ow[begin]:end],
+                u = d.ground_truth.u[:, ow[begin]:end],
+            )
             # NOTE: This does not handle the `extra_observation` but it also is not needed in the
             # online experiments due to the different cost structure
             obs_windowed = (; x = d.observation.x[:, ow], u = d.observation.u[:, ow])
             (; d.σ, observation_horizon, ground_truth = gt_truncated, observation = obs_windowed)
         end
+    end
+
+    map(dataset, Iterators.countfrom()) do d, idx
+        (; d..., idx)
     end
 end

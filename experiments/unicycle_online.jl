@@ -54,11 +54,6 @@ dataset = MonteCarloStudy.generate_dataset_observation_window_sweep(;
     n_observation_sequences_per_instance,
 )
 
-# TODO: move this indexing somewhere more appropriate
-dataset = map(dataset, Iterators.countfrom()) do d, idx
-    (; d..., idx)
-end
-
 ## Estimation
 estimator_setup = (;
     dataset,
