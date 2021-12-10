@@ -14,7 +14,7 @@ function estimate(
 
         converged, estimate, opt_model = solve_inverse_game(
             solver,
-            expected_observation(d.x);
+            expected_observation(d.observation.x);
             control_system,
             observation_model,
             player_cost_models,
@@ -43,7 +43,7 @@ function estimate(
 
         converged, estimate, opt_model = solve_inverse_game(
             solver,
-            expected_observation(d.x);
+            expected_observation(d.observation.x);
             control_system,
             observation_model,
             player_cost_models,
@@ -75,7 +75,7 @@ function estimate(
                 # pre-filter for baseline receives one extra state observation to avoid
                 # unobservability of the velocity at the end-point.
                 # TODO: allow to disable this
-                expected_observation([d.x d.x_extra]),
+                expected_observation([d.observation.x d.observation.x_extra]),
                 nothing;
                 control_system,
                 observation_model,
@@ -86,8 +86,8 @@ function estimate(
             # Filtered sequence is truncated to the original length to give all methods the same
             # number of data-points for inference.
             (;
-                x = pre_solve_solution.x[:, 1:size(d.x, 2)],
-                u = pre_solve_solution.u[:, 1:size(d.u, 2)],
+                x = pre_solve_solution.x[:, 1:size(d.observation.x, 2)],
+                u = pre_solve_solution.u[:, 1:size(d.observation.u, 2)],
             )
         end
 

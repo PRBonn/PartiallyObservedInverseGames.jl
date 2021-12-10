@@ -44,19 +44,15 @@ end
 
 ## Dataset Generation
 # TODO restore the original number of samples (40)
-n_observation_sequences_per_noise_level = 5
+n_observation_sequences_per_instance = 5
 # TODO: think about how to add different time windows to the dataset
-# TODO: make sure that the window is aligned properly in evaluation:
-#   - When we the window does not start at 1 then we would be comapring differnt time steps
-observation_window = 1:(T ÷ 3)
+observation_horizons = 5:10
 
-@run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;
-    solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
-    # TODO restore exisiting noise levels
+dataset = MonteCarloStudy.generate_dataset_noise_sweep(;
     noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
-    #noise_levels = unique([0, 0.01]),
-    n_observation_sequences_per_noise_level,
-    observation_window,
+    #noise_levels = [0.0],
+    solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
+    n_observation_sequences_per_instance,
 )
 
 ## Estimation
@@ -90,10 +86,9 @@ estimates = [
     estimates_resKKT_partial
 ]
 
-demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
 errstats = map(estimates) do estimate
-    MonteCarloStudy.estimator_statistics(estimate; dataset, demo_gt, position_indices)
+    MonteCarloStudy.estimator_statistics(estimate; dataset, player_cost_models_gt, position_indices)
 end
 
-frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]
+frame = [-floor(1.5n_observation_sequences_per_instance), 0]
 parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
