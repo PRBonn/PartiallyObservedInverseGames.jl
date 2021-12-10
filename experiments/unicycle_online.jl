@@ -46,14 +46,20 @@ end
 # TODO restore the original number of samples (40)
 n_observation_sequences_per_instance = 5
 # TODO: think about how to add different time windows to the dataset
-observation_horizons = 5:10
+observation_horizons = 5:T
 
 dataset = MonteCarloStudy.generate_dataset_noise_sweep(;
+    #observation_horizons,
     noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
-    #noise_levels = [0.0],
+    #noise_level = 0.0,
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     n_observation_sequences_per_instance,
 )
+
+# TODO: move this indexing somewhere more appropriate
+dataset = map(dataset, Iterators.countfrom()) do d, idx
+    (; d..., idx)
+end
 
 ## Estimation
 estimator_setup = (;
@@ -87,8 +93,9 @@ estimates = [
 ]
 
 errstats = map(estimates) do estimate
-    MonteCarloStudy.estimator_statistics(estimate; dataset, player_cost_models_gt, position_indices)
+    MonteCarloStudy.estimator_statistics(estimate; player_cost_models_gt, position_indices)
 end
 
-frame = [-floor(1.5n_observation_sequences_per_instance), 0]
+#frame = [-floor(1.5n_observation_sequences_per_instance), 0]
+frame = [-1, 0]
 parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)

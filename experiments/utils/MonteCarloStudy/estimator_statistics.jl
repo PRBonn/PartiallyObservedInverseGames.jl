@@ -1,12 +1,13 @@
 function estimator_statistics(
-    estimate;
-    dataset,
+    sample;
     player_cost_models_gt,
     position_indices,
     trajectory_distance = Distances.meanad,
     parameter_distance = Distances.cosine_dist,
 )
-    function trajectory_component_errors(t1, t2; window = 1:size(t2.x, 2))
+    # TODO: proper window sizing; I guess it's correct to just size based on the windwow length of
+    # `t2`. `t1` simply needs to have enough datapoints.
+    function trajectory_component_errors(t1, t2; window = 1:min(size(t1.x, 2), size(t2.x, 2)))
         if haskey(t2, :x)
             (;
                 x_error = trajectory_distance(t1.x[:, window], t2.x[:, window]),
@@ -20,11 +21,12 @@ function estimator_statistics(
         end
     end
 
-    d = dataset[estimate.observation_idx]
+    estimate = sample.estimate
+
     x_observation_error, position_observation_error =
-        trajectory_component_errors(d.ground_truth, d.observation)
+        trajectory_component_errors(sample.ground_truth, sample.observation)
     x_estimation_error, position_estimation_error =
-        trajectory_component_errors(d.ground_truth, estimate)
+        trajectory_component_errors(sample.ground_truth, estimate)
 
     parameter_estimation_error =
         map(player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
@@ -33,11 +35,11 @@ function estimator_statistics(
         end |> Statistics.mean
 
     (;
-        estimate.estimator_name,
-        estimate.observation_idx,
-        estimate.converged,
-        d.σ,
-        d.observation_horizon,
+        sample.idx,
+        sample.estimator_name,
+        sample.converged,
+        sample.σ,
+        sample.observation_horizon,
         x_observation_error,
         position_observation_error,
         x_estimation_error,

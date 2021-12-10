@@ -9,7 +9,7 @@ function estimate(
     estimator_name = (expected_observation === identity ? "Ours Full" : "Ours Partial"),
     solver_kwargs...,
 )
-    @showprogress pmap(enumerate(dataset)) do (observation_idx, d)
+    @showprogress pmap(dataset) do d
         observation_model = (; d.σ, expected_observation)
 
         converged, estimate, opt_model = solve_inverse_game(
@@ -22,9 +22,9 @@ function estimate(
             solver_kwargs...,
             # NOTE: This estimator does not use any information beyond the state observation!
         )
-        converged || @warn "conKKT did not converge on observation $observation_idx."
+        converged || @warn "conKKT did not converge on observation $(d.idx)."
 
-        merge(estimate, (; converged, observation_idx, estimator_name))
+        (; d..., estimate, converged, estimator_name)
     end
 end
 
@@ -38,7 +38,7 @@ function estimate(
     estimator_name = (expected_observation === identity ? "Baseline Full" : "Baseline Partial"),
     solver_kwargs...,
 )
-    @showprogress pmap(enumerate(dataset)) do (observation_idx, d)
+    @showprogress pmap(dataset) do d
         observation_model = (; d.σ, expected_observation)
 
         converged, estimate, opt_model = solve_inverse_game(
@@ -51,9 +51,9 @@ function estimate(
             solver_kwargs...,
             # NOTE: This estimator does not use any information beyond the state observation!
         )
-        converged || @warn "conKKT did not converge on observation $observation_idx."
+        converged || @warn "conKKT did not converge on observation $(d.idx)."
 
-        merge(estimate, (; converged, observation_idx, estimator_name))
+        (; d..., estimate, converged, estimator_name)
     end
 end
 
@@ -68,7 +68,7 @@ function estimate(
     estimator_name = (expected_observation === identity ? "Baseline Full" : "Baseline Partial"),
     pre_solve_kwargs = (;),
 )
-    @showprogress pmap(enumerate(dataset)) do (observation_idx, d)
+    @showprogress pmap(dataset) do d
         observation_model = (; d.σ, expected_observation)
         smoothed_observation = let
             pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
@@ -99,8 +99,8 @@ function estimate(
             player_cost_models,
             solver_attributes,
         )
-        converged || @warn "resKKT did not converge on observation $observation_idx."
+        converged || @warn "resKKT did not converge on observation $(d.idx)."
 
-        merge(estimate, (; converged, observation_idx, estimator_name, smoothed_observation))
+        (; d..., estimate, converged, estimator_name, smoothed_observation)
     end
 end
