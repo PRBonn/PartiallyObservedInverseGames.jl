@@ -4,10 +4,22 @@ function estimator_statistics(
     position_indices,
     trajectory_distance = Distances.meanad,
     parameter_distance = Distances.cosine_dist,
+    window_type,
+    T_predict,
 )
+    window = let
+        T_obs = size(sample.observation.x, 2)
+
+        if window_type === :observation
+            1:T_obs
+        elseif window_type === :prediction
+            (T_obs + 1):(T_obs + T_predict)
+        end
+    end
+
     # TODO: proper window sizing; I guess it's correct to just size based on the windwow length of
     # `t2`. `t1` simply needs to have enough datapoints.
-    function trajectory_component_errors(t1, t2; window = 1:min(size(t1.x, 2), size(t2.x, 2)))
+    function trajectory_component_errors(t1, t2)
         if haskey(t2, :x)
             (;
                 x_error = trajectory_distance(t1.x[:, window], t2.x[:, window]),

@@ -23,7 +23,7 @@ function solve_inverse_game(
     control_system,
     observation_model,
     player_cost_models,
-    T = size(y, 2),
+    T_predict = size(y, 2),
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
@@ -35,8 +35,9 @@ function solve_inverse_game(
     pre_solve = true,
     pre_solve_kwargs = (;),
 )
-    T >= size(y, 2) ||
-        throw(ArgumentError("Horizon `T` must be at least as long as number of observations."))
+    T_predict >= 0 ||
+        throw(ArgumentError("The prediction horizon `T_predict` must be non-negative."))
+    T = size(y, 2) + T_predict
 
     n_players = length(player_cost_models)
     @unpack n_states, n_controls = control_system
@@ -175,7 +176,7 @@ function solve_inverse_game(
     verbose = false,
     pre_solve_kwargs = (;),
     # TODO: implement these features...
-    T = nothing,
+    T_predict = nothing,
     player_weight_prior = nothing,
     max_observation_error = nothing,
     solver_args...,

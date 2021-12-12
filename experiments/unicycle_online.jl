@@ -45,7 +45,8 @@ end
 ## Dataset Generation
 # TODO restore the original number of samples (40)
 n_observation_sequences_per_instance = 5
-observation_horizons = 5:T
+T_predict = 10
+observation_horizons = 5:(T - T_predict)
 
 dataset = MonteCarloStudy.generate_dataset_observation_window_sweep(;
     observation_horizons,
@@ -60,7 +61,7 @@ estimator_setup = (;
     control_system,
     player_cost_models = player_cost_models_gt,
     solver_attributes = (; print_level = 1, max_iter = 500),
-    T,
+    T_predict,
     cmin = 1e-3,
     player_weight_prior = nothing,
     pre_solve_kwargs = (; u_regularization = 1e-5),
@@ -87,9 +88,18 @@ estimates =
     ] |> e -> filter(e -> e.converged, e)
 
 errstats = map(estimates) do estimate
-    MonteCarloStudy.estimator_statistics(estimate; player_cost_models_gt, position_indices)
+    MonteCarloStudy.estimator_statistics(
+        estimate;
+        player_cost_models_gt,
+        position_indices,
+        window_type = :observation,
+        T_predict = 10,
+    )
 end
 
-frame = [-floor(1.5n_observation_sequences_per_instance), 0]
+frame = [-floor(n_observation_sequences_per_instance), 0]
 parameter_error_viz =
     errstats |> MonteCarloStudy.visualize_paramerr_over_obshorizon(; frame, round_x_axis = false)
+
+#kposition_error_viz =
+#k    errstats |> MonteCarloStudy.visualize_poserr_over_obshorizon(; frame, round_x_axis = false)
