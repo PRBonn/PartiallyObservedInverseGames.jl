@@ -51,7 +51,7 @@ function estimate(
             solver_kwargs...,
             # NOTE: This estimator does not use any information beyond the state observation!
         )
-        converged || @warn "conKKT did not converge on observation $(d.idx)."
+        converged || @warn "resKKT did not converge on observation $(d.idx)."
 
         (; d..., estimate, converged, estimator_name)
     end

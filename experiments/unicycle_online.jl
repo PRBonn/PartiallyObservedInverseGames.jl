@@ -92,14 +92,13 @@ errstats = map(estimates) do estimate
         estimate;
         player_cost_models_gt,
         position_indices,
-        window_type = :observation,
+        window_type = :prediction,
         T_predict = 10,
     )
 end
 
 frame = [-floor(n_observation_sequences_per_instance), 0]
-parameter_error_viz =
+@saveviz parameter_error_viz =
     errstats |> MonteCarloStudy.visualize_paramerr_over_obshorizon(; frame, round_x_axis = false)
-
-#kposition_error_viz =
-#k    errstats |> MonteCarloStudy.visualize_poserr_over_obshorizon(; frame, round_x_axis = false)
+@saveviz position_error_viz =
+    errstats |> MonteCarloStudy.visualize_poserr_over_obshorizon(; frame, round_x_axis = false)

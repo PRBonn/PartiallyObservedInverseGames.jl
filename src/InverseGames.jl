@@ -7,6 +7,7 @@ using ..JuMPUtils: JuMPUtils
 using ..CostUtils: CostUtils
 using ..InverseOptimalControl: InverseOptimalControl
 using ..InversePreSolve: InversePreSolve
+using ..ForwardGame: ForwardGame
 
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
@@ -56,7 +57,7 @@ function solve_inverse_game(
     λ0 = @variable(opt_model, [1:n_states, 1:n_players])
 
     if pre_solve
-        pre_solve_conveged, pre_solve_init = InversePreSolve.pre_solve(
+        pre_solve_converged, pre_solve_init = InversePreSolve.pre_solve(
             y,
             nothing;
             control_system,
@@ -68,7 +69,7 @@ function solve_inverse_game(
             solver_attributes,
             pre_solve_kwargs...,
         )
-        @assert pre_solve_conveged
+        @assert pre_solve_converged
         # TODO: think about how to set an initial guess for the tail end. Maybe Just constant
         # velocity rollout?
         JuMP.set_start_value.(@view(x[CartesianIndices(pre_solve_init.x)]), pre_solve_init.x)
@@ -173,6 +174,7 @@ function solve_inverse_game(
     player_cost_models,
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
+    prediction_solver = ForwardGame.IBRGameSolver(),
     verbose = false,
     pre_solve_kwargs = (;),
     # TODO: implement these features...
@@ -181,24 +183,34 @@ function solve_inverse_game(
     max_observation_error = nothing,
     solver_args...,
 )
-    smoothed_observation = let
-        pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
-            y,
-            nothing;
-            control_system,
-            observation_model,
-            solver_attributes,
-            verbose,
-            pre_solve_kwargs...,
-        )
-        @assert pre_solve_converged
-        # Filtered sequence is truncated to the original length to give all methods the same
-        # number of data-points for inference.
-        # TODO: Think about how to cleanly handle the "extra observation" case here
-        (; x = pre_solve_solution.x[:, 1:size(y, 2)], u = pre_solve_solution.u[:, 1:size(y, 2)])
-    end
+    T_predict >= 0 ||
+        throw(ArgumentError("The prediction horizon `T_predict` must be non-negative."))
+    T_obs = size(y, 2)
+    T = T_obs + T_predict
 
-    converged, estimate, opt_model = solve_inverse_game(
+    converged = false
+
+    pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
+        y,
+        nothing;
+        control_system,
+        observation_model,
+        solver_attributes,
+        verbose,
+        pre_solve_kwargs...,
+        T,
+    )
+    @assert pre_solve_converged
+    converged = pre_solve_converged
+
+    # Filtered sequence is truncated to the original length to give all methods the same
+    # number of data-points for inference.
+    # TODO: Think about how to cleanly handle the "extra observation" case here. Otherwise, just use
+    # the `InverseKKTResidualSolver` dispatch for the old experiments.
+    smoothed_observation =
+        (; x = pre_solve_solution.x[:, 1:T_obs], u = pre_solve_solution.u[:, 1:T_obs])
+
+    inverse_converged, estimate, opt_model = solve_inverse_game(
         InverseKKTResidualSolver(),
         smoothed_observation.x,
         smoothed_observation.u;
@@ -209,9 +221,43 @@ function solve_inverse_game(
         verbose,
         solver_args...,
     )
+    @assert inverse_converged
+    converged = converged && inverse_converged
 
-    # TODO: this should probably also augment the states beyond the observation horizon
-    converged, (; smoothed_observation..., estimate...), opt_model
+    trajectory = smoothed_observation
+    if T_predict > 0
+        # TODO: assemble the `estimated_player_cost_models`.
+        prediction_init =
+            (; x = pre_solve_solution.x[:, T_obs:end], u = pre_solve_solution.u[:, T_obs:end])
+        x0_predict = prediction_init.x[:, begin]
+
+        estimated_player_cost_models =
+            map(player_cost_models, estimate.player_weights) do cost_model_gt, weights
+                merge(cost_model_gt, (; weights))
+            end
+        prediction_converged, prediction = ForwardGame.solve_game(
+            prediction_solver,
+            control_system,
+            estimated_player_cost_models,
+            x0_predict,
+            T_predict + 1;
+            solver,
+            solver_attributes,
+            init = prediction_init,
+            verbose,
+        )
+
+        @assert prediction_converged
+        converged = converged && prediction_converged
+        trajectory = (;
+            x = [smoothed_observation.x prediction.x[:, 2:end]],
+            u = [smoothed_observation.u prediction.u[:, 2:end]],
+        )
+
+        trajectory
+    end
+
+    converged, (; trajectory..., estimate...), opt_model
 end
 
 struct InverseKKTResidualSolver end

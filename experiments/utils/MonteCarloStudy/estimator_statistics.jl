@@ -7,9 +7,8 @@ function estimator_statistics(
     window_type,
     T_predict,
 )
+    T_obs = size(sample.observation.x, 2)
     window = let
-        T_obs = size(sample.observation.x, 2)
-
         if window_type === :observation
             1:T_obs
         elseif window_type === :prediction
@@ -19,7 +18,7 @@ function estimator_statistics(
 
     # TODO: proper window sizing; I guess it's correct to just size based on the windwow length of
     # `t2`. `t1` simply needs to have enough datapoints.
-    function trajectory_component_errors(t1, t2)
+    function trajectory_component_errors(t1, t2; window)
         if haskey(t2, :x)
             (;
                 x_error = trajectory_distance(t1.x[:, window], t2.x[:, window]),
@@ -36,9 +35,9 @@ function estimator_statistics(
     estimate = sample.estimate
 
     x_observation_error, position_observation_error =
-        trajectory_component_errors(sample.ground_truth, sample.observation)
+        trajectory_component_errors(sample.ground_truth, sample.observation; window = 1:T_obs)
     x_estimation_error, position_estimation_error =
-        trajectory_component_errors(sample.ground_truth, estimate)
+        trajectory_component_errors(sample.ground_truth, estimate; window)
 
     parameter_estimation_error =
         map(player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
