@@ -28,20 +28,21 @@ function visualize_trajectory(
     draw_line = true,
     legend = nothing,
     group = "",
+    opacity = 1.0,
 )
     trajectory_visualizer =
         VegaLite.@vlplot(
             encoding = {
                 x = {"px:q", scale = {domain = x_position_domain}, title = "Position x [m]"},
                 y = {"py:q", scale = {domain = y_position_domain}, title = "Position y [m]"},
+                opacity = {value = opacity},
                 order = "t:q",
                 # TODO: allow empty group
                 color = {datum = group, legend = legend},
                 shape = {"player:n", title = "Player", legend = legend},
                 detail = {"player:n"},
             }
-        ) +
-        VegaLite.@vlplot(mark = {"point", shape = "circle", size = 25, clip = true, filled = true})
+        ) + VegaLite.@vlplot(mark = {"point", size = 25, clip = true, filled = true})
 
     if draw_line
         trajectory_visualizer += VegaLite.@vlplot(mark = {"line", clip = true})
