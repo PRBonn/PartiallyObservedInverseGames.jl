@@ -109,19 +109,22 @@ end
 
 function visualize_paramerr_over_obshorizon(;
     scatter_opacity = viz_defaults.scatter_opacity,
-    width = viz_defaults.width,
-    height = viz_defaults.height,
+    width = 42,
+    height = 250,
     frame = viz_defaults.frame,
     y_label = "Mean Parameter Cosine Error",
     round_x_axis = true,
 )
     @vlplot(
         config = viz_global_config,
+        width = width,
+        height = height,
         mark = "boxplot",
         column = {
             "observation_horizon:o",
             title = "Observation Horizon [# time steps]",
-            header = {titleOrient = "bottom", labelOrient = "bottom", labelPadding = 205},
+            header =
+                {titleOrient = "bottom", labelOrient = "bottom", labelPadding = height + 5},
             spacing = 2,
         },
         x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
@@ -132,19 +135,22 @@ end
 
 function visualize_poserr_over_obshorizon(;
     scatter_opacity = viz_defaults.scatter_opacity,
-    width = viz_defaults.width,
-    height = viz_defaults.height,
+    width = 42,
+    height = 250,
     frame = viz_defaults.frame,
     y_label = "Mean Absolute Position Prediction Error [m]",
     round_x_axis = true,
 )
     @vlplot(
+        width = width,
+        height = height,
         config = viz_global_config,
         mark = "boxplot",
         column = {
             "observation_horizon:o",
             title = "Observation Horizon [# time steps]",
-            header = {titleOrient = "bottom", labelOrient = "bottom", labelPadding = 205},
+            header =
+                {titleOrient = "bottom", labelOrient = "bottom", labelPadding = height + 5},
             spacing = 2,
         },
         x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
