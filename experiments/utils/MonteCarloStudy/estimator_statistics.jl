@@ -45,6 +45,8 @@ function estimator_statistics(
             parameter_distance(CostUtils.normalize(cost_model_gt.weights), weights_est)
         end |> Statistics.mean
 
+    observation_model_type = contains(sample.estimator_name, "Partial") ? "Partial" : "Full"
+
     (;
         sample.idx,
         sample.estimator_name,
@@ -56,5 +58,6 @@ function estimator_statistics(
         x_estimation_error,
         position_estimation_error,
         parameter_estimation_error,
+        observation_model_type,
     )
 end

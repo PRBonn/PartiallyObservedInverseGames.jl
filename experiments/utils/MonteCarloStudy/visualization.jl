@@ -60,7 +60,7 @@ function visualize_poserr_over_noise(;
     width = viz_defaults.width,
     height = viz_defaults.height,
     frame = viz_defaults.frame,
-    y_label = "Mean Absolute Position Prediction Error [m]",
+    y_label = "Mean Absolute Trajectory Reconstruction Error [m]",
     round_x_axis = true,
 )
     @vlplot(
@@ -117,24 +117,17 @@ function visualize_paramerr_over_obshorizon(;
 )
     @vlplot(
         config = viz_global_config,
-        height = height,
-        width = width,
-        color = estimator_color_encoding,
-        x = {
-            "observation_horizon:q",
-            title = "Observation Horizon",
-            scale = {nice = round_x_axis, zero = false},
+        mark = "boxplot",
+        column = {
+            "observation_horizon:o",
+            title = "Observation Horizon [# time steps]",
+            header = {titleOrient = "bottom", labelOrient = "bottom", labelPadding = 205},
+            spacing = 2,
         },
-    ) +
-    @vlplot(
-        mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
-        y = {
-            "parameter_estimation_error:q",
-            title = y_label,
-            #scale = {type = "symlog", constant = "0.01"}
-        },
-    ) +
-    @vlplot(mark = "boxplot", y = {"parameter_estimation_error:q", title = y_label})
+        x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
+        y = {"parameter_estimation_error:q", title = y_label},
+        color = estimator_color_encoding
+    )
 end
 
 function visualize_poserr_over_obshorizon(;
@@ -147,22 +140,15 @@ function visualize_poserr_over_obshorizon(;
 )
     @vlplot(
         config = viz_global_config,
-        height = height,
-        width = width,
-        color = estimator_color_encoding,
-        x = {
-            "observation_horizon:q",
-            title = "Observation Horizon",
-            scale = {nice = round_x_axis, zero = false},
+        mark = "boxplot",
+        column = {
+            "observation_horizon:o",
+            title = "Observation Horizon [# time steps]",
+            header = {titleOrient = "bottom", labelOrient = "bottom", labelPadding = 205},
+            spacing = 2,
         },
-    ) +
-    @vlplot(
-        mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
-        y = {
-            "position_estimation_error:q",
-            title = y_label,
-            #scale = {type = "symlog", constant = "0.01"}
-        },
-    ) +
-    @vlplot(mark = "boxplot", y = {"position_estimation_error:q", title = y_label})
+        x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
+        y = {"position_estimation_error:q", title = y_label},
+        color = estimator_color_encoding
+    )
 end
