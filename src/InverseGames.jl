@@ -247,7 +247,6 @@ function solve_inverse_game(
             verbose,
         )
 
-        @assert prediction_converged
         converged = converged && prediction_converged
         trajectory = (;
             x = [smoothed_observation.x prediction.x[:, 2:end]],

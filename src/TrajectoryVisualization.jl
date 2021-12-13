@@ -38,7 +38,7 @@ function visualize_trajectory(
                 opacity = {value = opacity},
                 order = "t:q",
                 # TODO: allow empty group
-                color = {datum = group, legend = legend},
+                color = {datum = group, legend = legend, title = "Method"},
                 shape = {"player:n", title = "Player", legend = legend},
                 detail = {"player:n"},
             }

@@ -48,7 +48,7 @@ n_observation_sequences_per_instance = 5
 T_predict = 10
 observation_horizons = 5:(T - T_predict)
 
-dataset = MonteCarloStudy.generate_dataset_observation_window_sweep(;
+@run_cached dataset = MonteCarloStudy.generate_dataset_observation_window_sweep(;
     observation_horizons,
     noise_level = 0.05,
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
@@ -105,29 +105,33 @@ frame = [-floor(n_observation_sequences_per_instance), 0]
 
 @saveviz prediction_comparison_viz = let
     opacity = 0.5
-    d = dataset[30]
+    d = filter(d -> d.observation_horizon == 10, dataset)[1]
     window = 1:(d.observation_horizon + T_predict)
     ground_truth =
         TrajectoryVisualization.trajectory_data(control_system, d.ground_truth.x[:, window])
     observation = TrajectoryVisualization.trajectory_data(control_system, d.observation.x)
 
     ours = let
-        estimate = estimates_conKKT[d.idx]
+        estimate = estimates_conKKT_partial[d.idx]
         @assert estimate.idx == d.idx
         TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
     end
 
     baseline = let
-        estimate = estimates_resKKT[d.idx]
+        estimate = estimates_resKKT_partial[d.idx]
         @assert estimate.idx == d.idx
         TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
     end
 
-    canvas = VegaLite.@vlplot(title = "Observation Horizon: $(d.observation_horizon)")
+    canvas = VegaLite.@vlplot(
+        title = "Observation Horizon: $(d.observation_horizon)",
+        width = 200,
+        height = 200
+    )
 
     canvas = TrajectoryVisualization.visualize_trajectory(
         ours;
-        group = "ours",
+        group = "Ours",
         legend = true,
         opacity,
         canvas,
@@ -135,7 +139,7 @@ frame = [-floor(n_observation_sequences_per_instance), 0]
 
     canvas = TrajectoryVisualization.visualize_trajectory(
         baseline;
-        group = "baseline",
+        group = "Baseline",
         legend = true,
         opacity,
         canvas,
@@ -143,7 +147,7 @@ frame = [-floor(n_observation_sequences_per_instance), 0]
 
     canvas = TrajectoryVisualization.visualize_trajectory(
         ground_truth;
-        group = "ground truth",
+        group = "Ground Truth",
         legend = true,
         opacity,
         canvas,
@@ -151,7 +155,7 @@ frame = [-floor(n_observation_sequences_per_instance), 0]
 
     canvas = TrajectoryVisualization.visualize_trajectory(
         observation;
-        group = "observation",
+        group = "Observation",
         legend = true,
         draw_line = false,
         opacity,
