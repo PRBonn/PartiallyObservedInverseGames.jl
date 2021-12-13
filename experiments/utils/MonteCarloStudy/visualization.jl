@@ -108,12 +108,9 @@ function visualize_poserr_over_noise(;
 end
 
 function visualize_paramerr_over_obshorizon(;
-    scatter_opacity = viz_defaults.scatter_opacity,
     width = 42,
-    height = 250,
-    frame = viz_defaults.frame,
+    height = viz_defaults.height,
     y_label = "Mean Parameter Cosine Error",
-    round_x_axis = true,
 )
     @vlplot(
         config = viz_global_config,
@@ -134,12 +131,9 @@ function visualize_paramerr_over_obshorizon(;
 end
 
 function visualize_poserr_over_obshorizon(;
-    scatter_opacity = viz_defaults.scatter_opacity,
     width = 42,
-    height = 250,
-    frame = viz_defaults.frame,
+    height = viz_defaults.height,
     y_label = "Mean Absolute Position Prediction Error [m]",
-    round_x_axis = true,
 )
     @vlplot(
         width = width,

@@ -38,8 +38,9 @@ function visualize_trajectory(
                 opacity = {value = opacity},
                 order = "t:q",
                 # TODO: allow empty group
-                color = {datum = group, legend = legend, title = "Method"},
-                shape = {"player:n", title = "Player", legend = legend},
+                color =
+                    {datum = group, legend = {orient = "top", title = "Method", padding = 5}},
+                shape = {"player:n", title = "Player", legend = {orient = "top", padding = 5}},
                 detail = {"player:n"},
             }
         ) + VegaLite.@vlplot(mark = {"point", size = 25, clip = true, filled = true})

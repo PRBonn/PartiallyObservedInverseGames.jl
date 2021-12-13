@@ -98,11 +98,8 @@ errstats = map(estimates) do estimate
     )
 end
 
-frame = [-floor(n_observation_sequences_per_instance), 0]
-@saveviz parameter_error_viz =
-    errstats |> MonteCarloStudy.visualize_paramerr_over_obshorizon(; frame, round_x_axis = false)
-@saveviz position_error_viz =
-    errstats |> MonteCarloStudy.visualize_poserr_over_obshorizon(; frame, round_x_axis = false)
+@saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr_over_obshorizon()
+@saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr_over_obshorizon()
 
 @saveviz prediction_comparison_viz = let
     opacity = 0.5
@@ -124,11 +121,7 @@ frame = [-floor(n_observation_sequences_per_instance), 0]
         TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
     end
 
-    canvas = VegaLite.@vlplot(
-        title = "Observation Horizon: $(d.observation_horizon)",
-        width = 400,
-        height = 400
-    )
+    canvas = VegaLite.@vlplot(width = 400, height = 400,)
 
     canvas = TrajectoryVisualization.visualize_trajectory(
         ours;
