@@ -125,28 +125,12 @@ function visualize_paramerr_over_obshorizon(;
             title = "Observation Horizon",
             scale = {nice = round_x_axis, zero = false},
         },
-        transform = [
-            {
-                window = [
-                    {field = "parameter_estimation_error", op = "median", as = "error_average"},
-                    {field = "parameter_estimation_error", op = "q1", as = "error_band_lower"},
-                    {field = "parameter_estimation_error", op = "q3", as = "error_band_upper"},
-                ],
-                groupby = ["estimator_name"],
-                frame = frame,
-            },
-        ]
     ) +
     @vlplot(
         mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
         y = {"parameter_estimation_error:q", title = y_label},
     ) +
-    @vlplot(mark = "line", y = "error_average:q",) +
-    @vlplot(
-        mark = {"errorband", extent = "iqr"},
-        y = {"error_band_lower:q", title = y_label},
-        y2 = "error_band_upper:q"
-    )
+    @vlplot(mark = "boxplot", y = "parameter_estimation_error:q")
 end
 
 function visualize_poserr_over_obshorizon(;
@@ -167,36 +151,10 @@ function visualize_poserr_over_obshorizon(;
             title = "Observation Horizon",
             scale = {nice = round_x_axis, zero = false},
         },
-        transform = [
-            {
-                window = [
-                    {field = "position_estimation_error", op = "median", as = "error_average"},
-                    {field = "position_estimation_error", op = "q1", as = "error_band_lower"},
-                    {field = "position_estimation_error", op = "q3", as = "error_band_upper"},
-                ],
-                groupby = ["estimator_name"],
-                frame = frame,
-            },
-        ]
     ) +
     @vlplot(
         mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
-        y = {
-            "position_estimation_error:q",
-            title = y_label,
-            scale = {type = "symlog", constant = 0.01},
-        },
-        shape = {
-            "converged:n",
-            title = "Trajectory Reconstructable",
-            legend = nothing,
-            scale = {domain = [true, false], range = ["circle", "triangle-down"]},
-        },
+        y = {"position_estimation_error:q", title = y_label},
     ) +
-    @vlplot(mark = {"line"}, y = "error_average:q",) +
-    @vlplot(
-        mark = {"errorband", extent = "iqr"},
-        y = {"error_band_lower:q", title = y_label},
-        y2 = "error_band_upper:q",
-    )
+    @vlplot(mark = "boxplot", y = "position_estimation_error:q")
 end
