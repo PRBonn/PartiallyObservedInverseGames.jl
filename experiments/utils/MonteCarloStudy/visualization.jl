@@ -130,7 +130,7 @@ function visualize_paramerr_over_obshorizon(;
         mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
         y = {"parameter_estimation_error:q", title = y_label},
     ) +
-    @vlplot(mark = "boxplot", y = "parameter_estimation_error:q")
+    @vlplot(mark = "boxplot", y = {"parameter_estimation_error:q", title = y_label})
 end
 
 function visualize_poserr_over_obshorizon(;
@@ -156,5 +156,5 @@ function visualize_poserr_over_obshorizon(;
         mark = {"point", tooltip = {content = "data"}, opacity = scatter_opacity, filled = true},
         y = {"position_estimation_error:q", title = y_label},
     ) +
-    @vlplot(mark = "boxplot", y = "position_estimation_error:q")
+    @vlplot(mark = "boxplot", y = {"position_estimation_error:q", title = y_label})
 end
