@@ -93,7 +93,7 @@ errstats = map(estimates) do estimate
         player_cost_models_gt,
         position_indices,
         window_type = :prediction,
-        T_predict = 10,
+        T_predict,
     )
 end
 
@@ -102,3 +102,59 @@ frame = [-floor(n_observation_sequences_per_instance), 0]
     errstats |> MonteCarloStudy.visualize_paramerr_over_obshorizon(; frame, round_x_axis = false)
 @saveviz position_error_viz =
     errstats |> MonteCarloStudy.visualize_poserr_over_obshorizon(; frame, round_x_axis = false)
+
+@saveviz prediction_comparison_viz = let
+    opacity = 0.5
+    d = dataset[30]
+    window = 1:(d.observation_horizon + T_predict)
+    ground_truth =
+        TrajectoryVisualization.trajectory_data(control_system, d.ground_truth.x[:, window])
+    observation = TrajectoryVisualization.trajectory_data(control_system, d.observation.x)
+
+    ours = let
+        estimate = estimates_conKKT[d.idx]
+        @assert estimate.idx == d.idx
+        TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
+    end
+
+    baseline = let
+        estimate = estimates_resKKT[d.idx]
+        @assert estimate.idx == d.idx
+        TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
+    end
+
+    canvas = VegaLite.@vlplot(title = "Observation Horizon: $(d.observation_horizon)")
+
+    canvas = TrajectoryVisualization.visualize_trajectory(
+        ours;
+        group = "ours",
+        legend = true,
+        opacity,
+        canvas,
+    )
+
+    canvas = TrajectoryVisualization.visualize_trajectory(
+        baseline;
+        group = "baseline",
+        legend = true,
+        opacity,
+        canvas,
+    )
+
+    canvas = TrajectoryVisualization.visualize_trajectory(
+        ground_truth;
+        group = "ground truth",
+        legend = true,
+        opacity,
+        canvas,
+    )
+
+    canvas = TrajectoryVisualization.visualize_trajectory(
+        observation;
+        group = "observation",
+        legend = true,
+        draw_line = false,
+        opacity,
+        canvas,
+    )
+end

@@ -1,4 +1,3 @@
-
 d = dataset[end]
 observation_horizon = T ÷ 3
 y = d.x[:, (1:observation_horizon) .+ 5]
