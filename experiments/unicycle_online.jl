@@ -47,10 +47,11 @@ end
 n_observation_sequences_per_instance = 5
 T_predict = 10
 observation_horizons = 5:(T - T_predict)
+noise_level = 0.05
 
 @run_cached dataset = MonteCarloStudy.generate_dataset_observation_window_sweep(;
     observation_horizons,
-    noise_level = 0.05,
+    noise_level,
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     n_observation_sequences_per_instance,
 )

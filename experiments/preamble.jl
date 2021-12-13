@@ -12,7 +12,7 @@ Distributed.@everywhere begin
     using MonteCarloStudy: MonteCarloStudy
     using CollisionAvoidanceGame: CollisionAvoidanceGame
     using TestDynamics: TestDynamics
-    using PartiallyObservedInverseGames.ForwardGame: IBRGameSolver, KKTGameSolver
+    using PartiallyObservedInverseGames.ForwardGame: ForwardGame, IBRGameSolver, KKTGameSolver
     using PartiallyObservedInverseGames.InverseGames:
         InverseKKTConstraintSolver,
         InverseKKTResidualSolver,
