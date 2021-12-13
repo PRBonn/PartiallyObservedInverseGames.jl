@@ -126,8 +126,8 @@ frame = [-floor(n_observation_sequences_per_instance), 0]
 
     canvas = VegaLite.@vlplot(
         title = "Observation Horizon: $(d.observation_horizon)",
-        width = 200,
-        height = 200
+        width = 400,
+        height = 400
     )
 
     canvas = TrajectoryVisualization.visualize_trajectory(
