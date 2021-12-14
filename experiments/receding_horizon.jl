@@ -10,40 +10,32 @@ using Makie: Makie
 include("utils/preamble.jl")
 include("utils/unicycle_online_setup.jl")
 
-function visualize_trajectory_ineractive(
-    trajectory;
-    player_markers = ['●', '■'],
-    color = "black",
-    domain = 1.5,
-)
+function visualize_receding_horizon(sim_result, player_markers = ['●', '■'], domain = 1.5)
     fig = Makie.Figure()
     ax = Makie.Axis(fig[1, 1]; aspect = 1, limits = ((-domain, domain), (-domain, domain)))
 
-    time_slider = Makie.Slider(fig[2, 1]; range = 1:maximum(s.t for s in trajectory))
+    time_slider = Makie.Slider(fig[2, 1]; range = eachindex(sim_result.estimator_steps))
+    step = Makie.@lift sim_result.estimator_steps[$(time_slider.value)]
 
-    players = unique(s.player for s in trajectory)
-    for (ii, p) in pairs(players)
-        positions = [Makie.Point2f(s.px, s.py) for s in trajectory if s.player == p]
+    for (ii, p) in pairs(sim_result.position_indices)
         marker = player_markers[ii]
-        Makie.lines!(ax, positions; color)
-        Makie.scatter!(ax, Makie.@lift(positions[$(time_slider.value)]); marker, color)
-    end
+        buffer_size = Makie.@lift size($step.y_full, 2)
 
-    fig
-end
+        ground_truth = [Makie.Point2f(x[p]) for x in eachcol(sim_result.forward_solution_gt.x)]
+        prediction = Makie.@lift [Makie.Point2f(x[p]) for x in eachcol($step.x)]
+        observations_full =
+            Makie.@lift [Makie.Point2f(y_full[p]) for y_full in eachcol($step.y_full)]
 
-function visualize_receding_horizon(sim_steps, position_indices; domain = 1.5)
-    fig = Makie.Figure()
-    ax = Makie.Axis(fig[1, 1]; aspect = 1, limits = ((-domain, domain), (-domain, domain)))
+        # line and point for ground truth
+        Makie.lines!(ax, ground_truth; color = "green")
+        Makie.scatter!(ax, Makie.@lift ground_truth[$step.t]; color = "green", marker)
 
-    time_slider = Makie.Slider(fig[2, 1]; range = 1:maximum(s.t for s in sim_steps))
+        # line and point for prediction
+        Makie.lines!(ax, prediction; color = "blue")
+        Makie.scatter!(ax, Makie.@lift $prediction[$buffer_size]; color = "blue", marker)
 
-    step = Makie.@lift sim_steps[$(time_slider.value)]
-
-    for (ii, p) in pairs(position_indices)
-        positions = Makie.@lift [Makie.Point2f(x) for x in eachcol($step.x[p, :])]
-        Makie.lines!(ax, positions)
-        Makie.scatter!(ax, Makie.@lift $positions[$step.T_obs])
+        # raw observations in the buffer
+        Makie.scatter!(ax, observations_full; color = ("gray", 0.5), marker)
     end
 
     fig
@@ -64,17 +56,15 @@ function simulate(; T_gt = 50, T_predict = 10, T_obs = 10, σ = 0.05, t_start = 
         solver_attributes = (; print_level = 1),
     )
 
-    observations = observation_model.expected_observation(
-        forward_solution_gt.x .+ σ * randn(rng, size(forward_solution_gt.x)),
-    )
+    observations_full = forward_solution_gt.x .+ σ * randn(rng, size(forward_solution_gt.x))
+    observations_partial = observation_model.expected_observation(observations_full)
 
     # TODO warm-start with last solution (also costs weights)
-    sim_steps = NamedTuple[]
-
+    estimator_steps = NamedTuple[]
     ProgressMeter.@showprogress for t in t_start:(T_gt - T_predict)
         obs_window = max((t - T_obs + 1), 1):t
         @assert length(obs_window) <= T_obs
-        y = observations[:, obs_window]
+        y = observations_partial[:, obs_window]
         converged, solution = solve_inverse_game(
             InverseKKTConstraintSolver(),
             y;
@@ -89,12 +79,13 @@ function simulate(; T_gt = 50, T_predict = 10, T_obs = 10, σ = 0.05, t_start = 
 
         @assert converged
 
-        push!(sim_steps, (; t, T_obs = length(obs_window), solution...))
+        push!(estimator_steps, (; t, y_full = observations_full[:, obs_window], solution...))
     end
 
-    #gt_trajdata = TrajectoryVisualization.trajectory_data(control_system, forward_solution_gt.x)
-    #
-    #visualize_trajectory_ineractive(gt_trajdata)
-    sim_steps
+    (;
+        estimator_steps,
+        forward_solution_gt,
+        position_indices = position_indices |> ii -> Iterators.partition(ii, 2) |> collect,
+    )
 end
 end
