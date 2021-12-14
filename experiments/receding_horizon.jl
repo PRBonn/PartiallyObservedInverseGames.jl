@@ -10,7 +10,7 @@ using Makie: Makie
 include("utils/preamble.jl")
 include("utils/unicycle_online_setup.jl")
 
-function visualize_receding_horizon(sim_result, player_markers = ['●', '■'], domain = 1.5)
+function visualize_receding_horizon(sim_result, domain = 1.5)
     fig = Makie.Figure()
     ax = Makie.Axis(fig[1, 1]; aspect = 1, limits = ((-domain, domain), (-domain, domain)))
 
@@ -18,7 +18,6 @@ function visualize_receding_horizon(sim_result, player_markers = ['●', '■'],
     step = Makie.@lift sim_result.estimator_steps[$(time_slider.value)]
 
     for (ii, p) in pairs(sim_result.position_indices)
-        marker = player_markers[ii]
         buffer_size = Makie.@lift size($step.y_full, 2)
 
         ground_truth = [Makie.Point2f(x[p]) for x in eachcol(sim_result.forward_solution_gt.x)]
@@ -28,14 +27,14 @@ function visualize_receding_horizon(sim_result, player_markers = ['●', '■'],
 
         # line and point for ground truth
         Makie.lines!(ax, ground_truth; color = "green")
-        Makie.scatter!(ax, Makie.@lift ground_truth[$step.t]; color = "green", marker)
+        Makie.scatter!(ax, Makie.@lift ground_truth[$step.t]; color = "green")
 
         # line and point for prediction
         Makie.lines!(ax, prediction; color = "blue")
-        Makie.scatter!(ax, Makie.@lift $prediction[$buffer_size]; color = "blue", marker)
+        Makie.scatter!(ax, Makie.@lift $prediction[$buffer_size]; color = "blue")
 
         # raw observations in the buffer
-        Makie.scatter!(ax, observations_full; color = ("gray", 0.5), marker)
+        Makie.scatter!(ax, observations_full; color = ("gray", 0.5))
     end
 
     fig
