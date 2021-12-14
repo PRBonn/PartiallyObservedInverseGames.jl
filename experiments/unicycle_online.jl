@@ -65,57 +65,98 @@ end
 @saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr_over_obshorizon()
 
 @saveviz prediction_comparison_viz = let
-    opacity = 0.5
+    opacity = 0.6
     d = filter(d -> d.observation_horizon == 10, dataset)[1]
     window = 1:(d.observation_horizon + T_predict)
-    ground_truth =
-        TrajectoryVisualization.trajectory_data(control_system, d.ground_truth.x[:, window])
-    observation = TrajectoryVisualization.trajectory_data(control_system, d.observation.x)
+    ground_truth = let
+        trajectory = TrajectoryVisualization.trajectory_data(
+            control_system,
+            d.ground_truth.x[:, window],
+        )
+        player_weights = [m.weights for m in player_cost_models_gt]
+        (; player_weights, trajectory)
+    end
+
+    observation_trajectory =
+        TrajectoryVisualization.trajectory_data(control_system, d.observation.x)
 
     ours = let
         estimate = estimates_conKKT_partial[d.idx]
         @assert estimate.idx == d.idx
-        TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
+        player_weights = estimate.estimate.player_weights
+        trajectory =
+            TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
+        (; player_weights, trajectory)
     end
 
     baseline = let
         estimate = estimates_resKKT_partial[d.idx]
         @assert estimate.idx == d.idx
-        TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
+        player_weights = estimate.estimate.player_weights
+        trajectory =
+            TrajectoryVisualization.trajectory_data(control_system, estimate.estimate.x)
+        (; player_weights, trajectory)
     end
 
-    canvas = VegaLite.@vlplot(width = 400, height = 400,)
+    trajectory_canvas = VegaLite.@vlplot(width = 400, height = 400,)
 
-    canvas = TrajectoryVisualization.visualize_trajectory(
-        ours;
+    trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
+        ours.trajectory;
         group = "Ours",
         legend = true,
         opacity,
-        canvas,
+        canvas = trajectory_canvas,
     )
 
-    canvas = TrajectoryVisualization.visualize_trajectory(
-        baseline;
+    trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
+        baseline.trajectory;
         group = "Baseline",
         legend = true,
         opacity,
-        canvas,
+        canvas = trajectory_canvas,
     )
 
-    canvas = TrajectoryVisualization.visualize_trajectory(
-        ground_truth;
+    trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
+        ground_truth.trajectory;
         group = "Ground Truth",
         legend = true,
         opacity,
-        canvas,
+        canvas = trajectory_canvas,
     )
 
-    canvas = TrajectoryVisualization.visualize_trajectory(
-        observation;
+    trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
+        observation_trajectory;
         group = "Observation",
         legend = true,
         draw_line = false,
         opacity,
-        canvas,
+        canvas = trajectory_canvas,
     )
+
+    cost_data =
+        map(1:2) do ii
+            player = "P$ii"
+            [
+                (;
+                    player,
+                    group = "Baseline",
+                    weight = baseline.player_weights[ii][:state_proximity],
+                ), # TODO: get programatically
+                (; player, group = "Ground Truth", weight = 0.25), # TODO: get programatically
+                (; player, group = "Ours", weight = ours.player_weights[ii][:state_proximity]),
+            ]
+        end |> d -> reduce(vcat, d)
+
+    cost_canvas =
+        cost_data |> VegaLite.@vlplot(
+            mark = :bar,
+            width = 400 / 2 - 10,
+            height = 30,
+            column = {"player", title = nothing},
+            x = {"weight:q", title = "Proximity Cost Weight"},
+            y = {"group:o", title = nothing},
+            color = "group:o"
+        )
+
+    VegaLite.@vlplot(spacing = 10) + [trajectory_canvas; cost_canvas]
 end
