@@ -19,7 +19,7 @@ function pre_solve(
     function presolve_objective(; x, u, y_obs, u_obs)
         y_expected = observation_model.expected_observation(x)
         sum(el -> el^2, y_expected[:, 1:size(y_obs, 2)] - y_obs) +
-        (isnothing(u_obs) ? 0 : sum(el -> el^2, u - u_obs)) +
+        (isnothing(u_obs) ? 0 : sum(el -> el^2, u[:, 1:size(u_obs, 2)] - u_obs)) +
         (iszero(u_regularization) ? 0 : u_regularization * sum(el -> el^2, u))
     end
 

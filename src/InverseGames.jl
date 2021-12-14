@@ -30,7 +30,8 @@ function solve_inverse_game(
     solver_attributes = (; print_level = 3),
     cmin = 1e-5,
     max_observation_error = nothing,
-    player_weight_prior = nothing,
+    prior = nothing,
+    prior_weight = 1e-3,
     init_with_observation = true,
     verbose = false,
     pre_solve = true,
@@ -73,17 +74,24 @@ function solve_inverse_game(
         # TODO: think about how to set an initial guess for the tail end. Maybe Just constant
         # velocity rollout?
         JuMP.set_start_value.(@view(x[CartesianIndices(pre_solve_init.x)]), pre_solve_init.x)
-    else
-        # Initialization
-        if init_with_observation
-            # Note: This is not always correct. It will only work if
-            # `observation_model.expected_observation` effectively creates an array view into x
-            # (extracting components of the variable).
-            JuMP.set_start_value.(observation_model.expected_observation(x), y)
+    elseif init_with_observation
+        # Note: This is not always correct. It will only work if
+        # `observation_model.expected_observation` effectively creates an array view into x
+        # (extracting components of the variable).
+        JuMP.set_start_value.(observation_model.expected_observation(x), y)
+    end
+
+    # TODO maybe also warm-start the state and input estimates
+    JuMPUtils.init_if_hasproperty!(x, init, :x)
+    JuMPUtils.init_if_hasproperty!(u, init, :u)
+    JuMPUtils.init_if_hasproperty!(λ, init, :λ)
+
+    if hasproperty(init, :player_weights) && !isnothing(init.player_weights)
+        for (ii, weights) in pairs(init.player_weights)
+            for k in keys(weights)
+                JuMP.set_start_value(player_weights[ii][k], weights[k])
+            end
         end
-        JuMPUtils.init_if_hasproperty!(x, init, :x)
-        JuMPUtils.init_if_hasproperty!(u, init, :u)
-        JuMPUtils.init_if_hasproperty!(λ, init, :λ)
     end
 
     # constraints
@@ -134,20 +142,35 @@ function solve_inverse_game(
     end
 
     # The inverse objective: match the observed demonstration
-    if !isnothing(player_weight_prior)
-        # TODO implement proper weighting
-        @warn "TODO: Prior on cost weights is not weighted correctly yet!"
-        @objective(
-            opt_model,
-            Min,
+    prior_penalty = if !isnothing(prior)
+        weight_prior = if haskey(prior, :player_weights)
             sum(el -> el^2, y_expected .- y) +
-            sum(zip(player_weights, player_weight_prior)) do (w, w_prior)
-                sum(el -> el^2, w .- w_prior) * 1
+            sum(zip(player_weights, prior.player_weights)) do (w, w_prior)
+                sum(w[k] - w_prior[k] for k in keys(w_prior))
             end
-        )
+        else
+            0
+        end
+
+        state_prior = if haskey(prior, :x)
+            sum(el -> el^2, x[:, 1:size(prior.x, 2)] .- prior.x)
+        else
+            0
+        end
+
+        input_prior = if haskey(prior, :x)
+            sum(el -> el^2, u[:, 1:size(prior.u, 2)] .- prior.u)
+        else
+            0
+        end
+
+        # TODO implement proper weighting of prior
+        verbose && @warn "Note: The prior is only weighted heuristically for now."
+        (weight_prior + state_prior + input_prior) * prior_weight
     else
-        @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
+        0
     end
+    @objective(opt_model, Min, sum(el -> el^2, y_expected .- y) + prior_penalty)
 
     time = @elapsed JuMP.optimize!(opt_model)
     verbose && @info time
@@ -179,7 +202,7 @@ function solve_inverse_game(
     pre_solve_kwargs = (;),
     # TODO: implement these features...
     T_predict = nothing,
-    player_weight_prior = nothing,
+    prior = nothing,
     max_observation_error = nothing,
     solver_args...,
 )

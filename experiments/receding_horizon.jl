@@ -41,11 +41,19 @@ function visualize_receding_horizon(sim_result, player_markers = ['●', '■'],
     fig
 end
 
-function simulate(; T_gt = 50, T_predict = 10, T_obs = 10, σ = 0.05, t_start = 2)
+function simulate(;
+    T_gt = 50,
+    T_predict = 10,
+    T_obs = 10,
+    σ = 0.01,
+    t_start = 5,
+    u_regularization = 1e-5,
+    use_heuristic_prior = true,
+)
 
     # Generate a longer demo
     rng = Random.MersenneTwister(1)
-    observation_model = (; σ, expected_observation = identity)
+    observation_model = (; σ, expected_observation = x -> x[partial_state_indices, :])
 
     converged_gt, forward_solution_gt = ForwardGame.solve_game(
         IBRGameSolver(),
@@ -61,10 +69,42 @@ function simulate(; T_gt = 50, T_predict = 10, T_obs = 10, σ = 0.05, t_start = 
 
     # TODO warm-start with last solution (also costs weights)
     estimator_steps = NamedTuple[]
+    init = nothing
+    previous_solution = nothing
     ProgressMeter.@showprogress for t in t_start:(T_gt - T_predict)
         obs_window = max((t - T_obs + 1), 1):t
         @assert length(obs_window) <= T_obs
         y = observations_partial[:, obs_window]
+
+        # if we have a previous solution we can use it for warmstarting
+        if !isnothing(previous_solution)
+            init = let
+                presolve_converged, presolve_solution = InversePreSolve.pre_solve(
+                    y,
+                    nothing;
+                    control_system,
+                    observation_model,
+                    #observation_model = (; expected_observation = identity),
+                    T = length(obs_window) + T_predict,
+                    u_regularization,
+                    solver_attributes = (; print_level = 1),
+                )
+                @assert presolve_converged
+
+                (; presolve_solution..., player_weights = previous_solution.player_weights)
+            end
+        end
+
+        prior = if isnothing(previous_solution) || !use_heuristic_prior
+            nothing
+        else
+            (;
+                previous_solution.player_weights,
+                x = previous_solution.x[:, (1:length(obs_window)) .+ 1],
+                u = previous_solution.u[:, (1:length(obs_window)) .+ 1],
+            )
+        end
+
         converged, solution = solve_inverse_game(
             InverseKKTConstraintSolver(),
             y;
@@ -74,10 +114,15 @@ function simulate(; T_gt = 50, T_predict = 10, T_obs = 10, σ = 0.05, t_start = 
             T_predict,
             solver_attributes = (; print_level = 1),
             cmin = 1.e-3,
-            pre_solve_kwargs = (; u_regularization = 1e-5),
+            pre_solve = true,
+            prior,
+            init_with_observation = false,
+            pre_solve_kwargs = (; u_regularization),
+            init,
         )
 
         @assert converged
+        previous_solution = solution
 
         push!(estimator_steps, (; t, y_full = observations_full[:, obs_window], solution...))
     end

@@ -18,6 +18,7 @@ Distributed.@everywhere begin
         InverseKKTResidualSolver,
         AugmentedInverseKKTResidualSolver,
         solve_inverse_game
+    using PartiallyObservedInverseGames.InversePreSolve: InversePreSolve
 end
 
 using VegaLite: VegaLite

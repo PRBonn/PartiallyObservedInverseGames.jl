@@ -27,7 +27,7 @@ estimator_setup = (;
     solver_attributes = (; print_level = 1, max_iter = 500),
     T_predict,
     cmin = 1e-3,
-    player_weight_prior = nothing,
+    prior = nothing,
     pre_solve_kwargs = (; u_regularization = 1e-5),
     max_observation_error = nothing,
 )
