@@ -28,5 +28,5 @@ using PartiallyObservedInverseGames.TrajectoryVisualization:
     TrajectoryVisualization, visualize_trajectory
 
 # Utils
-include("utils/misc.jl")
-include("utils/simple_caching.jl")
+include("misc.jl")
+include("simple_caching.jl")
