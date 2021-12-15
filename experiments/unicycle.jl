@@ -102,27 +102,27 @@ end
 
 ## Visualization
 
-#=
 demo_noise_level = 0.1
-trajectory_viz_domain = (; x_position_domain = (-1.2, 1.2), y_position_domain = (-1.2, 1.2))
+trajectory_viz_config = (;
+    x_position_domain = (-1.2, 1.2),
+    y_position_domain = (-1.2, 1.2),
+    opacity = 0.5,
+    legend = false,
+)
 
 trajectory_data_gt =
     TrajectoryVisualization.trajectory_data(control_system, dataset[begin].ground_truth.x)
 
 trajectory_data_obs = [
-    TrajectoryVisualization.trajectory_data(control_system, d.x) for
+    TrajectoryVisualization.trajectory_data(control_system, d.observation.x) for
     d in dataset if d.σ == demo_noise_level
 ]
-
 trajectory_data_estimates =
     map.(
-        e -> TrajectoryVisualization.trajectory_data(control_system, e.x),
+        e -> TrajectoryVisualization.trajectory_data(control_system, e.estimate.x),
         grouped(
             e -> e.estimator_name,
-            Iterators.filter(
-                e -> e.converged && dataset[e.observation_idx].σ == demo_noise_level,
-                estimates,
-            ),
+            Iterators.filter(e -> e.converged && e.σ == demo_noise_level, estimates),
         ),
     )
 
@@ -131,25 +131,33 @@ ground_truth_viz =
         trajectory_data_gt;
         canvas = VegaLite.@vlplot(width = 200, height = 200),
         legend = VegaLite.@vlfrag(orient = "top", offset = 5),
-        trajectory_viz_domain...,
+        trajectory_viz_config...,
+        group = "Ground Truth",
+        color_scale = MonteCarloStudy.group_color_scale,
     ) + VegaLite.@vlplot(
         data = filter(s -> s.t == 1, trajectory_data_gt),
         mark = {"text", dx = 8, dy = 8},
         text = "player",
-        x = "px",
-        y = "py",
+        x = "px:q",
+        y = "py:q",
     )
 
 observations_bundle_viz =
     VegaLite.@vlplot() + MonteCarloStudy.visualize_trajectory_batch(
         trajectory_data_obs;
-        trajectory_viz_domain...,
+        trajectory_viz_config...,
         draw_line = false,
+        group = "Observation",
+        color_scale = MonteCarloStudy.group_color_scale,
     )
 
 viz_trajectory_estiamtes = Dict(
-    k => TrajectoryVisualization.visualize_trajectory_batch(v; trajectory_viz_domain...) for
-    (k, v) in trajectory_data_estimates
+    k => TrajectoryVisualization.visualize_trajectory_batch(
+        v;
+        trajectory_viz_config...,
+        color_scale = MonteCarloStudy.group_color_scale,
+        group = k,
+    ) for (k, v) in trajectory_data_estimates
 )
 
 @saveviz demo_trajs_viz = hcat(
@@ -166,7 +174,6 @@ viz_trajectory_estiamtes = Dict(
     VegaLite.@vlplot(title = "Full Observation") + viz_trajectory_estiamtes["Baseline Full"],
     VegaLite.@vlplot(title = "Partial Observation") + viz_trajectory_estiamtes["Baseline Partial"],
 )
-=#
 
 frame = [-floor(1.5n_observation_sequences_per_instance), 0]
 @saveviz parameter_error_viz =

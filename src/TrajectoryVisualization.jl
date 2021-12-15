@@ -26,10 +26,17 @@ function visualize_trajectory(
     x_position_domain = extrema(s.px for s in trajectory_data) .+ (-0.01, 0.01),
     y_position_domain = extrema(s.py for s in trajectory_data) .+ (-0.01, 0.01),
     draw_line = true,
-    legend = nothing,
+    legend = false,
     group = "",
     opacity = 1.0,
+    color_scale = VegaLite.@vlfrag(),
 )
+    legend_viz = if legend
+        VegaLite.@vlfrag(orient = "top", title = "Method", padding = 5)
+    else
+        false
+    end
+
     trajectory_visualizer =
         VegaLite.@vlplot(
             encoding = {
@@ -39,7 +46,7 @@ function visualize_trajectory(
                 order = "t:q",
                 # TODO: allow empty group
                 color =
-                    {datum = group, legend = {orient = "top", title = "Method", padding = 5}},
+                    VegaLite.@vlfrag(datum = group, legend = legend_viz, scale = color_scale),
                 detail = {"player:n"},
             }
         ) + VegaLite.@vlplot(mark = {"point", size = 25, clip = true, filled = true})

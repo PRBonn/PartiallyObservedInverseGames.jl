@@ -1,16 +1,23 @@
 viz_global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
 viz_defaults = (; width = 500, height = 300, frame = [-40, 0], scatter_opacity = 0.2)
 
-estimator_color_encoding = VegaLite.@vlfrag(
+group_color_scale = VegaLite.@vlfrag(
+    domain = [
+        "Ours Full",
+        "Ours Partial",
+        "Baseline Full",
+        "Baseline Partial",
+        "Ground Truth",
+        "Observation",
+    ],
+    range = ["#4c78a8", "#72b7b2", "#e45756", "#f58518", "black", "gray"],
+)
+
+group_color_encoding = VegaLite.@vlfrag(
     field = "estimator_name",
     type = "nominal",
     title = "Estimator",
-    scale = {
-        domain = ["Ours Full", "Ours Partial", "Baseline Full", "Baseline Partial"],
-        # Paired color scheme:
-        # range = ["#a6cee3", "#1f78b4", "#bdbdbd", "#636363"],
-        range = ["#4c78a8", "#72b7b2", "#e45756", "#f58518"],
-    },
+    scale = group_color_scale,
 )
 
 function visualize_paramerr_over_noise(;
@@ -25,7 +32,7 @@ function visualize_paramerr_over_noise(;
         config = viz_global_config,
         height = height,
         width = width,
-        color = estimator_color_encoding,
+        color = group_color_encoding,
         x = {
             "position_observation_error:q",
             title = "Postion Observation Error [m]",
@@ -67,7 +74,7 @@ function visualize_poserr_over_noise(;
         config = viz_global_config,
         height = height,
         width = width,
-        color = estimator_color_encoding,
+        color = group_color_encoding,
         x = {
             "position_observation_error:q",
             title = "Postion Observation Error [m]",
@@ -126,7 +133,7 @@ function visualize_paramerr_over_obshorizon(;
         },
         x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
         y = {"parameter_estimation_error:q", title = y_label},
-        color = estimator_color_encoding
+        color = group_color_encoding
     )
 end
 
@@ -149,6 +156,6 @@ function visualize_poserr_over_obshorizon(;
         },
         x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
         y = {"position_estimation_error:q", title = y_label},
-        color = estimator_color_encoding
+        color = group_color_encoding
     )
 end
