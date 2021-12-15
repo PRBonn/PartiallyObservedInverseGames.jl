@@ -2,7 +2,7 @@ function estimator_statistics(
     sample;
     player_cost_models_gt,
     position_indices,
-    trajectory_distance = Distances.meanad,
+    state_distance = Distances.euclidean,
     parameter_distance = Distances.cosine_dist,
     window_type,
     T_predict,
@@ -16,28 +16,28 @@ function estimator_statistics(
         end
     end
 
-    # TODO: proper window sizing; I guess it's correct to just size based on the windwow length of
-    # `t2`. `t1` simply needs to have enough datapoints.
     function trajectory_component_errors(t1, t2; window)
         if haskey(t2, :x)
-            (;
-                x_error = trajectory_distance(t1.x[:, window], t2.x[:, window]),
-                position_error = trajectory_distance(
-                    t1.x[position_indices, window],
-                    t2.x[position_indices, window],
-                ),
-            )
+            n_players = length(player_cost_models_gt)
+            @assert n_players == 2
+            grouped_position_indices = Iterators.partition(position_indices, n_players) |> collect
+            # mean over players
+            Statistics.mean(grouped_position_indices) do pindex
+                t1_states = t1.x[pindex, window]
+                t2_states = t2.x[pindex, window]
+                # mean over time
+                Statistics.mean(Distances.colwise(state_distance, t1_states, t2_states))
+            end
         else
-            (; x_error = Inf, position_error = Inf)
+            Inf
         end
     end
 
     estimate = sample.estimate
 
-    x_observation_error, position_observation_error =
+    position_observation_error =
         trajectory_component_errors(sample.ground_truth, sample.observation; window = 1:T_obs)
-    x_estimation_error, position_estimation_error =
-        trajectory_component_errors(sample.ground_truth, estimate; window)
+    position_estimation_error = trajectory_component_errors(sample.ground_truth, estimate; window)
 
     parameter_estimation_error =
         map(player_cost_models_gt, estimate.player_weights) do cost_model_gt, weights_est
@@ -53,9 +53,7 @@ function estimator_statistics(
         sample.converged,
         sample.σ,
         sample.observation_horizon,
-        x_observation_error,
         position_observation_error,
-        x_estimation_error,
         position_estimation_error,
         parameter_estimation_error,
         observation_model_type,
