@@ -32,7 +32,7 @@ function visualize_trajectory(
     color_scale = VegaLite.@vlfrag(),
 )
     legend_viz = if legend
-        VegaLite.@vlfrag(orient = "top", title = "Method", padding = 5)
+        VegaLite.@vlfrag(orient = "top", title = "Method", padding = 5, symbolOpacity = 1.0)
     else
         false
     end
@@ -44,7 +44,6 @@ function visualize_trajectory(
                 y = {"py:q", scale = {domain = y_position_domain}, title = "Position y [m]"},
                 opacity = {value = opacity},
                 order = "t:q",
-                # TODO: allow empty group
                 color =
                     VegaLite.@vlfrag(datum = group, legend = legend_viz, scale = color_scale),
                 detail = {"player:n"},

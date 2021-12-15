@@ -100,9 +100,16 @@ end
 
     trajectory_canvas = VegaLite.@vlplot(width = 400, height = 400,)
 
+    groups = ["Ground Truth", "Observation", "Ours Partial", "Baseline Partial"]
+    color_scale = VegaLite.@vlfrag(
+        domain = groups,
+        range = [MonteCarloStudy.color_map[g] for g in groups]
+    )
+
     trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
         ours.trajectory;
-        group = "Ours",
+        group = "Ours Partial",
+        color_scale,
         legend = true,
         opacity,
         canvas = trajectory_canvas,
@@ -110,7 +117,8 @@ end
 
     trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
         baseline.trajectory;
-        group = "Baseline",
+        group = "Baseline Partial",
+        color_scale,
         legend = true,
         opacity,
         canvas = trajectory_canvas,
@@ -119,6 +127,7 @@ end
     trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
         ground_truth.trajectory;
         group = "Ground Truth",
+        color_scale,
         legend = true,
         opacity,
         canvas = trajectory_canvas,
@@ -127,6 +136,7 @@ end
     trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
         observation_trajectory;
         group = "Observation",
+        color_scale,
         legend = true,
         draw_line = false,
         opacity,
@@ -139,11 +149,15 @@ end
             [
                 (;
                     player,
-                    group = "Baseline",
+                    group = "Baseline Partial",
                     weight = baseline.player_weights[ii][:state_proximity],
                 ), # TODO: get programatically
                 (; player, group = "Ground Truth", weight = 0.25), # TODO: get programatically
-                (; player, group = "Ours", weight = ours.player_weights[ii][:state_proximity]),
+                (;
+                    player,
+                    group = "Ours Partial",
+                    weight = ours.player_weights[ii][:state_proximity],
+                ),
             ]
         end |> d -> reduce(vcat, d)
 

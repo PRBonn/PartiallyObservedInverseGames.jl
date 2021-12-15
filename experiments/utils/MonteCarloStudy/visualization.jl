@@ -1,23 +1,23 @@
 viz_global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
 viz_defaults = (; width = 500, height = 300, frame = [-40, 0], scatter_opacity = 0.2)
 
-group_color_scale = VegaLite.@vlfrag(
-    domain = [
-        "Ours Full",
-        "Ours Partial",
-        "Baseline Full",
-        "Baseline Partial",
-        "Ground Truth",
-        "Observation",
-    ],
-    range = ["#4c78a8", "#72b7b2", "#e45756", "#f58518", "black", "gray"],
-)
+color_map = Dict([
+    "Ground Truth" => "black",
+    "Observation" => "gray",
+    "Ours Full" => "#4c78a8",
+    "Ours Partial" => "#72b7b2",
+    "Baseline Full" => "#e45756",
+    "Baseline Partial" => "#f58518",
+])
 
-group_color_encoding = VegaLite.@vlfrag(
+methods = ["Ours Full", "Ours Partial", "Baseline Full", "Baseline Partial"]
+method_colors = [color_map[m] for m in methods]
+method_color_encoding = VegaLite.@vlfrag(
     field = "estimator_name",
     type = "nominal",
     title = "Estimator",
-    scale = group_color_scale,
+    scale = {domain = methods, range = method_colors},
+    legend = {symbolOpacity = 1.0},
 )
 
 function visualize_paramerr_over_noise(;
@@ -32,7 +32,7 @@ function visualize_paramerr_over_noise(;
         config = viz_global_config,
         height = height,
         width = width,
-        color = group_color_encoding,
+        color = method_color_encoding,
         x = {
             "position_observation_error:q",
             title = "Postion Observation Error [m]",
@@ -74,7 +74,7 @@ function visualize_poserr_over_noise(;
         config = viz_global_config,
         height = height,
         width = width,
-        color = group_color_encoding,
+        color = method_color_encoding,
         x = {
             "position_observation_error:q",
             title = "Postion Observation Error [m]",
@@ -133,7 +133,7 @@ function visualize_paramerr_over_obshorizon(;
         },
         x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
         y = {"parameter_estimation_error:q", title = y_label},
-        color = group_color_encoding
+        color = method_color_encoding
     )
 end
 
@@ -156,6 +156,6 @@ function visualize_poserr_over_obshorizon(;
         },
         x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
         y = {"position_estimation_error:q", title = y_label},
-        color = group_color_encoding
+        color = method_color_encoding
     )
 end

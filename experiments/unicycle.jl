@@ -102,7 +102,6 @@ augmentor_kwargs = (;
 end
 
 ## Visualization
-
 demo_noise_level = 0.1
 trajectory_viz_config = (;
     x_position_domain = (-1.2, 1.2),
@@ -128,6 +127,17 @@ trajectory_viz_config = (;
         ),
     )
 
+groups = [
+    "Ground Truth",
+    "Observation",
+    "Ours Full",
+    "Ours Partial",
+    "Baseline Full",
+    "Baseline Partial",
+]
+color_scale =
+    VegaLite.@vlfrag(domain = groups, range = [MonteCarloStudy.color_map[g] for g in groups])
+
 ground_truth_viz =
     TrajectoryVisualization.visualize_trajectory(
         trajectory_data_gt;
@@ -135,7 +145,7 @@ ground_truth_viz =
         legend = VegaLite.@vlfrag(orient = "top", offset = 5),
         trajectory_viz_config...,
         group = "Ground Truth",
-        color_scale = MonteCarloStudy.group_color_scale,
+        color_scale,
     ) + VegaLite.@vlplot(
         data = filter(s -> s.t == 1, trajectory_data_gt),
         mark = {"text", dx = 8, dy = 8},
@@ -150,14 +160,14 @@ observations_bundle_viz =
         trajectory_viz_config...,
         draw_line = false,
         group = "Observation",
-        color_scale = MonteCarloStudy.group_color_scale,
+        color_scale,
     )
 
 viz_trajectory_estiamtes = Dict(
     k => TrajectoryVisualization.visualize_trajectory_batch(
         v;
         trajectory_viz_config...,
-        color_scale = MonteCarloStudy.group_color_scale,
+        color_scale,
         group = k,
     ) for (k, v) in trajectory_data_estimates
 )
