@@ -1,11 +1,8 @@
 const project_root_dir = realpath(joinpath(@__DIR__, ".."))
-include("preamble.jl")
-import LazyGroupBy: grouped
-
-# Utils
-include("utils/misc.jl")
-include("utils/simple_caching.jl")
+include("utils/preamble.jl")
 load_cache_if_not_defined!("unicycle")
+
+import LazyGroupBy: grouped
 
 #==================================== Forward Game Formulation =====================================#
 
@@ -46,12 +43,12 @@ end
 #======================================== Monte Carlo Study ========================================#
 
 ## Dataset Generation
-n_observation_sequences_per_noise_level = 40
+n_observation_sequences_per_instance = 40
 
-@run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;
+@run_cached dataset = MonteCarloStudy.generate_dataset_noise_sweep(;
     solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
     noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
-    n_observation_sequences_per_noise_level,
+    n_observation_sequences_per_instance,
 )
 
 ## Estimation
@@ -79,8 +76,6 @@ augmentor_kwargs = (;
     player_cost_models_gt,
     x0,
     T,
-    match_equilibrium = (; forward_solution_gt.x),
-    init = (; forward_solution_gt.x, forward_solution_gt.u),
     solver_attributes = (; print_level = 1),
 )
 @run_cached augmented_estimates_resKKT =
@@ -95,24 +90,31 @@ estimates = [
 ]
 
 ## Error Ststistics Computation
-demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
 @save_json errstats = map(estimates) do estimate
-    MonteCarloStudy.estimator_statistics(estimate; dataset, demo_gt, position_indices)
+    MonteCarloStudy.estimator_statistics(
+        estimate;
+        player_cost_models_gt,
+        position_indices,
+        window_type = :observation,
+        T_predict = 0,
+    )
 end
 
 ## Visualization
+
+#=
 demo_noise_level = 0.1
 trajectory_viz_domain = (; x_position_domain = (-1.2, 1.2), y_position_domain = (-1.2, 1.2))
 
-@save_json trajectory_data_gt =
-    TrajectoryVisualization.trajectory_data(control_system, forward_solution_gt.x)
+trajectory_data_gt =
+    TrajectoryVisualization.trajectory_data(control_system, dataset[begin].ground_truth.x)
 
-@save_json trajectory_data_obs = [
+trajectory_data_obs = [
     TrajectoryVisualization.trajectory_data(control_system, d.x) for
     d in dataset if d.σ == demo_noise_level
 ]
 
-@save_json trajectory_data_estimates =
+trajectory_data_estimates =
     map.(
         e -> TrajectoryVisualization.trajectory_data(control_system, e.x),
         grouped(
@@ -164,9 +166,10 @@ viz_trajectory_estiamtes = Dict(
     VegaLite.@vlplot(title = "Full Observation") + viz_trajectory_estiamtes["Baseline Full"],
     VegaLite.@vlplot(title = "Partial Observation") + viz_trajectory_estiamtes["Baseline Partial"],
 )
+=#
 
-frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]
+frame = [-floor(1.5n_observation_sequences_per_instance), 0]
 @saveviz parameter_error_viz =
-    errstats |> MonteCarloStudy.visualize_paramerr(; frame, round_x_axis = false)
+    errstats |> MonteCarloStudy.visualize_paramerr_over_noise(; frame, round_x_axis = false)
 @saveviz position_error_viz =
-    errstats |> MonteCarloStudy.visualize_poserr(; frame, round_x_axis = false)
+    errstats |> MonteCarloStudy.visualize_poserr_over_noise(; frame, round_x_axis = false)

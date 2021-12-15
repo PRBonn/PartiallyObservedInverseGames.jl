@@ -23,6 +23,7 @@ using PartiallyObservedInverseGames.TrajectoryVisualization:
     visualize_trajectory, visualize_trajectory_batch
 using ProgressMeter: @showprogress
 using VegaLite: @vlplot
+using Setfield: @set
 
 #======================================== Generate Dataset =========================================#
 

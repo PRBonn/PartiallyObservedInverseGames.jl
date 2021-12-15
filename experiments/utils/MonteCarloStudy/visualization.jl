@@ -28,7 +28,7 @@ function visualize_paramerr_over_noise(;
         color = estimator_color_encoding,
         x = {
             "position_observation_error:q",
-            title = "Mean Absolute Postion Observation Error [m]",
+            title = "Postion Observation Error [m]",
             scale = {nice = round_x_axis},
         },
         transform = [
@@ -60,7 +60,7 @@ function visualize_poserr_over_noise(;
     width = viz_defaults.width,
     height = viz_defaults.height,
     frame = viz_defaults.frame,
-    y_label = "Mean Absolute Trajectory Reconstruction Error [m]",
+    y_label = "Trajectory Reconstruction Error [m]",
     round_x_axis = true,
 )
     @vlplot(
@@ -70,7 +70,7 @@ function visualize_poserr_over_noise(;
         color = estimator_color_encoding,
         x = {
             "position_observation_error:q",
-            title = "Mean Absolute Postion Observation Error [m]",
+            title = "Postion Observation Error [m]",
             scale = {nice = round_x_axis},
         },
         transform = [
@@ -133,7 +133,7 @@ end
 function visualize_poserr_over_obshorizon(;
     width = 42,
     height = viz_defaults.height,
-    y_label = "Mean Absolute Position Prediction Error [m]",
+    y_label = "Position Prediction Error [m]",
 )
     @vlplot(
         width = width,

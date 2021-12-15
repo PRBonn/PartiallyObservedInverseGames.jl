@@ -17,19 +17,14 @@ function estimator_statistics(
     end
 
     function trajectory_component_errors(t1, t2; window)
-        if haskey(t2, :x)
-            n_players = length(player_cost_models_gt)
-            @assert n_players == 2
-            grouped_position_indices = Iterators.partition(position_indices, n_players) |> collect
-            # mean over players
-            Statistics.mean(grouped_position_indices) do pindex
-                t1_states = t1.x[pindex, window]
-                t2_states = t2.x[pindex, window]
-                # mean over time
-                Statistics.mean(Distances.colwise(state_distance, t1_states, t2_states))
-            end
-        else
-            Inf
+        n_players = length(player_cost_models_gt)
+        grouped_position_indices = Iterators.partition(position_indices, n_players) |> collect
+        # mean over players
+        Statistics.mean(grouped_position_indices) do pindex
+            t1_states = t1.x[pindex, window]
+            t2_states = t2.x[pindex, window]
+            # mean over time
+            Statistics.mean(Distances.colwise(state_distance, t1_states, t2_states))
         end
     end
 

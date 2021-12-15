@@ -24,7 +24,7 @@ function solve_inverse_game(
     control_system,
     observation_model,
     player_cost_models,
-    T_predict = size(y, 2),
+    T_predict = 0,
     init = (),
     solver = Ipopt.Optimizer,
     solver_attributes = (; print_level = 3),
@@ -79,12 +79,12 @@ function solve_inverse_game(
         # `observation_model.expected_observation` effectively creates an array view into x
         # (extracting components of the variable).
         JuMP.set_start_value.(observation_model.expected_observation(x), y)
-    end
 
-    # TODO maybe also warm-start the state and input estimates
-    JuMPUtils.init_if_hasproperty!(x, init, :x)
-    JuMPUtils.init_if_hasproperty!(u, init, :u)
-    JuMPUtils.init_if_hasproperty!(λ, init, :λ)
+        # TODO maybe also warm-start the state and input estimates
+        JuMPUtils.init_if_hasproperty!(x, init, :x)
+        JuMPUtils.init_if_hasproperty!(u, init, :u)
+        JuMPUtils.init_if_hasproperty!(λ, init, :λ)
+    end
 
     if hasproperty(init, :player_weights) && !isnothing(init.player_weights)
         for (ii, weights) in pairs(init.player_weights)
@@ -170,7 +170,7 @@ function solve_inverse_game(
     else
         0
     end
-    @objective(opt_model, Min, sum(el -> el^2, y_expected .- y) + prior_penalty)
+    @objective(opt_model, Min, sum(el -> el^2, y_expected .- y))
 
     time = @elapsed JuMP.optimize!(opt_model)
     verbose && @info time
@@ -201,7 +201,7 @@ function solve_inverse_game(
     verbose = false,
     pre_solve_kwargs = (;),
     # TODO: implement these features...
-    T_predict = nothing,
+    T_predict = 0,
     prior = nothing,
     max_observation_error = nothing,
     solver_args...,
