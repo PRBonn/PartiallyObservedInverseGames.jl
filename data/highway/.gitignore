@@ -2,3 +2,7 @@
 /cache.bson
 /cache.bson
 /errstats.json.gz
+/estimates.json.gz
+/trajectory_data_estimates.json.gz
+/trajectory_data_gt.json.gz
+/trajectory_data_obs.json.gz

@@ -42,90 +42,9 @@ end
 
 #======================================== Monte Carlo Study ========================================#
 
-## Dataset Generation
-n_observation_sequences_per_instance = 40
+include("utils/monte_carlo_study.jl")
 
-@run_cached dataset = MonteCarloStudy.generate_dataset_noise_sweep(;
-    solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
-    noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
-    n_observation_sequences_per_instance,
-)
-
-## Estimation
-estimator_setup = (;
-    dataset,
-    control_system,
-    player_cost_models = player_cost_models_gt,
-    solver_attributes = (; print_level = 1),
-)
-estimator_setup_partial =
-    merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
-@run_cached estimates_conKKT =
-    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup...)
-@run_cached estimates_conKKT_partial =
-    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup_partial...)
-@run_cached estimates_resKKT =
-    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup...)
-@run_cached estimates_resKKT_partial =
-    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup_partial...)
-
-## Forward Solution Augmentation
-augmentor_kwargs = (;
-    solver = KKTGameSolver(),
-    control_system,
-    player_cost_models_gt,
-    x0,
-    T,
-    solver_attributes = (; print_level = 1),
-)
-@run_cached augmented_estimates_resKKT =
-    MonteCarloStudy.augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
-@run_cached augmented_estimates_resKKT_partial =
-    MonteCarloStudy.augment_with_forward_solution(estimates_resKKT_partial; augmentor_kwargs...)
-
-@save_json estimates = [
-    estimates_conKKT
-    estimates_conKKT_partial
-    augmented_estimates_resKKT
-    augmented_estimates_resKKT_partial
-]
-
-## Error Ststistics Computation
-@save_json errstats = map(estimates) do estimate
-    MonteCarloStudy.estimator_statistics(
-        estimate;
-        player_cost_models_gt,
-        position_indices,
-        window_type = :observation,
-        T_predict = 0,
-    )
-end
-
-## Visualization
-demo_noise_level = 0.1
-trajectory_viz_config = (;
-    x_position_domain = (-1.2, 1.2),
-    y_position_domain = (-1.2, 1.2),
-    opacity = 0.5,
-    legend = false,
-)
-
-@save_json trajectory_data_gt =
-    TrajectoryVisualization.trajectory_data(control_system, dataset[begin].ground_truth.x)
-
-@save_json trajectory_data_obs = [
-    TrajectoryVisualization.trajectory_data(control_system, d.observation.x) for
-    d in dataset if d.σ == demo_noise_level
-]
-
-@save_json trajectory_data_estimates =
-    map.(
-        e -> TrajectoryVisualization.trajectory_data(control_system, e.estimate.x),
-        grouped(
-            e -> e.estimator_name,
-            Iterators.filter(e -> e.converged && e.σ == demo_noise_level, estimates),
-        ),
-    )
+## Extra Visualization
 
 groups = [
     "Ground Truth",
@@ -187,8 +106,3 @@ viz_trajectory_estiamtes = Dict(
     VegaLite.@vlplot(title = "Partial Observation") + viz_trajectory_estiamtes["Baseline Partial"],
 )
 
-frame = [-floor(1.5n_observation_sequences_per_instance), 0]
-@saveviz parameter_error_viz =
-    errstats |> MonteCarloStudy.visualize_paramerr_over_noise(; frame, round_x_axis = false)
-@saveviz position_error_viz =
-    errstats |> MonteCarloStudy.visualize_poserr_over_noise(; frame, round_x_axis = false)

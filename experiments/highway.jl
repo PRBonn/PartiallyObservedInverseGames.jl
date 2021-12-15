@@ -1,5 +1,5 @@
 const project_root_dir = realpath(joinpath(@__DIR__, ".."))
-include("preamble.jl")
+include("utils/preamble.jl")
 load_cache_if_not_defined!("highway")
 
 #==================================== Forward Game Formulation =====================================#
@@ -133,76 +133,22 @@ end
 
 #======================================== Monte Carlo Study ========================================#
 
-## Dataset Generation
-n_observation_sequences_per_noise_level = 40
+include("utils/monte_carlo_study.jl")
 
-@run_cached forward_solution_gt, dataset = MonteCarloStudy.generate_dataset(;
-    solve_args = (; solver = IBRGameSolver(), control_system, player_cost_models_gt, x0, T),
-    noise_levels = unique([0:0.001:0.01; 0.01:0.005:0.03; 0.03:0.01:0.1]),
-    n_observation_sequences_per_noise_level,
-)
-
-## Estimation
-estimator_setup = (;
-    dataset,
-    control_system,
-    player_cost_models = player_cost_models_gt,
-    solver_attributes = (; print_level = 1),
-)
-estimator_setup_partial =
-    merge(estimator_setup, (; expected_observation = x -> x[partial_state_indices, :]))
-@run_cached estimates_conKKT =
-    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup...)
-@run_cached estimates_conKKT_partial =
-    MonteCarloStudy.estimate(InverseKKTConstraintSolver(); estimator_setup_partial...)
-@run_cached estimates_resKKT =
-    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup...)
-@run_cached estimates_resKKT_partial =
-    MonteCarloStudy.estimate(InverseKKTResidualSolver(); estimator_setup_partial...)
-
-## Forward Solution Augmentation
-augmentor_kwargs = (;
-    solver = KKTGameSolver(),
-    control_system,
-    player_cost_models_gt,
-    x0,
-    T,
-    match_equilibrium = (; forward_solution_gt.x),
-    init = (; forward_solution_gt.x, forward_solution_gt.u),
-    solver_attributes = (; print_level = 1),
-)
-@run_cached augmented_estimates_resKKT =
-    MonteCarloStudy.augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
-@run_cached augmented_estimates_resKKT_partial =
-    MonteCarloStudy.augment_with_forward_solution(estimates_resKKT_partial; augmentor_kwargs...)
-estimates = [
-    estimates_conKKT
-    estimates_conKKT_partial
-    augmented_estimates_resKKT
-    augmented_estimates_resKKT_partial
-]
-
-## Error Ststistics Computation
-demo_gt = merge((; player_cost_models_gt), forward_solution_gt)
-@save_json errstats = map(estimates) do estimate
-    MonteCarloStudy.estimator_statistics(estimate; dataset, demo_gt, position_indices)
-end
-
-## Visualization
+## Extra Visualization
 frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]
-@saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr(; frame)
-@saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr(; frame)
 @saveviz highway_frontfig_cost1 = CostHeatmapVisualizer.cost_viz(
     1,
     player_configurations[1];
-    x_sequence = forward_solution_gt.x[:, 1:1],
+    x_sequence = dataset[begin].ground_truth.x[:, 1:1],
     control_system,
 )
 @saveviz highway_frontfig_cost5 = CostHeatmapVisualizer.cost_viz(
     5,
     player_configurations[5];
-    x_sequence = forward_solution_gt.x[:, 1:1],
+    x_sequence = dataset[begin].ground_truth.x[:, 1:1],
     control_system,
 )
-@saveviz highway_frontfig_gt_viz = visualize_highway(forward_solution_gt.x)
-@saveviz highway_frontfig_observation_viz = visualize_highway(dataset[end].x; draw_line = false)
+@saveviz highway_frontfig_gt_viz = visualize_highway(dataset[begin].ground_truth.x)
+@saveviz highway_frontfig_observation_viz =
+    visualize_highway(dataset[end].ground_truth.x; draw_line = false)
