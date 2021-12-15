@@ -5,3 +5,4 @@
 /trajectory_data_estimates.json.gz
 /trajectory_data_gt.json.gz
 /errstats.json.gz
+/estimates.json.gz

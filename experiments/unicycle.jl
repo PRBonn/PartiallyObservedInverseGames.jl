@@ -82,7 +82,8 @@ augmentor_kwargs = (;
     MonteCarloStudy.augment_with_forward_solution(estimates_resKKT; augmentor_kwargs...)
 @run_cached augmented_estimates_resKKT_partial =
     MonteCarloStudy.augment_with_forward_solution(estimates_resKKT_partial; augmentor_kwargs...)
-estimates = [
+
+@save_json estimates = [
     estimates_conKKT
     estimates_conKKT_partial
     augmented_estimates_resKKT
@@ -110,14 +111,15 @@ trajectory_viz_config = (;
     legend = false,
 )
 
-trajectory_data_gt =
+@save_json trajectory_data_gt =
     TrajectoryVisualization.trajectory_data(control_system, dataset[begin].ground_truth.x)
 
-trajectory_data_obs = [
+@save_json trajectory_data_obs = [
     TrajectoryVisualization.trajectory_data(control_system, d.observation.x) for
     d in dataset if d.σ == demo_noise_level
 ]
-trajectory_data_estimates =
+
+@save_json trajectory_data_estimates =
     map.(
         e -> TrajectoryVisualization.trajectory_data(control_system, e.estimate.x),
         grouped(
