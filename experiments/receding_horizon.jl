@@ -5,6 +5,7 @@ const project_root_dir = realpath(joinpath(@__DIR__, ".."))
 using Random: Random
 using ProgressMeter: ProgressMeter
 using CairoMakie: CairoMakie
+using GLMakie: GLMakie
 using Makie: Makie
 
 include("utils/preamble.jl")
@@ -113,12 +114,16 @@ end
 function visualize_receding_horizon(
     sim_result,
     time_steps::Colon = :;
-    resolution = (600, 300),
-    limits = ((-5, 32), (-2, 2)),
+    resolution = (600, 180),
+    limits = ((-5, 25), (-2, 2)),
+    savepath::Nothing,
 )
+    GLMakie.activate!()
+
     fig = Makie.Figure(; resolution)
     ax = Makie.Axis(fig[1, 1]; limits)
-    time_slider = Makie.Slider(fig[2, 1]; range = eachindex(sim_result.estimator_steps))
+    time_slider =
+        Makie.Slider(fig[2, 1]; range = eachindex(sim_result.estimator_steps), tellwidth = true)
     _visualize_receding_horizon_frame!(ax, time_slider.value, sim_result)
     fig
 end
@@ -128,7 +133,9 @@ function visualize_receding_horizon(
     time_steps;
     limits = ((-5, 25), (-2, 2)),
     resolution = (600, length(time_steps) * 135),
+    savepath = nothing,
 )
+    CairoMakie.activate!()
     axislabelfont = "Noto-Bold"
 
     fig = Makie.Figure(; resolution)
@@ -154,6 +161,10 @@ function visualize_receding_horizon(
     axes[end].bottomspinevisible = true
     axes[3].ylabel = "Position y [m]"
     axes[3].ylabelfont = axislabelfont
+
+    if !isnothing(savepath)
+        Makie.save(savepath, fig)
+    end
 
     fig
 end
@@ -273,9 +284,7 @@ function main(
                 bottomspinevisible = false,
             ),
         )
-        viz = visualize_receding_horizon(sim_result, visualize_time_steps)
-        Makie.save(savepath, viz)
-        viz
+        visualize_receding_horizon(sim_result, visualize_time_steps; savepath)
     end
 end
 
