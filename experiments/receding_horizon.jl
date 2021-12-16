@@ -57,12 +57,8 @@ function setup_highway(player_configurations; Δt = 1.0, T)
     (; T, x0, control_system, position_indices, partial_state_indices, player_cost_models_gt)
 end
 
-function visualize_receding_horizon_interactive(sim_result)
-    fig = Makie.Figure(; resolution = (600, 300))
-    ax = Makie.Axis(fig[1, 1], limits = ((-5, 32), (-2, 2)))
-
-    time_slider = Makie.Slider(fig[2, 1]; range = eachindex(sim_result.estimator_steps))
-    step = Makie.@lift sim_result.estimator_steps[$(time_slider.value)]
+function _visualize_receding_horizon_frame!(ax, t::Makie.Observable, sim_result)
+    step = Makie.@lift sim_result.estimator_steps[$t]
 
     for (ii, p) in pairs(sim_result.position_indices)
         buffer_size = Makie.@lift size($step.y_full, 2)
@@ -77,16 +73,57 @@ function visualize_receding_horizon_interactive(sim_result)
         Makie.scatter!(ax, Makie.@lift ground_truth[$step.t]; color = "black")
 
         # line and point for prediction
-        Makie.lines!(ax, prediction; color = "green")
-        Makie.scatter!(ax, Makie.@lift $prediction[$buffer_size]; color = "green")
+        Makie.lines!(ax, prediction; color = "royalblue")
+        Makie.scatter!(ax, Makie.@lift $prediction[$buffer_size]; color = "royalblue")
 
         # raw observations in the buffer
         Makie.scatter!(ax, observations_full; color = ("gray", 0.5))
     end
 
     ax.aspect = Makie.DataAspect()
-
     Makie.rotate!(ax.scene, -pi / 2)
+    ax.aspect = Makie.DataAspect()
+    ax
+end
+
+function visualize_receding_horizon_interactive(
+    sim_result;
+    resolution = (600, 300),
+    limits = ((-5, 32), (-2, 2)),
+)
+    fig = Makie.Figure(; resolution)
+    ax = Makie.Axis(fig[1, 1]; limits)
+    time_slider = Makie.Slider(fig[2, 1]; range = eachindex(sim_result.estimator_steps))
+    _visualize_receding_horizon_frame!(ax, time_slider.value, sim_result)
+    fig
+end
+
+function visualize_receding_horizon_facets(
+    sim_result;
+    resolution = (700, 600),
+    limits = ((-5, 32), (-2, 2)),
+    n_steps = 5,
+)
+    fig = Makie.Figure(; resolution)
+
+    time_steps = unique(
+        Int.(
+            round.(
+                range(
+                    firstindex(sim_result.estimator_steps),
+                    lastindex(sim_result.estimator_steps);
+                    length = n_steps,
+                ),
+                RoundingMode{:Nearest}(),
+            ),
+        ),
+    )
+
+    for (i, t) in zip(1:n_steps, time_steps)
+        ax = Makie.Axis(fig[i, 1]; limits)
+        time = Makie.Observable(t)
+        _visualize_receding_horizon_frame!(ax, time, sim_result)
+    end
 
     fig
 end
@@ -189,7 +226,7 @@ end
 function main(player_configurations = player_configurations; T_gt = 60, sim_kwargs = (;))
     setup = setup_highway(player_configurations; T = T_gt)
     @run_cached sim_result = RecedingHorizon.simulate(setup; sim_kwargs...)
-    visualize_receding_horizon_interactive(sim_result)
+    visualize_receding_horizon_facets(sim_result)
 end
 
 player_configurations = [
