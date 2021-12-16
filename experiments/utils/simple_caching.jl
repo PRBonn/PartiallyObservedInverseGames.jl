@@ -34,7 +34,7 @@ macro run_cached(assigned_computation_expr)
 
     quote
         $(esc(var)) = run_cached!(result_group, $(Meta.quot(var))) do
-            $fun
+            $(esc(fun))
         end
     end
 end
