@@ -46,6 +46,31 @@ include("utils/monte_carlo_study.jl")
 
 ## Extra Visualization
 
+demo_noise_level = 0.1
+trajectory_viz_config = (;
+    x_position_domain = (-1.2, 1.2),
+    y_position_domain = (-1.2, 1.2),
+    opacity = 0.5,
+    legend = false,
+)
+
+@save_json trajectory_data_gt =
+    TrajectoryVisualization.trajectory_data(control_system, dataset[begin].ground_truth.x)
+
+@save_json trajectory_data_obs = [
+    TrajectoryVisualization.trajectory_data(control_system, d.observation.x) for
+    d in dataset if d.σ == demo_noise_level
+]
+
+@save_json trajectory_data_estimates =
+    map.(
+        e -> TrajectoryVisualization.trajectory_data(control_system, e.estimate.x),
+        grouped(
+            e -> e.estimator_name,
+            Iterators.filter(e -> e.converged && e.σ == demo_noise_level, estimates),
+        ),
+    )
+
 groups = [
     "Ground Truth",
     "Observation",
@@ -105,4 +130,3 @@ viz_trajectory_estiamtes = Dict(
     VegaLite.@vlplot(title = "Full Observation") + viz_trajectory_estiamtes["Baseline Full"],
     VegaLite.@vlplot(title = "Partial Observation") + viz_trajectory_estiamtes["Baseline Partial"],
 )
-

@@ -136,7 +136,6 @@ end
 include("utils/monte_carlo_study.jl")
 
 ## Extra Visualization
-frame = [-floor(1.5n_observation_sequences_per_noise_level), 0]
 @saveviz highway_frontfig_cost1 = CostHeatmapVisualizer.cost_viz(
     1,
     player_configurations[1];
