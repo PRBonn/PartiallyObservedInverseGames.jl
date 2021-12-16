@@ -4,7 +4,7 @@ const project_root_dir = realpath(joinpath(@__DIR__, ".."))
 #using PartiallyObservedInverseGames.ForwardGame: ForwardGame
 using Random: Random
 using ProgressMeter: ProgressMeter
-using GLMakie: GLMakie
+using CairoMakie: CairoMakie
 using Makie: Makie
 
 include("utils/preamble.jl")
@@ -66,7 +66,7 @@ function _visualize_receding_horizon_frame!(
 )
     step = Makie.@lift sim_result.estimator_steps[$t]
 
-    for (ii, p) in pairs(sim_result.position_indices)
+    for p in sim_result.position_indices
         buffer_size = Makie.@lift size($step.y_full, 2)
 
         ground_truth = [Makie.Point2f(x[p]) for x in eachcol(sim_result.forward_solution_gt.x)]
@@ -126,16 +126,34 @@ end
 function visualize_receding_horizon(
     sim_result,
     time_steps;
-    limits = ((-5, 32), (-2, 2)),
-    resolution = (700, length(time_steps) * 125),
+    limits = ((-5, 25), (-2, 2)),
+    resolution = (600, length(time_steps) * 135),
 )
-    fig = Makie.Figure(; resolution)
+    axislabelfont = "Noto-Bold"
 
-    for (k, t) in enumerate(time_steps)
-        ax = Makie.Axis(fig[k, 1]; limits)
+    fig = Makie.Figure(; resolution)
+    ax_main = fig[1:length(time_steps), 1] = Makie.GridLayout()
+
+    axes = map(enumerate(time_steps)) do (k, t)
+        ax = Makie.Axis(
+            ax_main[k, 1];
+            limits,
+            title = "t = $(t - 1) [s]",
+            titlefont = axislabelfont,
+            titlegap = 2,
+            titlealign = :left,
+        )
         time = Makie.Observable(t)
         _visualize_receding_horizon_frame!(ax, time, sim_result)
     end
+
+    Makie.rowgap!(ax_main, 5)
+
+    axes[end].xlabel = "Position x [m]"
+    axes[end].xlabelfont = axislabelfont
+    axes[end].bottomspinevisible = true
+    axes[3].ylabel = "Position y [m]"
+    axes[3].ylabelfont = axislabelfont
 
     fig
 end
@@ -237,16 +255,27 @@ end
 
 function main(
     player_configurations = player_configurations;
-    T_gt = 60,
+    T_gt = 35,
     sim_kwargs = (;),
     interactive = false,
-    visualize_time_steps = [1, 6, 11, 16, 21, 31, 41],
+    visualize_time_steps = [1, 6, 11, 16, 21],
+    savepath = "$project_root_dir/figures/highway/receding_horizon.pdf",
 )
     setup = setup_highway(player_configurations; T = T_gt)
     @run_cached sim_result = RecedingHorizon.simulate(setup; sim_kwargs...)
 
     if !isnothing(visualize_time_steps)
-        visualize_receding_horizon(sim_result, visualize_time_steps)
+        Makie.set_theme!()
+        Makie.update_theme!(;
+            Axis = (;
+                topspinevisible = false,
+                rightspinevisible = false,
+                bottomspinevisible = false,
+            ),
+        )
+        viz = visualize_receding_horizon(sim_result, visualize_time_steps)
+        Makie.save(savepath, viz)
+        viz
     end
 end
 
