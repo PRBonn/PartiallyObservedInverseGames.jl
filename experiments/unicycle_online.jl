@@ -6,8 +6,7 @@ load_cache_if_not_defined!("unicycle_online")
 #======================================== Monte Carlo Study ========================================#
 
 ## Dataset Generation
-# TODO restore the original number of samples (40)
-n_observation_sequences_per_instance = 5
+n_observation_sequences_per_instance = 40
 T_predict = 10
 observation_horizons = 5:(T - T_predict)
 noise_level = 0.05
