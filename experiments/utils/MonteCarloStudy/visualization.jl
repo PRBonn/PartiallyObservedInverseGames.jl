@@ -1,5 +1,5 @@
 viz_global_config = VegaLite.@vlfrag(legend = {orient = "top", padding = 0})
-viz_defaults = (; width = 500, height = 300, frame = [-40, 0], scatter_opacity = 0.2)
+viz_defaults = (; width = 420, height = 300, frame = [-40, 0], scatter_opacity = 0.2)
 
 color_map = Dict([
     "Ground Truth" => "black",
@@ -115,7 +115,7 @@ function visualize_poserr_over_noise(;
 end
 
 function visualize_paramerr_over_obshorizon(;
-    width = 42,
+    width = 35,
     height = viz_defaults.height,
     y_label = "Mean Parameter Cosine Error",
 )
@@ -138,7 +138,7 @@ function visualize_paramerr_over_obshorizon(;
 end
 
 function visualize_poserr_over_obshorizon(;
-    width = 42,
+    width = 35,
     height = viz_defaults.height,
     y_label = "Position Prediction Error [m]",
 )

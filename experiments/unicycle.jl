@@ -85,7 +85,7 @@ color_scale =
 ground_truth_viz =
     TrajectoryVisualization.visualize_trajectory(
         trajectory_data_gt;
-        canvas = VegaLite.@vlplot(width = 200, height = 200),
+        canvas = VegaLite.@vlplot(width = 170, height = 170),
         legend = VegaLite.@vlfrag(orient = "top", offset = 5),
         trajectory_viz_config...,
         group = "Ground Truth",
@@ -101,6 +101,7 @@ ground_truth_viz =
 observations_bundle_viz =
     VegaLite.@vlplot() + MonteCarloStudy.visualize_trajectory_batch(
         trajectory_data_obs;
+        canvas = VegaLite.@vlplot(width = 170, height = 170),
         trajectory_viz_config...,
         draw_line = false,
         group = "Observation",
@@ -110,6 +111,7 @@ observations_bundle_viz =
 viz_trajectory_estiamtes = Dict(
     k => TrajectoryVisualization.visualize_trajectory_batch(
         v;
+        canvas = VegaLite.@vlplot(width = 170, height = 170),
         trajectory_viz_config...,
         color_scale,
         group = k,

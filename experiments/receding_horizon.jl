@@ -114,7 +114,7 @@ end
 function visualize_receding_horizon(
     sim_result,
     time_steps::Colon = :;
-    resolution = (600, 180),
+    resolution = (650, 195),
     limits = ((-5, 25), (-2, 2)),
     savepath::Nothing,
 )
@@ -132,7 +132,7 @@ function visualize_receding_horizon(
     sim_result,
     time_steps;
     limits = ((-5, 25), (-2, 2)),
-    resolution = (600, length(time_steps) * 135),
+    resolution = (650, length(time_steps) * 145),
     savepath = nothing,
 )
     CairoMakie.activate!()
@@ -276,12 +276,14 @@ function main(
     @run_cached sim_result = RecedingHorizon.simulate(setup; sim_kwargs...)
 
     if !isnothing(visualize_time_steps)
-        Makie.set_theme!()
-        Makie.update_theme!(;
+        Makie.set_theme!(
+            figure_padding = 0,
             Axis = (;
                 topspinevisible = false,
                 rightspinevisible = false,
                 bottomspinevisible = false,
+                leftspinecolor = "gray",
+                bottomspinecolor = "gray",
             ),
         )
         visualize_receding_horizon(sim_result, visualize_time_steps; savepath)
