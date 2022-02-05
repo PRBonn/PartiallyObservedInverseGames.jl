@@ -64,6 +64,7 @@ function _visualize_receding_horizon_frame!(
     sim_result;
     subsampling = 2,
     temporal_markersize = 3,
+    show_legend = false,
 )
     step = Makie.@lift sim_result.estimator_steps[$t]
 
@@ -81,29 +82,40 @@ function _visualize_receding_horizon_frame!(
         ground_truth_prediction = Makie.@lift ground_truth[$prediction_window]
         ground_truth_history = Makie.@lift ground_truth[$history_window]
 
-        Makie.lines!(ax, ground_truth_history; color = ("black", 0.2))
+        Makie.lines!(ax, ground_truth_history; color = ("black", 0.2), label = "Ground Truth Past")
         Makie.scatter!(
             ax,
             ground_truth_history;
             color = ("black", 0.2),
             markersize = temporal_markersize,
+            label = "Ground Truth Past",
         )
 
-        Makie.lines!(ax, ground_truth_prediction; color = "black")
+        Makie.lines!(ax, ground_truth_prediction; color = "black", label = "Ground Truth Future")
         Makie.scatter!(
             ax,
             ground_truth_prediction;
             color = "black",
             markersize = temporal_markersize,
+            label = "Ground Truth Future",
         )
         Makie.scatter!(ax, Makie.@lift ground_truth[$step.t]; color = "black")
 
         # line and point for prediction
-        Makie.lines!(ax, prediction; color = "royalblue")
-        Makie.scatter!(ax, Makie.@lift $prediction[$buffer_size]; color = "royalblue")
+        Makie.lines!(ax, prediction; color = "royalblue", label = "Prediction")
+        Makie.scatter!(
+            ax,
+            Makie.@lift $prediction[$buffer_size];
+            color = "royalblue",
+            label = "Prediction",
+        )
 
         # raw observations in the buffer
-        Makie.scatter!(ax, observations_full; color = ("gray", 0.5))
+        Makie.scatter!(ax, observations_full; color = ("gray", 0.5), label = "Observation")
+    end
+
+    if show_legend
+        Makie.axislegend(ax, unique = true, merge = true, position = (1, 0.1))
     end
 
     Makie.rotate!(ax.scene, -pi / 2)
@@ -138,7 +150,7 @@ function visualize_receding_horizon(
     CairoMakie.activate!()
     axislabelfont = "Noto-Bold"
 
-    fig = Makie.Figure(; resolution)
+    fig = Makie.Figure(; resolution, figure_padding = 10)
     ax_main = fig[1:length(time_steps), 1] = Makie.GridLayout()
 
     axes = map(enumerate(time_steps)) do (k, t)
@@ -151,7 +163,7 @@ function visualize_receding_horizon(
             titlealign = :left,
         )
         time = Makie.Observable(t)
-        _visualize_receding_horizon_frame!(ax, time, sim_result)
+        _visualize_receding_horizon_frame!(ax, time, sim_result, show_legend = k == 1)
     end
 
     Makie.rowgap!(ax_main, 5)
@@ -161,6 +173,8 @@ function visualize_receding_horizon(
     axes[end].bottomspinevisible = true
     axes[3].ylabel = "Position y [m]"
     axes[3].ylabelfont = axislabelfont
+
+    Makie.resize_to_layout!(fig)
 
     if !isnothing(savepath)
         Makie.save(savepath, fig)
