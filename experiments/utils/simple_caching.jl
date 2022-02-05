@@ -48,7 +48,7 @@ function run_cached!(f, result_group, key; force_run = false)
 end
 
 function load_cache_if_not_defined!(the_result_group; filly_emtpy = true)
-    global results_cache = if !isdefined(Main, :results_cache) || isnothing(results_cache)
+    global results_cache = if !isdefined(@__MODULE__, :results_cache) || isnothing(results_cache)
         loaded_cache = load_cache(the_result_group)
         if isnothing(loaded_cache)
             @info "No persisted results cache file found. Resuming with an empty cache."
@@ -57,7 +57,7 @@ function load_cache_if_not_defined!(the_result_group; filly_emtpy = true)
             @info "Loaded cached results for group \"$the_result_group\" from file!"
             loaded_cache
         end
-    elseif isdefined(Main, :results_cache) &&
+    elseif isdefined(@__MODULE__, :results_cache) &&
            any(!startswith(string(k), "$the_result_group.") for k in keys(results_cache))
         error("Skipping. Cache contains results for another group. In order to proceed, call \
               `unload_cache!()`. If you want to keep the cached results, make sure to call \
