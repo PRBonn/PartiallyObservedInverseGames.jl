@@ -82,11 +82,11 @@ function _visualize_receding_horizon_frame!(
         ground_truth_prediction = Makie.@lift ground_truth[$prediction_window]
         ground_truth_history = Makie.@lift ground_truth[$history_window]
 
-        Makie.lines!(ax, ground_truth_history; color = ("black", 0.2), label = "Ground Truth Past")
+        Makie.lines!(ax, ground_truth_history; color = ("black", 0.4), label = "Ground Truth Past")
         Makie.scatter!(
             ax,
             ground_truth_history;
-            color = ("black", 0.2),
+            color = ("black", 0.4),
             markersize = temporal_markersize,
             label = "Ground Truth Past",
         )
@@ -295,9 +295,10 @@ function main(
             Axis = (;
                 topspinevisible = false,
                 rightspinevisible = false,
+                leftspinevisible= true,
                 bottomspinevisible = false,
-                leftspinecolor = "gray",
-                bottomspinecolor = "gray",
+                leftspinecolor = :darkgray,
+                bottomspinecolor = :darkgray,
             ),
         )
         visualize_receding_horizon(sim_result, visualize_time_steps; savepath)
