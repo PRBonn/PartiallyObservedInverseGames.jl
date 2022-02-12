@@ -282,7 +282,6 @@ function main(
     player_configurations = player_configurations;
     T_gt = 35,
     sim_kwargs = (;),
-    interactive = false,
     visualize_time_steps = [1, 6, 11, 16, 21],
     savepath = "$project_root_dir/figures/highway/receding_horizon.pdf",
 )
