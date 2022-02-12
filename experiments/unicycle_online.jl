@@ -130,6 +130,12 @@ end
         legend = true,
         opacity,
         canvas = trajectory_canvas,
+    ) + VegaLite.@vlplot(
+        data = filter(s -> s.t == 1, ground_truth.trajectory),
+        mark = {"text", dx = -10, dy = 15},
+        text = "player",
+        x = "px:q",
+        y = "py:q",
     )
 
     trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
@@ -144,7 +150,7 @@ end
 
     cost_data =
         map(1:2) do ii
-            player = "P$ii"
+            player = "Player-$ii"
             [
                 (;
                     player,
