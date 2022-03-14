@@ -125,10 +125,10 @@ end
 
 function visualize_receding_horizon(
     sim_result,
-    time_steps::Colon = :;
+    time_steps::Colon = :,
+    savepath::Nothing = nothing;
     resolution = (650, 195),
     limits = ((-5, 25), (-2, 2)),
-    savepath::Nothing,
 )
     GLMakie.activate!()
 
@@ -142,10 +142,31 @@ end
 
 function visualize_receding_horizon(
     sim_result,
-    time_steps;
+    time_steps::Colon,
+    savepath::String;
+    resolution = 1.5 .*(650, 195),
+    limits = ((-5, 21), (-2, 2)),
+)
+    time_indices = eachindex(sim_result.estimator_steps[time_steps])
+    t_obs = Makie.Observable(first(time_indices))
+
+    GLMakie.activate!()
+
+    fig = Makie.Figure(; resolution)
+    ax = Makie.Axis(fig[1, 1]; limits)
+    _visualize_receding_horizon_frame!(ax, t_obs, sim_result)
+    Makie.record(fig, savepath, time_indices; framerate = 3) do t
+        t_obs[] = t
+    end
+    fig
+end
+
+function visualize_receding_horizon(
+    sim_result,
+    time_steps,
+    savepath = nothing;
     limits = ((-5, 25), (-2, 2)),
     resolution = (650, length(time_steps) * 145),
-    savepath = nothing,
 )
     CairoMakie.activate!()
     axislabelfont = "Noto-Bold"
@@ -294,13 +315,13 @@ function main(
             Axis = (;
                 topspinevisible = false,
                 rightspinevisible = false,
-                leftspinevisible= true,
+                leftspinevisible = true,
                 bottomspinevisible = false,
                 leftspinecolor = :darkgray,
                 bottomspinecolor = :darkgray,
             ),
         )
-        visualize_receding_horizon(sim_result, visualize_time_steps; savepath)
+        visualize_receding_horizon(sim_result, visualize_time_steps, savepath)
     end
 end
 
