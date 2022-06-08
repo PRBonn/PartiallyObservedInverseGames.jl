@@ -28,12 +28,10 @@ This code was tested with Julia versions 1.5 and 1.6.
 
 ### Basic
 
-Either clone this repository manually or hit `]` in a Julia REPL to enter
-[package mode](https://docs.julialang.org/en/v1/stdlib/Pkg/) and run
-```julia
-pkg> dev https://github.com/PRBonn/PartiallyObservedInverseGames.jl
+Clone this reposistory
 ```
-which will clone the package to `~/.julia/dev/PartiallyObservedInverseGames`.
+git clone https://github.com/PRBonn/PartiallyObservedInverseGames.jl
+```
 
 After you have cloned the repository, you can install all dependencies at the
 versions recorded in the `Manifest.toml`:
