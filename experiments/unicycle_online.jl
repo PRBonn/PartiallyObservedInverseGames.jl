@@ -62,6 +62,7 @@ end
 
 @saveviz parameter_error_viz = errstats |> MonteCarloStudy.visualize_paramerr_over_obshorizon()
 @saveviz position_error_viz = errstats |> MonteCarloStudy.visualize_poserr_over_obshorizon()
+@saveviz timing_stats_viz = errstats |> MonteCarloStudy.visualize_runtime_over_obshorizon()
 
 @saveviz prediction_comparison_viz = let
     opacity = 0.6
@@ -123,20 +124,21 @@ end
         canvas = trajectory_canvas,
     )
 
-    trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
-        ground_truth.trajectory;
-        group = "Ground Truth",
-        color_scale,
-        legend = true,
-        opacity,
-        canvas = trajectory_canvas,
-    ) + VegaLite.@vlplot(
-        data = filter(s -> s.t == 1, ground_truth.trajectory),
-        mark = {"text", dx = -10, dy = 15},
-        text = "player",
-        x = "px:q",
-        y = "py:q",
-    )
+    trajectory_canvas =
+        TrajectoryVisualization.visualize_trajectory(
+            ground_truth.trajectory;
+            group = "Ground Truth",
+            color_scale,
+            legend = true,
+            opacity,
+            canvas = trajectory_canvas,
+        ) + VegaLite.@vlplot(
+            data = filter(s -> s.t == 1, ground_truth.trajectory),
+            mark = {"text", dx = -10, dy = 15},
+            text = "player",
+            x = "px:q",
+            y = "py:q",
+        )
 
     trajectory_canvas = TrajectoryVisualization.visualize_trajectory(
         observation_trajectory;
