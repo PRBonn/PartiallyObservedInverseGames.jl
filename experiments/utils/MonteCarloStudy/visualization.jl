@@ -159,3 +159,26 @@ function visualize_poserr_over_obshorizon(;
         color = method_color_encoding
     )
 end
+
+function visualize_runtime_over_obshorizon(;
+    width = 35,
+    height = viz_defaults.height,
+    y_label = "Runtime [s]",
+)
+    @vlplot(
+        width = width,
+        height = height,
+        config = viz_global_config,
+        mark = {type = "boxplot", clip = true},
+        column = {
+            "observation_horizon:o",
+            title = "Observation Horizon [# time steps]",
+            header =
+                {titleOrient = "bottom", labelOrient = "bottom", labelPadding = height + 5},
+            spacing = 2,
+        },
+        x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
+        y = {"runtime:q", title = y_label, scale = {domain = [0, 0.75]}},
+        color = method_color_encoding
+    )
+end

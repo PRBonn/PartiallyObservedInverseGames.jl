@@ -12,7 +12,7 @@ function estimate(
     @showprogress pmap(dataset) do d
         observation_model = (; d.σ, expected_observation)
 
-        converged, estimate, opt_model = solve_inverse_game(
+        (converged, estimate, opt_model), runtime = @timed solve_inverse_game(
             solver,
             expected_observation(d.observation.x);
             control_system,
@@ -24,7 +24,7 @@ function estimate(
         )
         converged || @warn "conKKT did not converge on observation $(d.idx)."
 
-        (; d..., estimate, converged, estimator_name)
+        (; d..., estimate, converged, estimator_name, runtime)
     end
 end
 
@@ -41,7 +41,7 @@ function estimate(
     @showprogress pmap(dataset) do d
         observation_model = (; d.σ, expected_observation)
 
-        converged, estimate, opt_model = solve_inverse_game(
+        (converged, estimate, opt_model), runtime = @timed solve_inverse_game(
             solver,
             expected_observation(d.observation.x);
             control_system,
@@ -53,7 +53,7 @@ function estimate(
         )
         converged || @warn "resKKT did not converge on observation $(d.idx)."
 
-        (; d..., estimate, converged, estimator_name)
+        (; d..., estimate, converged, estimator_name, runtime)
     end
 end
 
@@ -70,7 +70,7 @@ function estimate(
 )
     @showprogress pmap(dataset) do d
         observation_model = (; d.σ, expected_observation)
-        smoothed_observation = let
+        smoothed_observation, smooth_time = @timed let
             pre_solve_converged, pre_solve_solution = InversePreSolve.pre_solve(
                 # pre-filter for baseline receives one extra state observation to avoid
                 # unobservability of the velocity at the end-point.
@@ -91,7 +91,7 @@ function estimate(
             )
         end
 
-        converged, estimate, opt_model = solve_inverse_game(
+        (converged, estimate, opt_model), solve_time = @timed solve_inverse_game(
             solver,
             smoothed_observation.x,
             smoothed_observation.u;
@@ -101,6 +101,8 @@ function estimate(
         )
         converged || @warn "resKKT did not converge on observation $(d.idx)."
 
-        (; d..., estimate, converged, estimator_name, smoothed_observation)
+        runtime = smooth_time + solve_time
+
+        (; d..., estimate, converged, estimator_name, smoothed_observation, runtime)
     end
 end
