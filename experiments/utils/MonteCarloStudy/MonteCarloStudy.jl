@@ -24,6 +24,7 @@ using PartiallyObservedInverseGames.TrajectoryVisualization:
 using ProgressMeter: @showprogress
 using VegaLite: @vlplot
 using Setfield: @set
+using JuMP: JuMP
 
 #======================================== Generate Dataset =========================================#
 

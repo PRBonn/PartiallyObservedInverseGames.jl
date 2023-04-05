@@ -178,7 +178,11 @@ function visualize_runtime_over_obshorizon(;
             spacing = 2,
         },
         x = {"observation_model_type:n", title = nothing, axis = {orient = "top"}},
-        y = {"runtime:q", title = y_label, scale = {domain = [0, 0.75]}},
+        y = {
+            "runtime:q",
+            title = y_label,
+            scale = {type = "symlog", constant = 0.1, domain = [0, 0.75]},
+        },
         color = method_color_encoding
     )
 end

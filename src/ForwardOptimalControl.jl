@@ -1,9 +1,9 @@
 module ForwardOptimalControl
 
-import ..DynamicsModelInterface
-import ..JuMPUtils
-import Ipopt
-import JuMP
+using ..DynamicsModelInterface: DynamicsModelInterface
+using ..JuMPUtils: JuMPUtils
+using Ipopt: Ipopt
+using JuMP: JuMP
 
 using JuMP: @variable, @constraint, @objective
 using UnPack: @unpack
@@ -86,8 +86,8 @@ function solve_optimal_control(
     cost_model.add_objective!(opt_model, x, u; cost_model.weights)
     time = @elapsed JuMP.optimize!(opt_model)
     verbose && @info time
-
-    JuMPUtils.isconverged(opt_model), JuMPUtils.get_values(; x, u), opt_model
+    solution = merge(JuMPUtils.get_values(; x, u), (; runtime = JuMP.solve_time(opt_model)))
+    JuMPUtils.isconverged(opt_model), solution, opt_model
 end
 
 end

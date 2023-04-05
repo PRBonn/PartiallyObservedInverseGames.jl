@@ -57,6 +57,7 @@ function solve_inverse_game(
     x0 = @variable(opt_model, [1:n_states])
     λ0 = @variable(opt_model, [1:n_states, 1:n_players])
 
+    pre_solve_runtime = 0.0
     if pre_solve
         pre_solve_converged, pre_solve_init = InversePreSolve.pre_solve(
             y,
@@ -70,6 +71,7 @@ function solve_inverse_game(
             solver_attributes,
             pre_solve_kwargs...,
         )
+        pre_solve_runtime = pre_solve_init.runtime
         @assert pre_solve_converged
         # TODO: think about how to set an initial guess for the tail end. Maybe Just constant
         # velocity rollout?
@@ -177,7 +179,10 @@ function solve_inverse_game(
 
     solution = merge(
         JuMPUtils.get_values(; x, u, λ),
-        (; player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights)),
+        (;
+            player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights),
+            runtime = JuMP.solve_time(opt_model) + pre_solve_runtime,
+        ),
     )
 
     (JuMPUtils.isconverged(opt_model), solution, opt_model)
@@ -248,6 +253,8 @@ function solve_inverse_game(
     converged = converged && inverse_converged
 
     trajectory = smoothed_observation
+    prediction_runtime = 0.0
+
     if T_predict > 0
         # TODO: assemble the `estimated_player_cost_models`.
         prediction_init =
@@ -270,6 +277,8 @@ function solve_inverse_game(
             verbose,
         )
 
+        prediction_runtime = prediction.runtime
+
         converged = converged && prediction_converged
         trajectory = (;
             x = [smoothed_observation.x prediction.x[:, 2:end]],
@@ -279,7 +288,9 @@ function solve_inverse_game(
         trajectory
     end
 
-    converged, (; trajectory..., estimate...), opt_model
+    runtime = pre_solve_solution.runtime + estimate.runtime + prediction_runtime
+
+    converged, (; trajectory..., estimate..., runtime), opt_model
 end
 
 struct InverseKKTResidualSolver end
@@ -373,7 +384,10 @@ function solve_inverse_game(
 
     solution = merge(
         JuMPUtils.get_values(; λ),
-        (; player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights)),
+        (;
+            player_weights = map(w -> CostUtils.namedtuple(JuMP.value.(w)), player_weights),
+            runtime = JuMP.solve_time(opt_model),
+        ),
     )
 
     JuMPUtils.isconverged(opt_model), solution, opt_model

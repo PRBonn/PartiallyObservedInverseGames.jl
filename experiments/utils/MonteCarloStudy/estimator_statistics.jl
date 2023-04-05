@@ -48,7 +48,7 @@ function estimator_statistics(
         sample.converged,
         sample.σ,
         sample.observation_horizon,
-        runtime = get(sample, :runtime, missing),
+        runtime = get(estimate, :runtime, missing),
         position_observation_error,
         position_estimation_error,
         parameter_estimation_error,
