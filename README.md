@@ -24,7 +24,7 @@ state observations of non-cooperative multi-agent interactions.
 
 ## Setup
 
-This code was tested with Julia version 1.7.0.
+This code was tested with Julia version 1.9.0-rc2.
 
 ### Basic
 
@@ -91,7 +91,7 @@ If cached results are found, they will be loaded and the figures will be
 reproduced from this data. In order to reproduce results from scratch you will
 have to clear the cache first by calling `clear_cache!()` (implemented in
 `experiments/utils/simple_caching.jl`). Alternatively, you can remove the
-`@run_cached`  macro in front the function calls in the experiment to disable
+`@run_cached`  macro in front of the function calls in the experiment to disable
 caching for that call.
 
 ### Distributed Experiments
